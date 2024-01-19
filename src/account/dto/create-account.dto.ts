@@ -1,47 +1,53 @@
-import { IsEmail, IsInt, IsJSON, IsJWT, IsNotEmpty, IsString, IsUUID } from "class-validator";
-
+import {
+  IsArray,
+  IsEmail,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateAccountDto {
-    @IsEmail()
-    @IsNotEmpty()
-    email: string;
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
 
-    @IsString()
-    @IsNotEmpty()
-    passImap: string;
+  @IsString()
+  @IsNotEmpty()
+  passImap: string;
 
-    @IsString()
-    @IsNotEmpty()
-    passEmail: string;
+  @IsString()
+  @IsNotEmpty()
+  passEmail: string;
 
-    @IsJSON()
-    @IsNotEmpty()
-    cookie: string;
+  @IsNotEmpty()
+  cookie: string;
 
-    @IsJWT()
-    @IsNotEmpty()
-    accessToken: string;
+  @IsString()
+  @IsNotEmpty()
+  accessToken: string;
 
-    @IsJWT()
-    @IsNotEmpty()
-    refreshToken: string;
+  @IsString()
+  @IsNotEmpty()
+  refreshToken: string;
 
-    @IsString()
-    @IsNotEmpty()
-    xUserId: string;
+  @IsString()
+  @IsNotEmpty()
+  xUserId: string;
 
-    @IsUUID()
-    @IsNotEmpty()
-    deviceId: string;
+  @IsUUID()
+  @IsNotEmpty()
+  deviceId: string;
 
-    @IsUUID()
-    @IsNotEmpty()
-    installationId: string;
+  @IsUUID()
+  @IsNotEmpty()
+  installationId: string;
 
-    @IsInt()
-    @IsNotEmpty()
-    expiresIn: number;
+  @IsInt()
+  @IsNotEmpty()
+  expiresIn: number;
 
-    @IsInt()
-    bonusCount: string;
-  }
+  @IsString()
+  @IsNotEmpty()
+  bonusCount: string;
+}
