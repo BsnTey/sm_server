@@ -6,3 +6,103 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum UserRole {
+  User
+  Admin
+}
+
+model User {
+  uuid         String @id @default(uuid()) @db.Uuid
+  firstName    String @map("first_name")
+  email        String
+  passwordHash String @map("password_hash")
+
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  userTelegram   UserTelegram @relation(fields: [userTelegramId], references: [telegramId])
+  userTelegramId String       @unique
+
+  @@map("user")
+}
+
+model UserTelegram {
+  telegramId   String   @id @unique @map("telegram_id")
+  telegramName String   @map("telegram_name")
+  countBonuses Int      @default(0) @map("count_bonuses")
+  role         UserRole @default(User)
+  isBan        Boolean  @default(false) @map("is_ban")
+
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+  user       User?
+  accounts   Account[]
+  userCities UserCitySM[]
+
+  @@map("user_telegram")
+}
+
+model Account {
+  accountId         String   @id @map("account_id")
+  email             String
+  passImap          String   @map("pass_imap")
+  passEmail         String   @map("pass_email")
+  cookie            String
+  accessToken       String   @map("access_token")
+  refreshToken      String   @map("refresh_token")
+  xUserId           String   @map("x_user_id")
+  deviceId          String   @map("device_id")
+  installationId    String   @map("installation_id")
+  googleId          String   @map("google_id")
+  pushToken         String   @map("push_token")
+  expiresIn         DateTime @map("expires_in")
+  isAccessMp        Boolean  @default(true) @map("is_access_mp")
+  isAccessCookie    Boolean  @default(true) @map("is_access_cookie")
+  isOnlyAccessOrder Boolean  @default(false) @map("is_only_access_order")
+  bonusCount        Int      @map("bonus_count")
+  isUpdateBonus     Boolean  @default(false) @map("is_update_bonus")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  orders          Order[]
+  ownerTelegramId String       @default("750126398")
+  ownerTelegram   UserTelegram @relation(fields: [ownerTelegramId], references: [telegramId])
+
+  @@map("account")
+}
+
+model CitySM {
+  cityId    String       @id @unique @map("city_id")
+  name      String
+  fullName  String       @map("full_name")
+  cityUsers UserCitySM[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("city_sm")
+}
+
+model UserCitySM {
+  cityId String @map("city_id")
+  city   CitySM @relation(fields: [cityId], references: [cityId])
+
+  userTelegramId String        @map("user_telegram_id")
+  userTelegram   UserTelegram? @relation(fields: [userTelegramId], references: [telegramId])
+
+  @@id([cityId, userTelegramId])
+  @@map("user_city_sm")
+}
+
+model Order {
+  id          Int     @id @default(autoincrement())
+  orderNumber String  @map("order_number")
+  accountId   String  @map("account_id")
+  account     Account @relation(fields: [accountId], references: [accountId])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("order")
+}
