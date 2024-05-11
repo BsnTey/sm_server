@@ -4,8 +4,8 @@ import { getTelegramConfig } from '@common/telegram/telegram.config';
 import { ConfigModule } from '@nestjs/config';
 import { TelegramModule } from './module/telegram/telegram.module';
 import { UserModule } from './module/user/user.module';
-import { APP_FILTER } from '@nestjs/core';
-import { TelegrafExceptionFilter } from '@common/filters/telegraf-exception.filter';
+import { SportModule } from './module/sport/sport.module';
+import { AccountModule } from './module/account/account.module';
 
 @Module({
     imports: [
@@ -15,14 +15,9 @@ import { TelegrafExceptionFilter } from '@common/filters/telegraf-exception.filt
         TelegrafModule.forRootAsync(getTelegramConfig()),
         TelegramModule,
         UserModule,
-        // AccountModule,
+        SportModule,
+        AccountModule,
     ],
     controllers: [],
-    providers: [
-        {
-            provide: APP_FILTER,
-            useClass: TelegrafExceptionFilter,
-        },
-    ],
 })
 export class AppModule {}

@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common';
+import { UseFilters, UseGuards } from '@nestjs/common';
 import { Ctx, Hears, Update } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
 import {
@@ -16,6 +16,7 @@ import {
 } from './base-command.constants';
 import { Context } from '../../interfaces/telegram.context';
 import { AdminGuard } from '../admin/admin.guard';
+import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 
 @Update()
 export class BaseUpdate {
@@ -26,6 +27,7 @@ export class BaseUpdate {
 
     @Hears([ADMIN.name])
     @UseGuards(AdminGuard)
+    @UseFilters(TelegrafExceptionFilter)
     async onAdminCommand(@Ctx() ctx: Context) {
         await ctx.reply('admin');
     }
