@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Account } from '@prisma/client';
 import { PrismaService } from '@common/database/prisma.service';
 import { AccountEntity } from './entities/account.entity';
+import { IRefreshAccount } from './interfaces/account.interface';
 
 @Injectable()
 export class AccountRepository {
@@ -42,18 +43,18 @@ export class AccountRepository {
         });
     }
 
-    // async updateTokensAccount(accountId: string, { accessToken, refreshToken, expiresIn }): Promise<any> {
-    //     return this.prisma.account.update({
-    //         where: {
-    //             accountId,
-    //         },
-    //         data: {
-    //             accessToken,
-    //             refreshToken,
-    //             expiresIn,
-    //         },
-    //     });
-    // }
+    async updateTokensAccount(accountId: string, { accessToken, refreshToken, expiresIn }: IRefreshAccount): Promise<Account> {
+        return this.prisma.account.update({
+            where: {
+                accountId,
+            },
+            data: {
+                accessToken,
+                refreshToken,
+                expiresIn,
+            },
+        });
+    }
 
     async setBanMp(accountId: string): Promise<any> {
         return this.prisma.account.update({

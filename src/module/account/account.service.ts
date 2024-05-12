@@ -1,16 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AccountRepository } from './account.repository';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
 import { AccountEntity } from './entities/account.entity';
+import { SportApi } from '../sport/sport.api';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { IRefreshAccount } from './interfaces/account.interface';
+import { Account } from '@prisma/client';
+import { ProxyService } from '../proxy/proxy.service';
 
 @Injectable()
 export class AccountService {
     constructor(
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
         private accountRep: AccountRepository,
-        // private proxyService: ProxyService,
+        private proxyService: ProxyService,
     ) {}
 
-    async addingAccount(accountDto: AddingAccountRequestDto) {
+    async addingAccount(accountDto: AddingAccountRequestDto): Promise<AccountEntity> {
         const {
             accountId,
             email,
@@ -44,12 +50,16 @@ export class AccountService {
             bonusCount: +bonusCount,
             isOnlyAccessOrder: Boolean(isOnlyAccessOrder),
         });
-        return await this.accountRep.addingAccount(account);
+        await this.accountRep.addingAccount(account);
+        return account;
     }
 
-    async findAccount(accountId: string) {
+    async findAccount(accountId: string): Promise<AccountEntity | null> {
         const account = await this.accountRep.getAccount(accountId);
-        return account;
+        if (account) {
+            return new AccountEntity(account);
+        }
+        return null;
     }
 
     async getAccountCookie(accountId: string) {
@@ -67,106 +77,66 @@ export class AccountService {
         return account;
     }
 
-    // async updateTokensAccount(accountId: string, dataAccount: IRefreshAccount) {
-    //     const account = await this.accountRep.updateTokensAccount(accountId, dataAccount);
-    //     return account;
-    // }
+    async updateTokensAccount(accountId: string, dataAccount: IRefreshAccount): Promise<Account> {
+        return await this.accountRep.updateTokensAccount(accountId, dataAccount);
+    }
     //
     // async setBanMp(accountId: string) {
     //     const account = await this.accountRep.setBanMp(accountId);
     //     return account;
     // }
     //
-    // async refresh(api: ApiSM, refreshByType: TypeRefreshBy) {
-    //     let proxy: string;
-    //     for (let attempt = 0; attempt < 4; attempt++) {
-    //         try {
-    //             proxy = this.proxyService.getRandomProxy();
-    //             api.setProxy(proxy);
-    //         } catch {
-    //             throw new Error(KNOWN_ERROR.NOT_FREE_PROXIES.code);
-    //         }
-    //
-    //         try {
-    //             const accountId = api.accountId;
-    //             let isNotRefresh = false;
-    //             const isRefreshDate = api.isRefreshDate();
-    //             if (!isRefreshDate) isNotRefresh = await this.refreshBy(api, refreshByType);
-    //
-    //             if (!isNotRefresh) {
-    //                 try {
-    //                     const dataAccount = await api.refresh();
-    //                     await this.updateTokensAccount(accountId, dataAccount);
-    //                 } catch (error) {
-    //                     if (error.message == 'WRONG_TOKEN') {
-    //                         await this.setBanMp(accountId);
-    //                         throw new Error(KNOWN_ERROR.WRONG_TOKEN.code);
-    //                     }
-    //                     throw error.message;
-    //                 }
-    //
-    //                 isNotRefresh = await this.refreshBy(api, refreshByType);
-    //
-    //                 if (!isNotRefresh) {
-    //                     await this.setBanMp(accountId);
-    //                     throw new Error(KNOWN_ERROR.WRONG_TOKEN.code);
-    //                 }
-    //             }
-    //             return true;
-    //         } catch (error) {
-    //             const errMessage = error.message;
-    //             if (errMessage.includes('connect ECONNREFUSED')) {
-    //                 this.proxyService.setProxyBan(proxy);
-    //             } else {
-    //                 throw new Error(error.message);
-    //             }
-    //         }
-    //
-    //         continue;
-    //     }
-    //
-    //     throw new Error(KNOWN_ERROR.ERROR_CONNECT_ACCOUNT.code);
-    // }
-    //
-    // private async refreshBy(api: ApiSM, refreshByType: TypeRefreshBy) {
-    //     let status: boolean;
-    //     switch (refreshByType) {
-    //         case 'shortInfo':
-    //             status = await api.shortInfo();
-    //             break;
-    //         case 'detailsBonus':
-    //             status = await api.detailsBonus();
-    //             break;
-    //         case 'promocode':
-    //             status = await api.shortInfo();
-    //             break;
-    //     }
-    //     return status;
-    // }
-    //
-    // async getApi(accountId: string, refreshByType: TypeRefreshBy) {
-    //     const isValidAccount = isValidUUID(accountId);
-    //     if (!isValidAccount) throw new Error(KNOWN_ERROR.INCORRECT_ENTERED_KEY.code);
-    //
-    //     const account = await this.findAccount(accountId);
-    //     if (!account) throw new Error(KNOWN_ERROR.ACCOUNT_NOT_FOUND.code);
-    //
-    //     const readyAccount = {
-    //         accountId: accountId,
-    //         accessToken: account.accessToken,
-    //         refreshToken: account.refreshToken,
-    //         xUserId: account.xUserId,
-    //         deviceId: account.deviceId,
-    //         installationId: account.installationId,
-    //         expiresIn: account.expiresIn,
-    //     };
-    //
-    //     try {
-    //         const api = new ApiSM(readyAccount);
-    //         await this.refresh(api, refreshByType);
-    //         return api;
-    //     } catch (err) {
-    //         throw new Error(err.message);
-    //     }
-    // }
+    async refreshByApi(sportApi: SportApi) {
+        const tokens = await sportApi.refresh();
+        await this.updateTokensAccount(sportApi.accountId, tokens);
+    }
+
+    async refreshByAccountId(accountId: string) {
+        const account = await this.findAccount(accountId);
+
+        if (account) {
+            const sportApi = new SportApi(account);
+            await this.refreshByApi(sportApi);
+            return sportApi;
+        }
+        throw new NotFoundException();
+    }
+
+    async refreshByDate(sportApi: SportApi) {
+        const isUpdate = this.updateTokensByTime(sportApi.expiresIn);
+        if (isUpdate) {
+            await this.refreshByApi(sportApi);
+        }
+    }
+
+    private updateTokensByTime(expiresIn: Date | null) {
+        const nowDate = new Date();
+        const oneHourNext = new Date(nowDate.getTime() + 60 * 60 * 1000);
+        if (expiresIn && oneHourNext < expiresIn) {
+            console.log('Не обновлял по времени');
+            return false;
+        }
+        console.log('Иду обновлять по истечению времени');
+        return true;
+    }
+
+    private async getApi(accountId: string) {
+        let sportApi = await this.cacheManager.get<SportApi>(accountId);
+
+        if (sportApi) {
+            await this.refreshByDate(sportApi);
+            return sportApi;
+        }
+        sportApi = await this.refreshByAccountId(accountId);
+        await this.cacheManager.set(accountId, sportApi);
+        return sportApi;
+    }
+
+    async shortInfo(accountId: string) {
+        const sportApi = await this.getApi(accountId);
+        const result = await sportApi.shortInfo();
+        await this.updateAccountBonusCount(accountId, result.bonusCount);
+        return result;
+        //Обернуть в ошибку связанную с блокировкой прокси
+    }
 }

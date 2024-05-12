@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { TelegrafException, TelegrafExecutionContext } from 'nestjs-telegraf';
 import { Context } from 'telegraf';
-import { NOT_ADMIN, NOT_ADMIN_LIST } from '../../exceptions/admin.exception';
+import { NOT_ADMIN, NOT_ADMIN_LIST } from '../../constants/admin.constant';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()

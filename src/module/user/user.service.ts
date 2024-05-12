@@ -8,12 +8,14 @@ import { UserTelegramEntity } from './entities/user-telegram.entity';
 export class UserService {
     constructor(private readonly userRepository: UserRepository) {}
 
-    async createOrUpdateUserByTelegram({ telegramName, telegramId }: ITelegramUser): Promise<UserTelegram> {
+    async createOrUpdateUserByTelegram({ telegramName, telegramId }: ITelegramUser): Promise<UserTelegram | void> {
         const existUser = await this.getUserByTelegramId(telegramId);
         if (!existUser) {
             return await this.createUserByTelegram({ telegramName, telegramId });
         }
-        return await this.updateUserByTelegram({ telegramName, telegramId });
+        if (existUser.telegramName != telegramName) {
+            return await this.updateUserByTelegram({ telegramName, telegramId });
+        }
     }
 
     async getUserByTelegramId(telegramId: string): Promise<UserTelegram | null> {

@@ -8,6 +8,7 @@ import {
     CHANGE_NUMBER,
     CHECK,
     COOKIE,
+    getValueKeysMenu,
     HELP,
     MAKE_ORDER,
     PROFILE,
@@ -19,6 +20,7 @@ import { AdminGuard } from '../admin/admin.guard';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 
 @Update()
+@UseFilters(TelegrafExceptionFilter)
 export class BaseUpdate {
     @Hears([START.name])
     async onStart(@Ctx() ctx: Context) {
@@ -27,7 +29,6 @@ export class BaseUpdate {
 
     @Hears([ADMIN.name])
     @UseGuards(AdminGuard)
-    @UseFilters(TelegrafExceptionFilter)
     async onAdminCommand(@Ctx() ctx: Context) {
         await ctx.reply('admin');
     }
@@ -75,5 +76,14 @@ export class BaseUpdate {
     @Hears([CALCULATE_BONUS.name])
     async onStartCalculate(@Ctx() ctx: WizardContext) {
         await ctx.scene.enter(CALCULATE_BONUS.scene);
+    }
+
+    static async exitScene(menuBtn: string, @Ctx() ctx: WizardContext) {
+        await ctx.scene.leave();
+        const scene = getValueKeysMenu(menuBtn);
+        if (scene) {
+            return await ctx.scene.enter(scene);
+        }
+        return await ctx.reply('Команда не найдена');
     }
 }

@@ -66,3 +66,20 @@ export const ADMIN = {
     name: '/admin',
     scene: ADMIN_SCENE,
 };
+
+export const ALL_KEYS_MENU_BUTTON = [
+    CALCULATE_BONUS,
+    CHANGE_NUMBER,
+    MAKE_ORDER,
+    COOKIE,
+    CHECK,
+    QR_CODE,
+    CASH_RECEIPT,
+    PROFILE,
+    HELP,
+    START,
+    ADMIN,
+];
+
+export const ALL_KEYS_MENU_BUTTON_NAME = ALL_KEYS_MENU_BUTTON.map(item => item.name);
+export const getValueKeysMenu = (key: string) => ALL_KEYS_MENU_BUTTON.find(btnObj => key === btnObj.name)?.scene;
