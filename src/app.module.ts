@@ -15,8 +15,7 @@ import { ProxyModule } from './module/proxy/proxy.module';
         }),
         CacheModule.register({
             isGlobal: true,
-            // ttl: 18000000,
-            ttl: 3000,
+            ttl: 18000000,
             max: 1000,
         }),
         TelegrafModule.forRootAsync(getTelegramConfig()),

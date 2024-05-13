@@ -9,7 +9,7 @@ import {
     MAKE_ORDER,
     PROFILE,
     QR_CODE,
-} from '../base-command/base-command.constants';
+} from '../updates/base-command/base-command.constants';
 
 function getMainMenuKeyboard() {
     return Markup.keyboard([

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IProxyDict } from './interfaces/proxy.interface';
+import { ERROR_FREE_PROXY } from './error/error.constant';
 
 @Injectable()
 export class ProxyService {
@@ -8,14 +9,8 @@ export class ProxyService {
     public proxyDict: IProxyDict = {};
 
     constructor(private configService: ConfigService) {
-        const PROXY_LIST = this.configService.getOrThrow<string[]>('PROXY_LIST');
-        const proxyList = [];
-        for (const proxy of PROXY_LIST) {
-            if (proxy.length == 0) continue;
-            proxyList.push(proxy.trim());
-        }
-
-        this.proxyList = proxyList;
+        const PROXY_ENV = this.configService.getOrThrow<string>('PROXY_LIST');
+        this.proxyList = PROXY_ENV.split(',');
 
         this.proxyList.forEach(line => {
             this.proxyDict[line] = {
@@ -46,7 +41,7 @@ export class ProxyService {
             proxyListCopy.splice(randomIndex, 1);
         }
 
-        throw new Error('No available proxy found');
+        throw new Error(ERROR_FREE_PROXY);
     }
 
     setProxyBan(proxy: string) {

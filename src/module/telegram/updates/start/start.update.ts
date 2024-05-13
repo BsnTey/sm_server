@@ -1,7 +1,7 @@
 import { Ctx, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { START } from '../base-command/base-command.constants';
 import { Context } from '../../interfaces/telegram.context';
-import { mainMenuKeyboard } from '../keyboards/base.keyboard';
+import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { UserService } from '../../../user/user.service';
 
 @Scene(START.scene)

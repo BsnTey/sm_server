@@ -5,3 +5,8 @@ export interface IRefreshAccount {
     refreshToken: string;
     expiresIn: Date;
 }
+
+export interface IAccountCashing {
+    accountId: string;
+    [key: string]: string;
+}

@@ -1,13 +1,8 @@
-import axios from 'axios';
-import { SocksProxyAgent } from 'socks-proxy-agent';
-import md5 from 'md5';
-import { HashString, IHashAplaut } from './interfaces/sport.interface';
 import { AccountEntity } from '../account/entities/account.entity';
-import { IRefreshAccount } from '../account/interfaces/account.interface';
 
 export class SportApi {
     private prefixHash = 'eb1a3e30291bc971c4da0e86375961a4';
-    private httpsAgent: SocksProxyAgent;
+
     private proxy: string | null = null;
     private cityId = '1720920299';
     public cityName = 'Москва';
@@ -40,82 +35,44 @@ export class SportApi {
         this.expiresIn = account.expiresIn;
     }
 
-    setProxy(proxy: string) {
-        this.proxy = proxy;
-        this.httpsAgent = new SocksProxyAgent(proxy);
-    }
+    // setProxy(proxy: string) {
+    //     this.proxy = proxy;
+    //     this.httpsAgent = new SocksProxyAgent(proxy);
+    // }
 
-    private generateHash({ url, timestamp }: IHashAplaut): HashString {
-        const combinedString = this.prefixHash + url + timestamp + this.xUserId;
-        console.log(combinedString);
-        return md5(combinedString);
-    }
+    // private generateHash({ url, timestamp }: IHashAplaut): HashString {
+    //     const combinedString = this.prefixHash + url + timestamp + this.xUserId;
+    //     console.log(combinedString);
+    //     return md5(combinedString);
+    // }
 
-    getHeaders(url: string) {
-        const timestamp = String(Date.now());
-        const hash = this.generateHash({ url, timestamp });
-
-        return {
-            'User-Agent': 'android-4.44.0-google(44971)',
-            Locale: 'ru',
-            Country: 'RU',
-            'Device-Id': this.deviceId,
-            'Installation-Id': this.installationId,
-            'City-Id': this.cityId,
-            Eutc: 'UTC+3',
-            'x-user-id': this.xUserId,
-            Authorization: this.accessToken,
-            Host: 'mp4x-api.sportmaster.ru',
-            'Accept-Encoding': 'gzip, deflate',
-            'Content-Type': 'application/json; charset=utf-8',
-            Timestamp: timestamp,
-            'Aplaut-Id': hash,
-            'Aplaut-Build': '2',
-        };
-    }
+    // getHeaders(url: string) {
+    //     const timestamp = String(Date.now());
+    //     const hash = this.generateHash({ url, timestamp });
+    //
+    //     return {
+    //         'User-Agent': 'android-4.44.0-google(44971)',
+    //         Locale: 'ru',
+    //         Country: 'RU',
+    //         'Device-Id': this.deviceId,
+    //         'Installation-Id': this.installationId,
+    //         'City-Id': this.cityId,
+    //         Eutc: 'UTC+3',
+    //         'x-user-id': this.xUserId,
+    //         Authorization: this.accessToken,
+    //         Host: 'mp4x-api.sportmaster.ru',
+    //         'Accept-Encoding': 'gzip, deflate',
+    //         'Content-Type': 'application/json; charset=utf-8',
+    //         Timestamp: timestamp,
+    //         'Aplaut-Id': hash,
+    //         'Aplaut-Build': '2',
+    //     };
+    // }
 
     // setCity(cityId, cityName): void {
     //     this.cityId = cityId;
     //     this.cityName = cityName;
     // }
-
-    async refresh(): Promise<IRefreshAccount> {
-        const url = 'https://mp4x-api.sportmaster.ru/api/v1/auth/refresh';
-        const headers = this.getHeaders(url);
-
-        const payload = {
-            refreshToken: this.refreshToken,
-            deviceId: this.deviceId,
-        };
-        const response = await axios.post(url, payload, {
-            headers,
-            httpsAgent: this.httpsAgent,
-        });
-
-        this.accessToken = response.data.data.token.accessToken;
-        this.refreshToken = response.data.data.token.refreshToken;
-        const expires = response.data.data.token.expiresIn;
-        const expiresInTimestamp = Date.now() + +expires * 1000;
-        const expiresInDate = new Date(expiresInTimestamp);
-        this.expiresIn = expiresInDate;
-
-        return {
-            accessToken: this.accessToken,
-            refreshToken: this.refreshToken,
-            expiresIn: expiresInDate,
-        };
-    }
-    async shortInfo() {
-        const url = 'https://mp4x-api.sportmaster.ru/api/v2/bonus/shortInfo';
-        const headers = this.getHeaders(url);
-        const response = await axios.get(url, {
-            headers,
-            httpsAgent: this.httpsAgent,
-        });
-        const bonusCount: number = +response.data.data.info.totalAmount;
-        const qrCode: string = response.data.data.info.clubCard.qrCode;
-        return { bonusCount, qrCode };
-    }
 
     // async detailsBonus(): Promise<boolean> {
     //     const today = new Date();

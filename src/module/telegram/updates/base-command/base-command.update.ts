@@ -8,7 +8,6 @@ import {
     CHANGE_NUMBER,
     CHECK,
     COOKIE,
-    getValueKeysMenu,
     HELP,
     MAKE_ORDER,
     PROFILE,
@@ -76,14 +75,5 @@ export class BaseUpdate {
     @Hears([CALCULATE_BONUS.name])
     async onStartCalculate(@Ctx() ctx: WizardContext) {
         await ctx.scene.enter(CALCULATE_BONUS.scene);
-    }
-
-    static async exitScene(menuBtn: string, @Ctx() ctx: WizardContext) {
-        await ctx.scene.leave();
-        const scene = getValueKeysMenu(menuBtn);
-        if (scene) {
-            return await ctx.scene.enter(scene);
-        }
-        return await ctx.reply('Команда не найдена');
     }
 }

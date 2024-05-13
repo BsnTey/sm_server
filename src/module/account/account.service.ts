@@ -1,12 +1,13 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AccountRepository } from './account.repository';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
 import { AccountEntity } from './entities/account.entity';
-import { SportApi } from '../sport/sport.api';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { IRefreshAccount } from './interfaces/account.interface';
 import { Account } from '@prisma/client';
 import { ProxyService } from '../proxy/proxy.service';
+import axios from 'axios';
+import { ERROR_ACCOUNT_NOT_FOUND, ERROR_LOGOUT_MP } from './constants/error.constant';
 
 @Injectable()
 export class AccountService {
@@ -54,89 +55,105 @@ export class AccountService {
         return account;
     }
 
-    async findAccount(accountId: string): Promise<AccountEntity | null> {
-        const account = await this.accountRep.getAccount(accountId);
-        if (account) {
-            return new AccountEntity(account);
-        }
-        return null;
-    }
-
     async getAccountCookie(accountId: string) {
-        const account = await this.accountRep.getAccountCookie(accountId);
-        return account;
+        return await this.accountRep.getAccountCookie(accountId);
     }
 
-    async findAccountEmail(accountId: string) {
-        const account = await this.accountRep.getAccountEmail(accountId);
-        return account;
-    }
+    // async findAccountEmail(accountId: string) {
+    //     return await this.accountRep.getAccountEmail(accountId);
+    // }
 
     async updateAccountBonusCount(accountId: string, bonusCount: number) {
-        const account = await this.accountRep.updateBonusCount(accountId, bonusCount);
-        return account;
+        return await this.accountRep.updateBonusCount(accountId, bonusCount);
     }
 
     async updateTokensAccount(accountId: string, dataAccount: IRefreshAccount): Promise<Account> {
         return await this.accountRep.updateTokensAccount(accountId, dataAccount);
     }
+
     //
     // async setBanMp(accountId: string) {
     //     const account = await this.accountRep.setBanMp(accountId);
     //     return account;
     // }
     //
-    async refreshByApi(sportApi: SportApi) {
-        const tokens = await sportApi.refresh();
-        await this.updateTokensAccount(sportApi.accountId, tokens);
+
+    // async forceRefresh(accountId: string) {
+    //     const accountEntity = await this.getAccountEntity(accountId);
+    //     await this.refreshForValidation(accountEntity);
+    // }
+
+    private async refreshForValidation(accountEntity: AccountEntity) {
+        const url = 'https://mp4x-api.sportmaster.ru/api/v1/auth/refresh';
+        const headers = accountEntity.getHeaders(url);
+
+        const payload = {
+            refreshToken: accountEntity.refreshToken,
+            deviceId: accountEntity.deviceId,
+        };
+        const response = await axios.post(url, payload, {
+            headers,
+            httpsAgent: accountEntity.httpsAgent,
+        });
+
+        accountEntity.accessToken = response.data.data.token.accessToken;
+        accountEntity.refreshToken = response.data.data.token.refreshToken;
+        const expires = response.data.data.token.expiresIn;
+        const expiresInTimestamp = Date.now() + +expires * 1000;
+        const expiresInDate = new Date(expiresInTimestamp);
+        accountEntity.expiresIn = expiresInDate;
+        await this.updateTokensAccount(accountEntity.accountId, {
+            accessToken: accountEntity.accessToken,
+            refreshToken: accountEntity.refreshToken,
+            expiresIn: expiresInDate,
+        });
     }
 
-    async refreshByAccountId(accountId: string) {
-        const account = await this.findAccount(accountId);
-
+    private async getAccountEntity(accountId: string): Promise<AccountEntity> {
+        let accountEntity = await this.cacheManager.get<AccountEntity>(accountId);
+        if (accountEntity) {
+            console.log('взял из кеша');
+            return accountEntity;
+        }
+        const account = await this.accountRep.getAccount(accountId);
         if (account) {
-            const sportApi = new SportApi(account);
-            await this.refreshByApi(sportApi);
-            return sportApi;
+            accountEntity = new AccountEntity(account);
+            const proxy = this.proxyService.getRandomProxy();
+            accountEntity.setProxy(proxy);
+            console.log('взял из БД');
+            return accountEntity;
         }
-        throw new NotFoundException();
+        throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
     }
 
-    async refreshByDate(sportApi: SportApi) {
-        const isUpdate = this.updateTokensByTime(sportApi.expiresIn);
+    private async validationToken(accountEntity: AccountEntity) {
+        const isUpdate = accountEntity.updateTokensByTime();
         if (isUpdate) {
-            await this.refreshByApi(sportApi);
+            await this.refreshForValidation(accountEntity);
         }
     }
 
-    private updateTokensByTime(expiresIn: Date | null) {
-        const nowDate = new Date();
-        const oneHourNext = new Date(nowDate.getTime() + 60 * 60 * 1000);
-        if (expiresIn && oneHourNext < expiresIn) {
-            console.log('Не обновлял по времени');
-            return false;
+    private async getAccount(accountId: string) {
+        const accountEntity = await this.getAccountEntity(accountId);
+        if (!accountEntity.isAccessMp) {
+            throw new HttpException(ERROR_LOGOUT_MP, HttpStatus.FORBIDDEN);
         }
-        console.log('Иду обновлять по истечению времени');
-        return true;
-    }
-
-    private async getApi(accountId: string) {
-        let sportApi = await this.cacheManager.get<SportApi>(accountId);
-
-        if (sportApi) {
-            await this.refreshByDate(sportApi);
-            return sportApi;
-        }
-        sportApi = await this.refreshByAccountId(accountId);
-        await this.cacheManager.set(accountId, sportApi);
-        return sportApi;
+        await this.validationToken(accountEntity);
+        return accountEntity;
     }
 
     async shortInfo(accountId: string) {
-        const sportApi = await this.getApi(accountId);
-        const result = await sportApi.shortInfo();
-        await this.updateAccountBonusCount(accountId, result.bonusCount);
-        return result;
-        //Обернуть в ошибку связанную с блокировкой прокси
+        const accountEntity = await this.getAccount(accountId);
+
+        const url = 'https://mp4x-api.sportmaster.ru/api/v2/bonus/shortInfo';
+        const headers = accountEntity.getHeaders(url);
+        const response = await axios.get(url, {
+            headers,
+            httpsAgent: accountEntity.httpsAgent,
+        });
+        const bonusCount: number = +response.data.data.info.totalAmount;
+        const qrCode: string = response.data.data.info.clubCard.qrCode;
+        await this.updateAccountBonusCount(accountId, bonusCount);
+        return { bonusCount, qrCode };
     }
 }
