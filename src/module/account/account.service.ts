@@ -3,18 +3,24 @@ import { AccountRepository } from './account.repository';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
 import { AccountEntity } from './entities/account.entity';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { IRefreshAccount } from './interfaces/account.interface';
+import { IAccountWithProxy, IRefreshAccount } from './interfaces/account.interface';
 import { Account } from '@prisma/client';
 import { ProxyService } from '../proxy/proxy.service';
-import axios from 'axios';
 import { ERROR_ACCOUNT_NOT_FOUND, ERROR_LOGOUT_MP } from './constants/error.constant';
+import { ConfigService } from '@nestjs/config';
+import { HttpService } from '../http/http.service';
+import { SocksProxyAgent } from 'socks-proxy-agent';
+import { SportmasterHeaders } from './entities/headers.entity';
+import { AccountWithProxyEntity } from './entities/accountWithProxy.entity';
 
 @Injectable()
 export class AccountService {
     constructor(
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
+        private configService: ConfigService,
         private accountRep: AccountRepository,
         private proxyService: ProxyService,
+        private httpService: HttpService,
     ) {}
 
     async addingAccount(accountDto: AddingAccountRequestDto): Promise<AccountEntity> {
@@ -78,82 +84,182 @@ export class AccountService {
     // }
     //
 
-    // async forceRefresh(accountId: string) {
-    //     const accountEntity = await this.getAccountEntity(accountId);
-    //     await this.refreshForValidation(accountEntity);
-    // }
+    async openForceRefresh(accountId: string) {
+        const accountWithProxyEntity = await this.getAccount(accountId);
+        await this.refreshForValidation(accountWithProxyEntity);
+    }
 
-    private async refreshForValidation(accountEntity: AccountEntity) {
+    private async getHttpOptions(url: string, accountWithProxy: AccountWithProxyEntity): Promise<any> {
+        const headers = new SportmasterHeaders(url, accountWithProxy).getHeaders();
+        const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
+
+        return { headers, httpsAgent };
+    }
+
+    private async refreshPrivate(accountWithProxy: AccountWithProxyEntity) {
+        const tokens = await this.refreshForValidation(accountWithProxy);
+        accountWithProxy.accessToken = tokens.accessToken;
+        accountWithProxy.refreshToken = tokens.refreshToken;
+        accountWithProxy.expiresIn = tokens.expiresIn;
+        await this.updateTokensAccount(accountWithProxy.accountId, tokens);
+        return tokens;
+    }
+
+    private async refreshForValidation(accountWithProxyEntity: AccountWithProxyEntity): Promise<IRefreshAccount> {
         const url = 'https://mp4x-api.sportmaster.ru/api/v1/auth/refresh';
-        const headers = accountEntity.getHeaders(url);
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
-            refreshToken: accountEntity.refreshToken,
-            deviceId: accountEntity.deviceId,
+            refreshToken: accountWithProxyEntity.refreshToken,
+            deviceId: accountWithProxyEntity.deviceId,
         };
-        const response = await axios.post(url, payload, {
-            headers,
-            httpsAgent: accountEntity.httpsAgent,
-        });
 
-        accountEntity.accessToken = response.data.data.token.accessToken;
-        accountEntity.refreshToken = response.data.data.token.refreshToken;
+        const response = await this.httpService.post(url, payload, httpOptions);
+
+        const accessToken = response.data.data.token.accessToken;
+        const refreshToken = response.data.data.token.refreshToken;
         const expires = response.data.data.token.expiresIn;
         const expiresInTimestamp = Date.now() + +expires * 1000;
         const expiresInDate = new Date(expiresInTimestamp);
-        accountEntity.expiresIn = expiresInDate;
-        await this.updateTokensAccount(accountEntity.accountId, {
-            accessToken: accountEntity.accessToken,
-            refreshToken: accountEntity.refreshToken,
+        return {
+            accessToken,
+            refreshToken,
             expiresIn: expiresInDate,
-        });
+        };
     }
 
-    private async getAccountEntity(accountId: string): Promise<AccountEntity> {
-        let accountEntity = await this.cacheManager.get<AccountEntity>(accountId);
-        if (accountEntity) {
-            console.log('взял из кеша');
-            return accountEntity;
-        }
-        const account = await this.accountRep.getAccount(accountId);
-        if (account) {
-            accountEntity = new AccountEntity(account);
-            const proxy = this.proxyService.getRandomProxy();
-            accountEntity.setProxy(proxy);
-            console.log('взял из БД');
-            return accountEntity;
-        }
-        throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
-    }
-
-    private async validationToken(accountEntity: AccountEntity) {
-        const isUpdate = accountEntity.updateTokensByTime();
+    private async validationToken(accountWithProxy: AccountWithProxyEntity) {
+        const isUpdate = accountWithProxy.updateTokensByTime();
         if (isUpdate) {
-            await this.refreshForValidation(accountEntity);
+            await this.refreshPrivate(accountWithProxy);
         }
     }
 
-    private async getAccount(accountId: string) {
-        const accountEntity = await this.getAccountEntity(accountId);
-        if (!accountEntity.isAccessMp) {
-            throw new HttpException(ERROR_LOGOUT_MP, HttpStatus.FORBIDDEN);
+    private async getAndValidateOrSetProxyAccount(accountWithProxy: IAccountWithProxy): Promise<AccountWithProxyEntity> {
+        const currentTime = new Date();
+        const durationTimeProxyBlock = this.configService.getOrThrow('TIME_DURATION_PROXY_BLOCK_IN_MIN');
+        const timeBlockedAgo = new Date();
+        timeBlockedAgo.setMinutes(currentTime.getMinutes() - +durationTimeProxyBlock);
+
+        let accountWithProxyEntity: AccountWithProxyEntity;
+        if (
+            !accountWithProxy.proxy ||
+            accountWithProxy.proxy.expiresAt < currentTime ||
+            (accountWithProxy.proxy.blockedAt && accountWithProxy.proxy.blockedAt > timeBlockedAgo)
+        ) {
+            const proxy = await this.proxyService.getRandomProxy();
+            const newAccountWithProxy = await this.accountRep.setProxyAccount(accountWithProxy.accountId, proxy.uuid);
+            accountWithProxyEntity = new AccountWithProxyEntity(newAccountWithProxy);
+        } else {
+            accountWithProxyEntity = new AccountWithProxyEntity(accountWithProxy);
         }
-        await this.validationToken(accountEntity);
-        return accountEntity;
+        return accountWithProxyEntity;
+    }
+
+    private async getAccount(accountId: string): Promise<AccountWithProxyEntity> {
+        const accountWithProxy = await this.accountRep.getAccountWithProxy(accountId);
+
+        if (!accountWithProxy) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        if (!accountWithProxy.isAccessMp) throw new HttpException(ERROR_LOGOUT_MP, HttpStatus.FORBIDDEN);
+        const accountWithProxyEntity = await this.getAndValidateOrSetProxyAccount(accountWithProxy);
+        await this.validationToken(accountWithProxyEntity);
+
+        return accountWithProxyEntity;
     }
 
     async shortInfo(accountId: string) {
-        const accountEntity = await this.getAccount(accountId);
-
-        const url = 'https://mp4x-api.sportmaster.ru/api/v2/bonus/shortInfo';
-        const headers = accountEntity.getHeaders(url);
-        const response = await axios.get(url, {
-            headers,
-            httpsAgent: accountEntity.httpsAgent,
-        });
-        const bonusCount: number = +response.data.data.info.totalAmount;
-        const qrCode: string = response.data.data.info.clubCard.qrCode;
+        const { bonusCount, qrCode } = await this.shortInfoPrivate(accountId);
         await this.updateAccountBonusCount(accountId, bonusCount);
         return { bonusCount, qrCode };
+    }
+
+    private async shortInfoPrivate(accountId: string) {
+        const accountWithProxyEntity = await this.getAccount(accountId);
+        const url = 'https://mp4x-api.sportmaster.ru/api/v2/bonus/shortInfo';
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const response = await this.httpService.get(url, httpOptions);
+
+        const bonusCount: number = +response.data.data.info.totalAmount;
+        const qrCode: string = response.data.data.info.clubCard.qrCode;
+        return { bonusCount, qrCode };
+    }
+
+    async sendSms(accountId: string, phoneNumber: string): Promise<string> {
+        const accountWithProxyEntity = await this.getAccount(accountId);
+        await this.analyticsTags(accountWithProxyEntity);
+        await new Promise<void>(resolve => {
+            setTimeout(() => {
+                resolve();
+            }, 1000);
+        });
+        return await this.sendSmsPrivate(accountWithProxyEntity, phoneNumber);
+    }
+
+    async openForceSendSms(accountId: string, phoneNumber: string): Promise<string> {
+        const accountWithProxyEntity = await this.getAccount(accountId);
+        return await this.sendSmsPrivate(accountWithProxyEntity, phoneNumber);
+    }
+
+    private async sendSmsPrivate(accountWithProxyEntity: AccountWithProxyEntity, phoneNumber: string): Promise<string> {
+        const url = `https://mp4x-api.sportmaster.ru/api/v1/verify/sendSms`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+
+        const payload = {
+            phone: {
+                countryCode: 7,
+                nationalNumber: phoneNumber,
+                isoCode: 'RU',
+            },
+            operation: 'change_phone',
+            communicationChannel: 'SMS',
+        };
+        const response = await this.httpService.post(url, payload, httpOptions);
+
+        return response.data.data.requestId;
+    }
+
+    async phoneChange(accountId: string, requestId: string, code: string) {
+        const accountWithProxyEntity = await this.getAccount(accountId);
+        const token = await this.verifyCheck(accountWithProxyEntity, requestId, code);
+        await this.changePhone(accountWithProxyEntity, token);
+    }
+
+    private async verifyCheck(accountWithProxyEntity: AccountWithProxyEntity, requestId: string, code: string): Promise<string> {
+        const url = `https://mp4x-api.sportmaster.ru/api/v1/verify/check`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+
+        const payload = {
+            requestId,
+            code,
+        };
+
+        const response = await this.httpService.post(url, payload, httpOptions);
+        return response.data.data.token;
+    }
+
+    private async changePhone(accountWithProxyEntity: AccountWithProxyEntity, token: string): Promise<boolean> {
+        const url = `https://mp4x-api.sportmaster.ru/api/v1/profile/changePhone`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+
+        const payload = {
+            token,
+        };
+        await this.httpService.post(url, payload, httpOptions);
+        return true;
+    }
+
+    async openForceAnalyticsTags(accountId: string) {
+        const accountWithProxyEntity = await this.getAccount(accountId);
+        await this.analyticsTags(accountWithProxyEntity);
+    }
+
+    async analyticsTags(accountWithProxyEntity: AccountWithProxyEntity): Promise<boolean> {
+        const url = `https://mp4x-api.sportmaster.ru/api/v2/analytics/tags`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+
+        const payload = {};
+        await this.httpService.post(url, payload, httpOptions);
+
+        return true;
     }
 }

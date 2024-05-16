@@ -19,7 +19,12 @@ export class TelegramService {
         }
     }
 
-    async setCache(telegramId: number, accountId: string) {
+    async setTelegramAccountCache(telegramId: number, accountId: string) {
+        const accountFromCache = await this.cacheManager.get<IAccountCashing>(String(telegramId));
+        if (accountFromCache) {
+            await this.cacheManager.del(accountFromCache.accountId);
+        }
+        await this.cacheManager.del(accountId);
         await this.cacheManager.set(String(telegramId), { accountId }, TTL_CASH);
     }
 

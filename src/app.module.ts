@@ -7,6 +7,7 @@ import { UserModule } from './module/user/user.module';
 import { AccountModule } from './module/account/account.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ProxyModule } from './module/proxy/proxy.module';
+import { HttpModule } from './module/http/http.module';
 
 @Module({
     imports: [
@@ -23,6 +24,7 @@ import { ProxyModule } from './module/proxy/proxy.module';
         UserModule,
         AccountModule,
         ProxyModule,
+        HttpModule,
     ],
     controllers: [],
 })

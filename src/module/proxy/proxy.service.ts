@@ -1,51 +1,26 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { IProxyDict } from './interfaces/proxy.interface';
+import { ProxyRepository } from './proxy.repository';
+import { ProxyEntity } from './entities/proxy.entity';
 import { ERROR_FREE_PROXY } from './error/error.constant';
 
 @Injectable()
 export class ProxyService {
-    public proxyList: string[];
-    public proxyDict: IProxyDict = {};
+    constructor(private proxyRepository: ProxyRepository) {}
 
-    constructor(private configService: ConfigService) {
-        const PROXY_ENV = this.configService.getOrThrow<string>('PROXY_LIST');
-        this.proxyList = PROXY_ENV.split(',');
+    // async addingProxy(proxys: string[]) {
+    //
+    // }
 
-        this.proxyList.forEach(line => {
-            this.proxyDict[line] = {
-                isBan: false,
-                timeBlock: new Date(),
-            };
-        });
+    async getRandomProxy(): Promise<ProxyEntity> {
+        const proxies = await this.proxyRepository.getAllAvailableProxy(new Date());
+        if (proxies.length == 0) throw new Error(ERROR_FREE_PROXY);
+        const index = Math.floor(Math.random() * proxies.length);
+        const proxy = proxies[index];
+        return new ProxyEntity(proxy);
     }
 
-    getRandomProxy() {
-        const currentTime = new Date();
-        const proxyListCopy = [...this.proxyList];
-
-        while (proxyListCopy.length > 0) {
-            const randomIndex = Math.floor(Math.random() * proxyListCopy.length);
-            const randomProxy = proxyListCopy[randomIndex];
-
-            const proxyData = this.proxyDict[randomProxy];
-
-            if (!proxyData.isBan) {
-                return randomProxy;
-            } else if (proxyData.isBan && currentTime.getTime() - proxyData.timeBlock.getTime() > 10 * 60 * 1000) {
-                proxyData.isBan = false;
-                proxyData.timeBlock = new Date();
-                return randomProxy;
-            }
-
-            proxyListCopy.splice(randomIndex, 1);
-        }
-
-        throw new Error(ERROR_FREE_PROXY);
-    }
-
-    setProxyBan(proxy: string) {
-        this.proxyDict[proxy].isBan = true;
-        this.proxyDict[proxy].timeBlock = new Date();
-    }
+    // setProxyBan(proxy: string) {
+    //     this.proxyDict[proxy].isBan = true;
+    //     this.proxyDict[proxy].timeBlock = new Date();
+    // }
 }

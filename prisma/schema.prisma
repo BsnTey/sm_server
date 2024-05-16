@@ -56,6 +56,7 @@ model Account {
   googleId          String?  @map("google_id")
   pushToken         String?  @map("push_token")
   expiresIn         DateTime @map("expires_in")
+  cityId            String   @default("1720920299") @map("city_id")
   isAccessMp        Boolean  @default(true) @map("is_access_mp")
   isAccessCookie    Boolean  @default(true) @map("is_access_cookie")
   isOnlyAccessOrder Boolean  @default(false) @map("is_only_access_order")
@@ -66,8 +67,11 @@ model Account {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   orders          Order[]
-  ownerTelegramId String       @default("750126398")
+  ownerTelegramId String       @default("750126398") @map("owner_telegram_id")
   ownerTelegram   UserTelegram @relation(fields: [ownerTelegramId], references: [telegramId])
+
+  proxyUuid String? @map("proxy_uuid") @db.Uuid
+  proxy     Proxy?  @relation(fields: [proxyUuid], references: [uuid])
 
   @@map("account")
 }
@@ -105,4 +109,17 @@ model Order {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("order")
+}
+
+model Proxy {
+  uuid      String    @id @default(uuid()) @db.Uuid
+  proxy     String
+  expiresAt DateTime  @map("expires_at")
+  blockedAt DateTime? @map("blocked_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  Account   Account[]
+
+  @@map("proxy")
 }

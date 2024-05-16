@@ -436,70 +436,8 @@ export class SportApi {
     //     }
     // }
     //
-    // async sendSms(phoneNumber): Promise<any> {
-    //     const url = `https://mp4x-api.sportmaster.ru/api/v1/verify/sendSms`;
-    //     this.setHeaders(url);
+
     //
-    //     const payload = {
-    //         phone: {
-    //             countryCode: 7,
-    //             nationalNumber: phoneNumber,
-    //             isoCode: 'RU',
-    //         },
-    //         operation: 'change_phone',
-    //         communicationChannel: 'SMS',
-    //     };
+
     //
-    //     try {
-    //         const response = await axios.post(url, payload, {
-    //             headers: this.headers,
-    //             httpsAgent: this.httpsAgent,
-    //         });
-    //
-    //         return response.data.data.requestId;
-    //     } catch (err) {
-    //         throw new Error(err.response.data.error.code);
-    //     }
-    // }
-    //
-    // async verifyCheck(requestId: string, code: string): Promise<string> {
-    //     const url = `https://mp4x-api.sportmaster.ru/api/v1/verify/check`;
-    //     this.setHeaders(url);
-    //
-    //     const payload = {
-    //         requestId,
-    //         code,
-    //     };
-    //
-    //     try {
-    //         const response = await axios.post(url, payload, {
-    //             headers: this.headers,
-    //             httpsAgent: this.httpsAgent,
-    //         });
-    //
-    //         return response.data.data.token;
-    //     } catch (err) {
-    //         throw new Error(err.response.data.error.code);
-    //     }
-    // }
-    //
-    // async changePhone(token: string): Promise<any> {
-    //     const url = `https://mp4x-api.sportmaster.ru/api/v1/profile/changePhone`;
-    //     this.setHeaders(url);
-    //
-    //     const payload = {
-    //         token,
-    //     };
-    //
-    //     try {
-    //         const response = await axios.post(url, payload, {
-    //             headers: this.headers,
-    //             httpsAgent: this.httpsAgent,
-    //         });
-    //
-    //         return true;
-    //     } catch (err) {
-    //         throw new Error(err.response.data.error.code);
-    //     }
-    // }
 }

@@ -1,10 +1,6 @@
 import { Account } from '@prisma/client';
-import { HashString, IHashAplaut } from '../../sport/interfaces/sport.interface';
-import md5 from 'md5';
-import { SocksProxyAgent } from 'socks-proxy-agent';
 
 export class AccountEntity implements Account {
-    private prefixHash = 'eb1a3e30291bc971c4da0e86375961a4';
     accountId: string;
     email: string;
     passImap: string;
@@ -15,8 +11,8 @@ export class AccountEntity implements Account {
     xUserId: string;
     deviceId: string;
     installationId: string;
-    googleId: string;
-    pushToken: string;
+    googleId: string | null;
+    pushToken: string | null;
     expiresIn: Date;
     bonusCount: number;
     isAccessMp: boolean;
@@ -24,16 +20,15 @@ export class AccountEntity implements Account {
     isOnlyAccessOrder: boolean;
     isUpdateBonus: boolean;
     ownerTelegramId: string;
-    proxy: string;
+    proxyUuid: string | null; //что вернет, если прокси будет у аккаунта
     cityId = '1720920299';
     cityName = 'Москва';
-    httpsAgent: SocksProxyAgent;
 
     createdAt: Date;
     updatedAt: Date;
 
-    constructor(user: Partial<Account>) {
-        Object.assign(this, user);
+    constructor(account: Partial<Account>) {
+        Object.assign(this, account);
         return this;
     }
 
@@ -48,40 +43,9 @@ export class AccountEntity implements Account {
         return true;
     }
 
-    private generateHash({ url, timestamp }: IHashAplaut): HashString {
-        const combinedString = this.prefixHash + url + timestamp + this.xUserId;
-        console.log(combinedString);
-        return md5(combinedString);
-    }
-
-    getHeaders(url: string) {
-        const timestamp = String(Date.now());
-        const hash = this.generateHash({ url, timestamp });
-
-        return {
-            'User-Agent': 'android-4.44.0-google(44971)',
-            Locale: 'ru',
-            Country: 'RU',
-            'Device-Id': this.deviceId,
-            'Account-Id': this.accountId,
-            'Installation-Id': this.installationId,
-            'City-Id': this.cityId,
-            Eutc: 'UTC+3',
-            'x-user-id': this.xUserId,
-            Authorization: this.accessToken,
-            Host: 'mp4x-api.sportmaster.ru',
-            'Accept-Encoding': 'gzip, deflate',
-            'Content-Type': 'application/json; charset=utf-8',
-            Timestamp: timestamp,
-            'Aplaut-Id': hash,
-            'Aplaut-Build': '2',
-        };
-    }
-
-    setProxy(proxy: string) {
-        this.proxy = proxy;
-        this.httpsAgent = new SocksProxyAgent(proxy);
-    }
+    // setProxy(proxy: string) {
+    //     this.proxy = proxy;
+    // }
 
     setCity(cityId: string, cityName: string): void {
         this.cityId = cityId;

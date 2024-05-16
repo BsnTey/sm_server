@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Account } from '@prisma/client';
 import { PrismaService } from '@common/database/prisma.service';
 import { AccountEntity } from './entities/account.entity';
-import { IRefreshAccount } from './interfaces/account.interface';
+import { IAccountWithProxy, IRefreshAccount } from './interfaces/account.interface';
 
 @Injectable()
 export class AccountRepository {
@@ -19,6 +19,33 @@ export class AccountRepository {
     async getAccount(accountId: string): Promise<Account | null> {
         return this.prisma.account.findUnique({
             where: { accountId },
+        });
+    }
+
+    async getAccountWithProxy(accountId: string): Promise<IAccountWithProxy | null> {
+        return this.prisma.account.findUnique({
+            where: { accountId },
+            include: {
+                proxy: true,
+            },
+        });
+    }
+
+    async setProxyAccount(accountId: string, proxyUuid: string): Promise<IAccountWithProxy> {
+        return this.prisma.account.update({
+            where: {
+                accountId,
+            },
+            data: {
+                proxy: {
+                    connect: {
+                        uuid: proxyUuid,
+                    },
+                },
+            },
+            include: {
+                proxy: true,
+            },
         });
     }
 

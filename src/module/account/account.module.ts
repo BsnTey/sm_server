@@ -3,9 +3,12 @@ import { AccountController } from './account.controller';
 import { AccountService } from './account.service';
 import { AccountRepository } from './account.repository';
 import { ProxyService } from '../proxy/proxy.service';
+import { ConfigService } from '@nestjs/config';
+import { HttpService } from '../http/http.service';
+import { ProxyRepository } from '../proxy/proxy.repository';
 
 @Module({
     controllers: [AccountController],
-    providers: [AccountService, AccountRepository, ProxyService],
+    providers: [ConfigService, AccountService, AccountRepository, ProxyService, HttpService, ProxyRepository],
 })
 export class AccountModule {}
