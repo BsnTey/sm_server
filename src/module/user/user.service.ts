@@ -3,6 +3,7 @@ import { UserRepository } from './user.repository';
 import { ITelegramUser } from './interfaces/user-telegram.interface';
 import { UserTelegram } from '@prisma/client';
 import { UserTelegramEntity } from './entities/user-telegram.entity';
+import { CitySMEntity } from '../account/entities/citySM.entity';
 
 @Injectable()
 export class UserService {
@@ -34,5 +35,20 @@ export class UserService {
     async updateUserByTelegram({ telegramName, telegramId }: ITelegramUser): Promise<UserTelegram> {
         const user = new UserTelegramEntity({ telegramName, telegramId });
         return this.userRepository.updateUserByTelegram(user);
+    }
+
+    async getUserCities(telegramId: string): Promise<CitySMEntity[]> {
+        const cities: any[] = await this.userRepository.getUserCities(telegramId);
+        return cities.map(city => {
+            return new CitySMEntity(city.city);
+        });
+    }
+
+    async addUserCity(telegramId: string, cityId: string) {
+        return await this.userRepository.addUserCity(telegramId, cityId);
+    }
+
+    async deleteUserCity(telegramId: string, cityId: string) {
+        return await this.userRepository.deleteUserCity(telegramId, cityId);
     }
 }

@@ -3,7 +3,7 @@ import { AccountRepository } from './account.repository';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
 import { AccountEntity } from './entities/account.entity';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { IAccountWithProxy, IRefreshAccount } from './interfaces/account.interface';
+import { IAccountWithProxy, IFindCitiesAccount, IRefreshAccount } from './interfaces/account.interface';
 import { Account } from '@prisma/client';
 import { ProxyService } from '../proxy/proxy.service';
 import { ERROR_ACCOUNT_NOT_FOUND, ERROR_LOGOUT_MP } from './constants/error.constant';
@@ -12,6 +12,7 @@ import { HttpService } from '../http/http.service';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { SportmasterHeaders } from './entities/headers.entity';
 import { AccountWithProxyEntity } from './entities/accountWithProxy.entity';
+import { CitySMEntity } from './entities/citySM.entity';
 
 @Injectable()
 export class AccountService {
@@ -39,8 +40,11 @@ export class AccountService {
             bonusCount,
             isOnlyAccessOrder,
         } = accountDto;
-        const expiresInTimestamp = Date.now() + +expiresIn * 1000;
-        const expiresInDate = new Date(expiresInTimestamp);
+        const expiresInTimestampAccess = Date.now() + +expiresIn * 1000;
+        const expiresInDateAccess = new Date(expiresInTimestampAccess);
+
+        const now = new Date();
+        const expiresInDateRefresh = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
 
         const account = new AccountEntity({
             accountId,
@@ -53,7 +57,8 @@ export class AccountService {
             xUserId,
             deviceId,
             installationId,
-            expiresIn: expiresInDate,
+            expiresInAccess: expiresInDateAccess,
+            expiresInRefresh: expiresInDateRefresh,
             bonusCount: +bonusCount,
             isOnlyAccessOrder: Boolean(isOnlyAccessOrder),
         });
@@ -75,6 +80,10 @@ export class AccountService {
 
     async updateTokensAccount(accountId: string, dataAccount: IRefreshAccount): Promise<Account> {
         return await this.accountRep.updateTokensAccount(accountId, dataAccount);
+    }
+
+    async setAccountCity(accountId: string, cityId: string) {
+        return await this.accountRep.setCityToAccount(accountId, cityId);
     }
 
     //
@@ -100,7 +109,7 @@ export class AccountService {
         const tokens = await this.refreshForValidation(accountWithProxy);
         accountWithProxy.accessToken = tokens.accessToken;
         accountWithProxy.refreshToken = tokens.refreshToken;
-        accountWithProxy.expiresIn = tokens.expiresIn;
+        accountWithProxy.expiresInAccess = tokens.expiresInAccess;
         await this.updateTokensAccount(accountWithProxy.accountId, tokens);
         return tokens;
     }
@@ -120,11 +129,16 @@ export class AccountService {
         const refreshToken = response.data.data.token.refreshToken;
         const expires = response.data.data.token.expiresIn;
         const expiresInTimestamp = Date.now() + +expires * 1000;
-        const expiresInDate = new Date(expiresInTimestamp);
+        const expiresInDateAccess = new Date(expiresInTimestamp);
+
+        const now = new Date();
+        const expiresInDateRefresh = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+
         return {
             accessToken,
             refreshToken,
-            expiresIn: expiresInDate,
+            expiresInAccess: expiresInDateAccess,
+            expiresInRefresh: expiresInDateRefresh,
         };
     }
 
@@ -168,9 +182,9 @@ export class AccountService {
     }
 
     async shortInfo(accountId: string) {
-        const { bonusCount, qrCode } = await this.shortInfoPrivate(accountId);
+        const { bonusCount, qrCode, citySMName } = await this.shortInfoPrivate(accountId);
         await this.updateAccountBonusCount(accountId, bonusCount);
-        return { bonusCount, qrCode };
+        return { bonusCount, qrCode, citySMName };
     }
 
     private async shortInfoPrivate(accountId: string) {
@@ -181,7 +195,7 @@ export class AccountService {
 
         const bonusCount: number = +response.data.data.info.totalAmount;
         const qrCode: string = response.data.data.info.clubCard.qrCode;
-        return { bonusCount, qrCode };
+        return { bonusCount, qrCode, citySMName: accountWithProxyEntity.citySM.name };
     }
 
     async sendSms(accountId: string, phoneNumber: string): Promise<string> {
@@ -261,5 +275,22 @@ export class AccountService {
         await this.httpService.post(url, payload, httpOptions);
 
         return true;
+    }
+
+    async findCity(accountId: string, city: string) {
+        const findCities = await this.findCityPrivate(accountId, city);
+
+        const cityEntities = findCities.map(city => new CitySMEntity(city));
+        await Promise.allSettled(cityEntities.map(cityEntity => this.accountRep.addingCitySM(cityEntity)));
+        return cityEntities;
+    }
+
+    private async findCityPrivate(accountId: string, city: string): Promise<IFindCitiesAccount[]> {
+        const accountWithProxyEntity = await this.getAccount(accountId);
+        const encodedCity = encodeURI(city.toUpperCase());
+        const url = `https://mp4x-api.sportmaster.ru/api/v1/city?query=${encodedCity}`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const response = await this.httpService.get(url, httpOptions);
+        return response.data.data.list;
     }
 }

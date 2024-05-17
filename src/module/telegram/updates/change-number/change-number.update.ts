@@ -5,7 +5,7 @@ import { UseFilters } from '@nestjs/common';
 import { AccountService } from '../../../account/account.service';
 import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
-import { CHANGE_NUMBER_CODE_SCENE, CHANGE_NUMBER_INPUT_NUMBER_SCENE } from '../../scenes/change-number.scene.constants';
+import { CHANGE_NUMBER_CODE_SCENE, CHANGE_NUMBER_INPUT_NUMBER_SCENE } from '../../scenes/change-number.scene-constants';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { TelegramService } from '../../telegram.service';
 import { isPhonePipe } from '../../pipes/isPhone.pipe';

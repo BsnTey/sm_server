@@ -1,9 +1,10 @@
-import { Account, Proxy } from '@prisma/client';
+import { Account, CitySM, Proxy } from '@prisma/client';
 
 export interface IRefreshAccount {
     accessToken: string;
     refreshToken: string;
-    expiresIn: Date;
+    expiresInAccess: Date;
+    expiresInRefresh: Date;
 }
 
 export interface IAccountCashing {
@@ -14,4 +15,14 @@ export interface IAccountCashing {
 
 export interface IAccountWithProxy extends Account {
     proxy: Proxy | null;
+    citySM: CitySM;
+}
+
+export interface IFindCitiesAccount {
+    id: string;
+    name: string;
+    fullName: string;
+    eutc: string;
+    macrocityId: string;
+    hasMetro: boolean;
 }

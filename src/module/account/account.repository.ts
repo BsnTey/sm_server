@@ -3,6 +3,7 @@ import { Account } from '@prisma/client';
 import { PrismaService } from '@common/database/prisma.service';
 import { AccountEntity } from './entities/account.entity';
 import { IAccountWithProxy, IRefreshAccount } from './interfaces/account.interface';
+import { CitySMEntity } from './entities/citySM.entity';
 
 @Injectable()
 export class AccountRepository {
@@ -27,6 +28,7 @@ export class AccountRepository {
             where: { accountId },
             include: {
                 proxy: true,
+                citySM: true,
             },
         });
     }
@@ -45,6 +47,7 @@ export class AccountRepository {
             },
             include: {
                 proxy: true,
+                citySM: true,
             },
         });
     }
@@ -70,7 +73,10 @@ export class AccountRepository {
         });
     }
 
-    async updateTokensAccount(accountId: string, { accessToken, refreshToken, expiresIn }: IRefreshAccount): Promise<Account> {
+    async updateTokensAccount(
+        accountId: string,
+        { accessToken, refreshToken, expiresInAccess, expiresInRefresh }: IRefreshAccount,
+    ): Promise<Account> {
         return this.prisma.account.update({
             where: {
                 accountId,
@@ -78,7 +84,8 @@ export class AccountRepository {
             data: {
                 accessToken,
                 refreshToken,
-                expiresIn,
+                expiresInAccess,
+                expiresInRefresh,
             },
         });
     }
@@ -101,6 +108,23 @@ export class AccountRepository {
             },
             data: {
                 bonusCount,
+            },
+        });
+    }
+
+    async setCityToAccount(accountId: string, cityId: string): Promise<Account> {
+        return this.prisma.account.update({
+            where: { accountId },
+            data: { cityId },
+        });
+    }
+
+    async addingCitySM(city: CitySMEntity): Promise<CitySMEntity> {
+        return this.prisma.citySM.create({
+            data: {
+                cityId: city.cityId,
+                name: city.name,
+                fullName: city.fullName,
             },
         });
     }

@@ -3,3 +3,5 @@ export const ERROR_ACCOUNT_ID =
 export const ERROR_TIMEOUT_TTL_CASH = 'Данные устарели, повторите заново';
 export const ERROR_NUMBER_PHONE = 'Неправильно введён номер! Номер должен иметь вид 88005553535';
 export const ERROR_CODE_PHONE = 'В коде должно быть 4 цифры, повторите ввод';
+export const ERROR_CITY = 'Не верно введено название города. Название должно содержать только кириллицу. Введите еще раз';
+export const ERROR_FIND_CITY = 'Город не найден';

@@ -34,4 +34,50 @@ export class UserRepository {
             },
         });
     }
+
+    async getUserCities(telegramId: string): Promise<any> {
+        return this.prisma.userCitySM.findMany({
+            where: {
+                userTelegramId: telegramId,
+            },
+            include: {
+                city: true,
+            },
+        });
+    }
+
+    async addUserCity(telegramId: string, cityId: string): Promise<any> {
+        return this.prisma.userCitySM.upsert({
+            where: {
+                cityId_userTelegramId: {
+                    cityId,
+                    userTelegramId: telegramId,
+                },
+            },
+            update: {},
+            create: {
+                city: {
+                    connect: {
+                        cityId,
+                    },
+                },
+                userTelegram: {
+                    connect: {
+                        telegramId,
+                    },
+                },
+            },
+        });
+    }
+
+    async deleteUserCity(telegramId: string, cityId: string): Promise<void> {
+        await this.prisma.userCitySM.delete({
+            where: {
+                cityId_userTelegramId: {
+                    cityId,
+                    userTelegramId: telegramId,
+                },
+            },
+        });
+    }
 }

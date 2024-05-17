@@ -13,14 +13,15 @@ export class AccountEntity implements Account {
     installationId: string;
     googleId: string | null;
     pushToken: string | null;
-    expiresIn: Date;
+    expiresInAccess: Date;
+    expiresInRefresh: Date;
     bonusCount: number;
     isAccessMp: boolean;
     isAccessCookie: boolean;
     isOnlyAccessOrder: boolean;
     isUpdateBonus: boolean;
     ownerTelegramId: string;
-    proxyUuid: string | null; //что вернет, если прокси будет у аккаунта
+    proxyUuid: string | null;
     cityId = '1720920299';
     cityName = 'Москва';
 
@@ -35,17 +36,11 @@ export class AccountEntity implements Account {
     updateTokensByTime() {
         const nowDate = new Date();
         const oneHourNext = new Date(nowDate.getTime() + 60 * 60 * 1000);
-        if (this.expiresIn && oneHourNext < this.expiresIn) {
-            console.log('Не обновлял по времени');
+        if (this.expiresInAccess && oneHourNext < this.expiresInAccess) {
             return false;
         }
-        console.log('Иду обновлять по истечению времени');
         return true;
     }
-
-    // setProxy(proxy: string) {
-    //     this.proxy = proxy;
-    // }
 
     setCity(cityId: string, cityName: string): void {
         this.cityId = cityId;

@@ -10,7 +10,7 @@ import {
     PROFILE_SCENE,
     QR_CODE_SCENE,
     START_SCENE,
-} from '../../scenes/base.scene-constants';
+} from '../../scenes/base.scene-constant';
 
 export const CALCULATE_BONUS = {
     name: '💵 Рассчитать стоимость',

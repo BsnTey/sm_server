@@ -10,6 +10,7 @@ import { ProxyService } from '../proxy/proxy.service';
 import { TelegramService } from './telegram.service';
 import { HttpService } from '../http/http.service';
 import { ProxyRepository } from '../proxy/proxy.repository';
+import { MakeOrderUpdate, OrderCity, OrderFavouriteCity, OrderMenuAccount } from './updates/make-order/make-order.update';
 
 @Module({
     providers: [
@@ -26,6 +27,10 @@ import { ProxyRepository } from '../proxy/proxy.repository';
         ChangeNumberUpdate,
         ChangeNumberInputNumber,
         ChangeNumberInputCode,
+        MakeOrderUpdate,
+        OrderMenuAccount,
+        OrderCity,
+        OrderFavouriteCity,
     ],
 })
 export class TelegramModule {}

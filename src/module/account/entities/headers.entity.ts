@@ -1,5 +1,4 @@
 import { ISportmasterRequestHeaders } from '../interfaces/headers.interface';
-import { HashString } from '../../sport/interfaces/sport.interface';
 import md5 from 'md5';
 
 export class SportmasterHeaders {
@@ -53,7 +52,7 @@ export class SportmasterHeaders {
         };
     }
 
-    private generateHash(timestamp: string): HashString {
+    private generateHash(timestamp: string): string {
         const combinedString = this.prefixHash + this.url + timestamp + this.xUserId;
         return md5(combinedString);
     }
