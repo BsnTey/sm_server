@@ -4,6 +4,7 @@ import { SocksProxyAgent } from 'socks-proxy-agent';
 export interface IHttpInterface {
     post: (url: string, payload: any, httpOptions: HttpOptions) => Promise<any>;
     get: (url: string, httpOptions: HttpOptions) => Promise<any>;
+    delete: (url: string, httpOptions: HttpOptions) => Promise<any>;
     // patch: () => any;
 }
 

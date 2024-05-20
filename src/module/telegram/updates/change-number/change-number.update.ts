@@ -66,7 +66,7 @@ export class ChangeNumberInputNumber {
         @Sender() { id: telegramId }: any,
     ) {
         const account = await this.telegramService.getFromCache(telegramId);
-        account.requestId = await this.accountService.sendSms(account.accountId, phoneNumber);
+        account.requestId = await this.accountService.sendSmsWithAnalytics(account.accountId, phoneNumber);
         await ctx.scene.enter(CHANGE_NUMBER_CODE_SCENE);
     }
 }

@@ -10,11 +10,24 @@ import { ProxyService } from '../proxy/proxy.service';
 import { TelegramService } from './telegram.service';
 import { HttpService } from '../http/http.service';
 import { ProxyRepository } from '../proxy/proxy.repository';
-import { MakeOrderUpdate, OrderCity, OrderFavouriteCity, OrderMenuAccount } from './updates/make-order/make-order.update';
+import {
+    MakeOrderUpdate,
+    OrderChangeRecipient,
+    OrderCity,
+    OrderFavouriteCity,
+    OrderGetOrders,
+    OrderInputArticle,
+    OrderInputLink,
+    OrderInputPromo,
+    OrderMenuAccount,
+    OrderMenuCart,
+} from './updates/make-order/make-order.update';
+import { MakeOrderService } from './updates/make-order/make-order.service';
 
 @Module({
     providers: [
         TelegramService,
+        MakeOrderService,
         ProxyRepository,
         HttpService,
         BaseUpdate,
@@ -31,6 +44,12 @@ import { MakeOrderUpdate, OrderCity, OrderFavouriteCity, OrderMenuAccount } from
         OrderMenuAccount,
         OrderCity,
         OrderFavouriteCity,
+        OrderMenuCart,
+        OrderInputLink,
+        OrderInputPromo,
+        OrderInputArticle,
+        OrderChangeRecipient,
+        OrderGetOrders,
     ],
 })
 export class TelegramModule {}

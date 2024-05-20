@@ -19,4 +19,11 @@ export class HttpService implements IHttpInterface {
             httpsAgent,
         });
     }
+
+    async delete(url: string, { headers, httpsAgent }: HttpOptions): Promise<any> {
+        return await axios.delete(url, {
+            headers,
+            httpsAgent,
+        });
+    }
 }

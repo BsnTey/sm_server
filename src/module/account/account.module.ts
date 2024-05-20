@@ -6,10 +6,9 @@ import { ProxyService } from '../proxy/proxy.service';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '../http/http.service';
 import { ProxyRepository } from '../proxy/proxy.repository';
-import { CitySMRepository } from './city-sm.repository';
 
 @Module({
     controllers: [AccountController],
-    providers: [ConfigService, AccountService, AccountRepository, ProxyService, HttpService, ProxyRepository, CitySMRepository],
+    providers: [ConfigService, AccountService, AccountRepository, ProxyService, HttpService, ProxyRepository],
 })
 export class AccountModule {}
