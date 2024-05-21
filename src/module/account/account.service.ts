@@ -22,6 +22,9 @@ import { OrderInfoInterface } from './interfaces/order-info.interface';
 
 @Injectable()
 export class AccountService {
+    private url = this.configService.getOrThrow('API_DONOR');
+    private durationTimeProxyBlock = this.configService.getOrThrow('TIME_DURATION_PROXY_BLOCK_IN_MIN');
+
     constructor(
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
         private configService: ConfigService,
@@ -121,7 +124,7 @@ export class AccountService {
     }
 
     private async refreshForValidation(accountWithProxyEntity: AccountWithProxyEntity): Promise<IRefreshAccount> {
-        const url = 'https://mp4x-api.sportmaster.ru/api/v1/auth/refresh';
+        const url = this.url + 'v1/auth/refresh';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
@@ -157,9 +160,8 @@ export class AccountService {
 
     private async getAndValidateOrSetProxyAccount(accountWithProxy: IAccountWithProxy): Promise<AccountWithProxyEntity> {
         const currentTime = new Date();
-        const durationTimeProxyBlock = this.configService.getOrThrow('TIME_DURATION_PROXY_BLOCK_IN_MIN');
         const timeBlockedAgo = new Date();
-        timeBlockedAgo.setMinutes(currentTime.getMinutes() - +durationTimeProxyBlock);
+        timeBlockedAgo.setMinutes(currentTime.getMinutes() - +this.durationTimeProxyBlock);
 
         let accountWithProxyEntity: AccountWithProxyEntity;
         if (
@@ -195,7 +197,7 @@ export class AccountService {
 
     private async shortInfoPrivate(accountId: string) {
         const accountWithProxyEntity = await this.getAccount(accountId);
-        const url = 'https://mp4x-api.sportmaster.ru/api/v2/bonus/shortInfo';
+        const url = this.url + 'v2/bonus/shortInfo';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
 
@@ -219,7 +221,7 @@ export class AccountService {
         if (typeof accountWithProxyEntity == 'string') {
             accountWithProxyEntity = await this.getAccount(accountWithProxyEntity);
         }
-        const url = `https://mp4x-api.sportmaster.ru/api/v1/verify/sendSms`;
+        const url = this.url + `v1/verify/sendSms`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
@@ -243,7 +245,7 @@ export class AccountService {
     }
 
     private async verifyCheck(accountWithProxyEntity: AccountWithProxyEntity, requestId: string, code: string): Promise<string> {
-        const url = `https://mp4x-api.sportmaster.ru/api/v1/verify/check`;
+        const url = this.url + `v1/verify/check`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
@@ -256,7 +258,7 @@ export class AccountService {
     }
 
     private async changePhone(accountWithProxyEntity: AccountWithProxyEntity, token: string): Promise<boolean> {
-        const url = `https://mp4x-api.sportmaster.ru/api/v1/profile/changePhone`;
+        const url = this.url + `v1/profile/changePhone`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
@@ -270,7 +272,7 @@ export class AccountService {
         if (typeof accountWithProxyEntity == 'string') {
             accountWithProxyEntity = await this.getAccount(accountWithProxyEntity);
         }
-        const url = `https://mp4x-api.sportmaster.ru/api/v2/analytics/tags`;
+        const url = this.url + `v2/analytics/tags`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {};
@@ -290,7 +292,7 @@ export class AccountService {
     private async findCityPrivate(accountId: string, city: string): Promise<IFindCitiesAccount[]> {
         const accountWithProxyEntity = await this.getAccount(accountId);
         const encodedCity = encodeURI(city.toUpperCase());
-        const url = `https://mp4x-api.sportmaster.ru/api/v1/city?query=${encodedCity}`;
+        const url = this.url + `v1/city?query=${encodedCity}`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
         return response.data.data.list;
@@ -300,7 +302,7 @@ export class AccountService {
         if (typeof accountWithProxyEntity == 'string') {
             accountWithProxyEntity = await this.getAccount(accountWithProxyEntity);
         }
-        const url = 'https://mp4x-api.sportmaster.ru/api/v1/cart2';
+        const url = this.url + 'v1/cart2';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const payload = { clearDeletedLines: 'true', cartResponse: 'FULL2' };
         const response = await this.httpService.post(url, payload, httpOptions);
@@ -310,7 +312,7 @@ export class AccountService {
 
     async applySnapshot(accountId: string, snapshotUrl: string): Promise<CartInterface> {
         const accountWithProxyEntity = await this.getAccount(accountId);
-        const url = 'https://mp4x-api.sportmaster.ru/api/v1/cart/applySnapshot';
+        const url = this.url + 'v1/cart/applySnapshot';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const payload = {
             snapshotUrl: snapshotUrl,
@@ -322,7 +324,7 @@ export class AccountService {
 
     async addPromocode(accountId: string, promocode: string): Promise<boolean> {
         const accountWithProxyEntity = await this.getAccount(accountId);
-        const url = 'https://mp4x-api.sportmaster.ru/api/v1/cart/promoCode';
+        const url = this.url + 'v1/cart/promoCode';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const payload = {
             promoCode: promocode,
@@ -334,7 +336,7 @@ export class AccountService {
 
     async createSnapshot(accountId: string): Promise<string> {
         const accountWithProxyEntity = await this.getAccount(accountId);
-        const url = 'https://mp4x-api.sportmaster.ru/api/v1/cart/createSnapshot';
+        const url = this.url + 'v1/cart/createSnapshot';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const payload = {};
         const response = await this.httpService.post(url, payload, httpOptions);
@@ -344,7 +346,7 @@ export class AccountService {
 
     async deletePromocode(accountId: string): Promise<void> {
         const accountWithProxyEntity = await this.getAccount(accountId);
-        const url = 'https://mp4x-api.sportmaster.ru/api/v1/cart/promoCode';
+        const url = this.url + this.url + 'v1/cart/promoCode';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         await this.httpService.delete(url, httpOptions);
     }
@@ -360,7 +362,7 @@ export class AccountService {
         if (typeof accountWithProxyEntity == 'string') {
             accountWithProxyEntity = await this.getAccount(accountWithProxyEntity);
         }
-        const url = 'https://mp4x-api.sportmaster.ru/api/v1/cart/remove';
+        const url = this.url + 'v1/cart/remove';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const ids = removeList.map((item: IItemsCart) => {
@@ -379,7 +381,7 @@ export class AccountService {
 
     async addInCart(accountId: string, { productId, sku }: IItemsCart): Promise<any> {
         const accountWithProxyEntity = await this.getAccount(accountId);
-        const url = 'https://mp4x-api.sportmaster.ru/api/v2/cart/add';
+        const url = this.url + 'v2/cart/add';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const payload = {
             productList: [
@@ -400,7 +402,7 @@ export class AccountService {
 
     async searchProduct(accountId: string, article: string): Promise<SearchProductInterface> {
         const accountWithProxyEntity = await this.getAccount(accountId);
-        const url = 'https://mp4x-api.sportmaster.ru/api/v2/products/search?limit=10&offset=0';
+        const url = this.url + 'v2/products/search?limit=10&offset=0';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = { queryText: article, persGateTags: ['A_search', 'auth_login_call'] };
@@ -412,7 +414,7 @@ export class AccountService {
 
     async internalPickupAvailability(accountId: string, internalPickupAvabilityItems: IItemsCart[]): Promise<PickupAvabilityInterface> {
         const accountWithProxyEntity = await this.getAccount(accountId);
-        const url = 'https://mp4x-api.sportmaster.ru/api/v1/cart2/internalPickupAvailability';
+        const url = this.url + 'v1/cart2/internalPickupAvailability';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
@@ -424,7 +426,7 @@ export class AccountService {
 
     async internalPickup(accountId: string, shopId: string, internalPickupAvabilityItems: IItemsCart[]) {
         const accountWithProxyEntity = await this.getAccount(accountId);
-        const url = 'https://mp4x-api.sportmaster.ru/api/v1/cart2/obtainPoint/internalPickup';
+        const url = this.url + 'v1/cart2/obtainPoint/internalPickup';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
@@ -442,7 +444,7 @@ export class AccountService {
 
     async submitOrder(accountId: string, version: string): Promise<string> {
         const accountWithProxyEntity = await this.getAccount(accountId);
-        const url = 'https://mp4x-api.sportmaster.ru/api/v1/cart/submit';
+        const url = this.url + 'v1/cart/submit';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
@@ -457,7 +459,7 @@ export class AccountService {
 
     async approveRecipientOrder(accountId: string, recipient: IRecipientOrder): Promise<any> {
         const accountWithProxyEntity = await this.getAccount(accountId);
-        const url = `https://mp4x-api.sportmaster.ru/api/v1/cart/order/${recipient.potentialOrder}/receiver`;
+        const url = this.url + `v1/cart/order/${recipient.potentialOrder}/receiver`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
@@ -474,7 +476,7 @@ export class AccountService {
 
     async orderHistory(accountId: string): Promise<OrdersInterface> {
         const accountWithProxyEntity = await this.getAccount(accountId);
-        const url = `https://mp4x-api.sportmaster.ru/api/v3/orderHistory`;
+        const url = this.url + `v3/orderHistory`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
         return response.data;
@@ -482,7 +484,7 @@ export class AccountService {
 
     async orderInfo(accountId: string, orderNumber: string): Promise<OrderInfoInterface> {
         const accountWithProxyEntity = await this.getAccount(accountId);
-        const url = `https://mp4x-api.sportmaster.ru/api/v4/order/${orderNumber}`;
+        const url = this.url + `v4/order/${orderNumber}`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const payload = {};
         const response = await this.httpService.post(url, payload, httpOptions);
@@ -494,7 +496,7 @@ export class AccountService {
         const reasons = [103, 104, 105, 106];
         const randomIndex = Math.floor(Math.random() * reasons.length);
         const reason = reasons[randomIndex];
-        const url = `https://mp4x-api.sportmaster.ru/api/v1/order/${orderNumber}`;
+        const url = this.url + `v1/order/${orderNumber}`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {

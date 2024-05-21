@@ -35,7 +35,7 @@ import {
     orderHistoryKeyboard,
     ordersInfoKeyboard,
     recipientKeyboard,
-} from './keyboards/make-order.keyboard';
+} from '../../keyboards/make-order.keyboard';
 import { UserService } from '../../../user/user.service';
 import { isCityPipe } from '../../pipes/isCity.pipe';
 import { ERROR_FIND_CITY } from '../../constants/error.constant';

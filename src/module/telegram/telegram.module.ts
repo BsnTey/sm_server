@@ -23,6 +23,7 @@ import {
     OrderMenuCart,
 } from './updates/make-order/make-order.update';
 import { MakeOrderService } from './updates/make-order/make-order.service';
+import { CalculateUpdate } from './updates/calculate/calculate.update';
 
 @Module({
     providers: [
@@ -50,6 +51,7 @@ import { MakeOrderService } from './updates/make-order/make-order.service';
         OrderInputArticle,
         OrderChangeRecipient,
         OrderGetOrders,
+        CalculateUpdate,
     ],
 })
 export class TelegramModule {}

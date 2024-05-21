@@ -1,9 +1,9 @@
 import { Markup } from 'telegraf';
-import { CitySMEntity } from '../../../../account/entities/citySM.entity';
-import { CartInterface } from '../../../../account/interfaces/cart.interface';
-import { SearchProductInterface } from '../../../../account/interfaces/search-product.interface';
-import { PickupAvabilityInterface } from '../../../../account/interfaces/pickup-avability.interface';
-import { OrdersInterface } from '../../../../account/interfaces/orders.interface';
+import { CitySMEntity } from '../../account/entities/citySM.entity';
+import { CartInterface } from '../../account/interfaces/cart.interface';
+import { SearchProductInterface } from '../../account/interfaces/search-product.interface';
+import { PickupAvabilityInterface } from '../../account/interfaces/pickup-avability.interface';
+import { OrdersInterface } from '../../account/interfaces/orders.interface';
 
 export const mainMenuOrderKeyboard = (city: string) => {
     return Markup.inlineKeyboard([

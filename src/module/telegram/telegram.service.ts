@@ -33,4 +33,18 @@ export class TelegramService {
         if (!account) throw new HttpException(ERROR_TIMEOUT_TTL_CASH, HttpStatus.FORBIDDEN);
         return account;
     }
+
+    async setDataCache(telegramId: number, data: any[]) {
+        const dataFromCache = await this.cacheManager.get<any>(String(telegramId));
+        if (dataFromCache) {
+            await this.cacheManager.del(dataFromCache.data);
+        }
+        await this.cacheManager.set(String(telegramId), data, TTL_CASH);
+    }
+
+    async getDataFromCache(telegramId: number): Promise<any[]> {
+        const data = await this.cacheManager.get<any>(String(telegramId));
+        if (!data) throw new HttpException(ERROR_TIMEOUT_TTL_CASH, HttpStatus.FORBIDDEN);
+        return data;
+    }
 }

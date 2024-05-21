@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { aproveShopKeyboard, comebackShopSelection } from './keyboards/make-order.keyboard';
+import { aproveShopKeyboard, comebackShopSelection } from '../../keyboards/make-order.keyboard';
 import { IAccountCashing } from '../../../account/interfaces/account.interface';
 
 @Injectable()
