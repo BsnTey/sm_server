@@ -19,10 +19,12 @@ import { SearchProductInterface } from './interfaces/search-product.interface';
 import { PickupAvabilityInterface } from './interfaces/pickup-avability.interface';
 import { OrdersInterface } from './interfaces/orders.interface';
 import { OrderInfoInterface } from './interfaces/order-info.interface';
+import { ShortInfoInterface } from './interfaces/short-info.interface';
 
 @Injectable()
 export class AccountService {
     private url = this.configService.getOrThrow('API_DONOR');
+    private adminsId: string[] = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
     private durationTimeProxyBlock = this.configService.getOrThrow('TIME_DURATION_PROXY_BLOCK_IN_MIN');
 
     constructor(
@@ -70,6 +72,7 @@ export class AccountService {
             expiresInRefresh: expiresInDateRefresh,
             bonusCount: +bonusCount,
             isOnlyAccessOrder: Boolean(isOnlyAccessOrder),
+            ownerTelegramId: this.adminsId[0],
         });
         await this.accountRep.addingAccount(account);
         return account;
@@ -189,13 +192,13 @@ export class AccountService {
         return accountWithProxyEntity;
     }
 
-    async shortInfo(accountId: string) {
-        const { bonusCount, qrCode, citySMName } = await this.shortInfoPrivate(accountId);
+    async shortInfo(accountId: string): Promise<ShortInfoInterface> {
+        const { bonusCount, qrCode, bonusDetails, citySMName } = await this.shortInfoPrivate(accountId);
         await this.updateAccountBonusCount(accountId, bonusCount);
-        return { bonusCount, qrCode, citySMName };
+        return { bonusCount, qrCode, bonusDetails, citySMName };
     }
 
-    private async shortInfoPrivate(accountId: string) {
+    private async shortInfoPrivate(accountId: string): Promise<ShortInfoInterface> {
         const accountWithProxyEntity = await this.getAccount(accountId);
         const url = this.url + 'v2/bonus/shortInfo';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
@@ -203,7 +206,8 @@ export class AccountService {
 
         const bonusCount: number = +response.data.data.info.totalAmount;
         const qrCode: string = response.data.data.info.clubCard.qrCode;
-        return { bonusCount, qrCode, citySMName: accountWithProxyEntity.citySM.name };
+        const bonusDetails = response.data.data.info.details;
+        return { bonusCount, qrCode, bonusDetails, citySMName: accountWithProxyEntity.citySM.name };
     }
 
     async sendSmsWithAnalytics(accountId: string, phoneNumber: string): Promise<string> {

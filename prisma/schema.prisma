@@ -65,7 +65,7 @@ model Account {
   cityId            String       @default("1720920299") @map("city_id")
   citySM            CitySM       @relation(fields: [cityId], references: [cityId])
   orders            Order[]
-  ownerTelegramId   String       @default("750126398") @map("owner_telegram_id")
+  ownerTelegramId   String       @map("owner_telegram_id")
   ownerTelegram     UserTelegram @relation(fields: [ownerTelegramId], references: [telegramId])
   proxyUuid         String?      @map("proxy_uuid") @db.Uuid
   proxy             Proxy?       @relation(fields: [proxyUuid], references: [uuid])
@@ -80,7 +80,7 @@ model CitySM {
   cityUsers UserCitySM[]
   createdAt DateTime     @default(now()) @map("created_at")
   updatedAt DateTime     @updatedAt @map("updated_at")
-  Account   Account[]
+  accounts  Account[]
 
   @@map("city_sm")
 }
@@ -113,7 +113,7 @@ model Proxy {
   blockedAt DateTime? @map("blocked_at")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
-  Account   Account[]
+  accounts  Account[]
 
   @@map("proxy")
 }
