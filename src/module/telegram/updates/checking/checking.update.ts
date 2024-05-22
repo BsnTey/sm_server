@@ -1,7 +1,6 @@
 import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
-import { AccountService } from '../../../account/account.service';
 import { TelegramService } from '../../telegram.service';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { ALL_KEYS_MENU_BUTTON_NAME, CHECK } from '../base-command/base-command.constants';
@@ -13,7 +12,6 @@ import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 export class CheckingUpdate {
     constructor(
         private checkingService: CheckingService,
-        private accountService: AccountService,
         private telegramService: TelegramService,
     ) {}
 

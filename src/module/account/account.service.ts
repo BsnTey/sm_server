@@ -82,9 +82,9 @@ export class AccountService {
         return await this.accountRep.getAccountCookie(accountId);
     }
 
-    // async findAccountEmail(accountId: string) {
-    //     return await this.accountRep.getAccountEmail(accountId);
-    // }
+    async findAccountEmail(accountId: string) {
+        return await this.accountRep.getAccountEmail(accountId);
+    }
 
     async updateAccountBonusCount(accountId: string, bonusCount: number) {
         return await this.accountRep.updateBonusCount(accountId, bonusCount);

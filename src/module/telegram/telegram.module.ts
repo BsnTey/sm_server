@@ -26,6 +26,8 @@ import { MakeOrderService } from './updates/make-order/make-order.service';
 import { CalculateUpdate } from './updates/calculate/calculate.update';
 import { CheckingUpdate } from './updates/checking/checking.update';
 import { CheckingService } from './updates/checking/checking.service';
+import { EmailUpdate } from './updates/email/email.update';
+import { EmailService } from './updates/email/email.service';
 
 @Module({
     providers: [
@@ -56,6 +58,8 @@ import { CheckingService } from './updates/checking/checking.service';
         CalculateUpdate,
         CheckingUpdate,
         CheckingService,
+        EmailUpdate,
+        EmailService,
     ],
 })
 export class TelegramModule {}
