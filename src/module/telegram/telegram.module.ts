@@ -28,6 +28,9 @@ import { CheckingUpdate } from './updates/checking/checking.update';
 import { CheckingService } from './updates/checking/checking.service';
 import { EmailUpdate } from './updates/email/email.update';
 import { EmailService } from './updates/email/email.service';
+import { CookieUpdate } from './updates/cookie/cookie.update';
+import { QrCodeUpdate } from './updates/qr-code/qr-code.update';
+import { QrCodeService } from './updates/qr-code/qr-code.service';
 
 @Module({
     providers: [
@@ -60,6 +63,9 @@ import { EmailService } from './updates/email/email.service';
         CheckingService,
         EmailUpdate,
         EmailService,
+        CookieUpdate,
+        QrCodeUpdate,
+        QrCodeService,
     ],
 })
 export class TelegramModule {}

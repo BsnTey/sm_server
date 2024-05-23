@@ -79,7 +79,34 @@ export class AccountService {
     }
 
     async getAccountCookie(accountId: string) {
-        return await this.accountRep.getAccountCookie(accountId);
+        const account = await this.accountRep.getAccountCookie(accountId);
+        const cookieString = account.cookie;
+
+        const cookieInJson: any[] = JSON.parse(cookieString);
+        const smid = cookieInJson.find(cookie => {
+            if (cookie.name == 'SMID') return true;
+        });
+        if (!smid) {
+            throw new Error('SMID not found in cookies');
+        }
+
+        const cookieObject = [
+            {
+                domain: 'www.sportmaster.ru',
+                hostOnly: true,
+                httpOnly: true,
+                name: 'SMID',
+                path: '/',
+                sameSite: 'lax',
+                secure: false,
+                session: false,
+                storeId: null,
+                value: smid.value,
+            },
+        ];
+
+        account.cookie = JSON.stringify(cookieObject);
+        return account;
     }
 
     async findAccountEmail(accountId: string) {
