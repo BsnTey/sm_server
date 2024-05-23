@@ -8,17 +8,17 @@ import { ConfigService } from '@nestjs/config';
 export class AdminGuard implements CanActivate {
     constructor(private readonly configService: ConfigService) {}
 
-    private TELEGRAM_ADMIN_ID: number[] | undefined;
+    private TELEGRAM_ADMIN_ID: string[] | undefined;
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
-        this.TELEGRAM_ADMIN_ID = this.configService.get<number[]>('TELEGRAM_ADMIN_ID');
-        if (!this.TELEGRAM_ADMIN_ID) {
+        this.TELEGRAM_ADMIN_ID = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
+        if (this.TELEGRAM_ADMIN_ID?.length == 0) {
             throw new TelegrafException(NOT_ADMIN_LIST);
         }
         const ctx = TelegrafExecutionContext.create(context);
         const { from } = ctx.getContext<Context>();
 
-        const isAdmin = this.TELEGRAM_ADMIN_ID.includes(from!.id);
+        const isAdmin = this.TELEGRAM_ADMIN_ID!.includes(String(from!.id));
         if (!isAdmin) {
             throw new TelegrafException(NOT_ADMIN);
         }

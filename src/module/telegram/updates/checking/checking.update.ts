@@ -1,4 +1,4 @@
-import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
+import { Ctx, Hears, Message, On, Scene, SceneEnter } from 'nestjs-telegraf';
 import { UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { TelegramService } from '../../telegram.service';
@@ -16,7 +16,7 @@ export class CheckingUpdate {
     ) {}
 
     @SceneEnter()
-    async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
+    async onSceneEnter(@Ctx() ctx: WizardContext) {
         await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки', mainMenuKeyboard);
     }
 

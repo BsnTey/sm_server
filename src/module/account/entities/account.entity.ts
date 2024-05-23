@@ -23,7 +23,7 @@ export class AccountEntity implements Account {
     ownerTelegramId: string;
     proxyUuid: string | null;
     cityId = '1720920299';
-    cityName = 'Москва';
+    cityName? = 'Москва';
 
     createdAt: Date;
     updatedAt: Date;

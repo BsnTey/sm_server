@@ -97,7 +97,7 @@ model UserCitySM {
 
 model Order {
   id          Int      @id @default(autoincrement())
-  orderNumber String   @map("order_number")
+  orderNumber String   @unique @map("order_number")
   accountId   String   @map("account_id")
   account     Account  @relation(fields: [accountId], references: [accountId])
   createdAt   DateTime @default(now()) @map("created_at")

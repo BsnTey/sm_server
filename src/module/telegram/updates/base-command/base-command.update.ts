@@ -1,8 +1,9 @@
 import { UseFilters, UseGuards } from '@nestjs/common';
-import { Ctx, Hears, Update } from 'nestjs-telegraf';
+import { Ctx, Hears, Message, Scene, SceneEnter, Update } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
 import {
     ADMIN,
+    ALL_KEYS_MENU_BUTTON_NAME,
     CALCULATE_BONUS,
     CASH_RECEIPT,
     CHANGE_NUMBER,
@@ -17,6 +18,8 @@ import {
 import { Context } from '../../interfaces/telegram.context';
 import { AdminGuard } from '../admin/admin.guard';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
+import { TelegramService } from '../../telegram.service';
+import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 
 @Update()
 @UseFilters(TelegrafExceptionFilter)
@@ -29,7 +32,7 @@ export class BaseUpdate {
     @Hears([ADMIN.name])
     @UseGuards(AdminGuard)
     async onAdminCommand(@Ctx() ctx: Context) {
-        await ctx.reply('admin');
+        await ctx.scene.enter(ADMIN.scene);
     }
 
     @Hears([CHANGE_NUMBER.name])
@@ -75,5 +78,21 @@ export class BaseUpdate {
     @Hears([CALCULATE_BONUS.name])
     async onStartCalculate(@Ctx() ctx: WizardContext) {
         await ctx.scene.enter(CALCULATE_BONUS.scene);
+    }
+}
+
+@Scene(HELP.scene)
+@UseFilters(TelegrafExceptionFilter)
+export class HelpUpdate {
+    constructor(private telegramService: TelegramService) {}
+
+    @SceneEnter()
+    async onSceneEnter(@Ctx() ctx: WizardContext) {
+        await ctx.reply('Обратиться в поддержку можно по ссылке t.me/tpsm_shop', mainMenuKeyboard);
+    }
+
+    @Hears(ALL_KEYS_MENU_BUTTON_NAME)
+    async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
+        await this.telegramService.exitScene(menuBtn, ctx);
     }
 }

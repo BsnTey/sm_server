@@ -6,7 +6,7 @@ const AddingAccountRequestSchema = z.object({
     email: z.string().email(),
     passImap: z.string(),
     passEmail: z.string(),
-    cookie: z.array(z.any()),
+    cookie: z.string(),
     accessToken: z.string(),
     refreshToken: z.string(),
     xUserId: z.string(),

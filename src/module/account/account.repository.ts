@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Account } from '@prisma/client';
+import { Account, Order, Prisma } from '@prisma/client';
 import { PrismaService } from '@common/database/prisma.service';
 import { AccountEntity } from './entities/account.entity';
 import { IAccountWithProxy, IRefreshAccount } from './interfaces/account.interface';
@@ -10,16 +10,61 @@ export class AccountRepository {
     constructor(private prisma: PrismaService) {}
 
     async addingAccount(account: AccountEntity): Promise<Account> {
-        return this.prisma.account.create({
-            data: {
-                ...account,
+        const accountData: Prisma.AccountCreateInput = {
+            accountId: account.accountId,
+            email: account.email,
+            passImap: account.passImap,
+            passEmail: account.passEmail,
+            cookie: account.cookie,
+            accessToken: account.accessToken,
+            refreshToken: account.refreshToken,
+            xUserId: account.xUserId,
+            deviceId: account.deviceId,
+            installationId: account.installationId,
+            googleId: account.googleId,
+            pushToken: account.pushToken,
+            expiresInAccess: account.expiresInAccess,
+            expiresInRefresh: account.expiresInRefresh,
+            isAccessMp: account.isAccessMp,
+            isAccessCookie: account.isAccessCookie,
+            isOnlyAccessOrder: account.isOnlyAccessOrder,
+            bonusCount: account.bonusCount,
+            isUpdateBonus: account.isUpdateBonus,
+            createdAt: account.createdAt,
+            updatedAt: account.updatedAt,
+            citySM: {
+                connect: {
+                    cityId: account.cityId,
+                },
             },
+            ownerTelegram: {
+                connect: {
+                    telegramId: account.ownerTelegramId,
+                },
+            },
+            proxy: account.proxyUuid
+                ? {
+                      connect: {
+                          uuid: account.proxyUuid,
+                      },
+                  }
+                : undefined,
+        };
+
+        return this.prisma.account.create({
+            data: accountData,
         });
     }
 
     async getAccount(accountId: string): Promise<Account | null> {
         return this.prisma.account.findUnique({
             where: { accountId },
+        });
+    }
+
+    async getOrder(orderNumber: string): Promise<Order | null> {
+        return this.prisma.order.findFirst({
+            where: { orderNumber },
         });
     }
 
@@ -125,6 +170,15 @@ export class AccountRepository {
                 cityId: city.cityId,
                 name: city.name,
                 fullName: city.fullName,
+            },
+        });
+    }
+
+    async addOrderNumber(accountId: string, orderNumber: string): Promise<Order> {
+        return this.prisma.order.create({
+            data: {
+                orderNumber,
+                accountId,
             },
         });
     }

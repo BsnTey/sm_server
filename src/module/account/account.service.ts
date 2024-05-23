@@ -1,10 +1,9 @@
-import { HttpException, HttpStatus, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { AccountRepository } from './account.repository';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
 import { AccountEntity } from './entities/account.entity';
-import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { IAccountWithProxy, IFindCitiesAccount, IRecipientOrder, IRefreshAccount } from './interfaces/account.interface';
-import { Account } from '@prisma/client';
+import { Account, Order } from '@prisma/client';
 import { ProxyService } from '../proxy/proxy.service';
 import { ERROR_ACCOUNT_NOT_FOUND, ERROR_LOGOUT_MP } from './constants/error.constant';
 import { ConfigService } from '@nestjs/config';
@@ -20,6 +19,7 @@ import { PickupAvabilityInterface } from './interfaces/pickup-avability.interfac
 import { OrdersInterface } from './interfaces/orders.interface';
 import { OrderInfoInterface } from './interfaces/order-info.interface';
 import { ShortInfoInterface } from './interfaces/short-info.interface';
+import { PromocodeInterface } from './interfaces/promocode.interface';
 
 @Injectable()
 export class AccountService {
@@ -28,7 +28,6 @@ export class AccountService {
     private durationTimeProxyBlock = this.configService.getOrThrow('TIME_DURATION_PROXY_BLOCK_IN_MIN');
 
     constructor(
-        @Inject(CACHE_MANAGER) private cacheManager: Cache,
         private configService: ConfigService,
         private accountRep: AccountRepository,
         private proxyService: ProxyService,
@@ -62,7 +61,7 @@ export class AccountService {
             email,
             passImap,
             passEmail,
-            cookie: JSON.stringify(cookie),
+            cookie,
             accessToken,
             refreshToken,
             xUserId,
@@ -113,12 +112,20 @@ export class AccountService {
         return await this.accountRep.getAccountEmail(accountId);
     }
 
+    async findOrderNumber(orderNumber: string) {
+        return await this.accountRep.getOrder(orderNumber);
+    }
+
     async updateAccountBonusCount(accountId: string, bonusCount: number) {
         return await this.accountRep.updateBonusCount(accountId, bonusCount);
     }
 
     async updateTokensAccount(accountId: string, dataAccount: IRefreshAccount): Promise<Account> {
         return await this.accountRep.updateTokensAccount(accountId, dataAccount);
+    }
+
+    async addOrder(accountId: string, orderNumber: string): Promise<Order> {
+        return await this.accountRep.addOrderNumber(accountId, orderNumber);
     }
 
     async setAccountCity(accountId: string, cityId: string) {
@@ -505,7 +512,17 @@ export class AccountService {
         return response.data.data.cart.version;
     }
 
-    async orderHistory(accountId: string): Promise<OrdersInterface> {
+    async orderHistory(accountId: string) {
+        const data = await this.orderHistoryPrivate(accountId);
+        for (const order of data.data.orders) {
+            try {
+                await this.addOrder(accountId, order.number);
+            } catch (err) {}
+        }
+        return data;
+    }
+
+    private async orderHistoryPrivate(accountId: string): Promise<OrdersInterface> {
         const accountWithProxyEntity = await this.getAccount(accountId);
         const url = this.url + `v3/orderHistory`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
@@ -535,6 +552,14 @@ export class AccountService {
         };
 
         const response = await this.httpService.post(url, payload, httpOptions);
+        return response.data;
+    }
+
+    async getPromocodeFromProfile(accountId: string): Promise<PromocodeInterface> {
+        const accountWithProxyEntity = await this.getAccount(accountId);
+        const url = this.url + `v2/promocode`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const response = await this.httpService.get(url, httpOptions);
         return response.data;
     }
 }

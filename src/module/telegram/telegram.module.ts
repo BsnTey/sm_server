@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { BaseUpdate } from './updates/base-command/base-command.update';
+import { BaseUpdate, HelpUpdate } from './updates/base-command/base-command.update';
 import { StartUpdate } from './updates/start/start.update';
 import { UserService } from '../user/user.service';
 import { UserRepository } from '../user/user.repository';
@@ -31,6 +31,8 @@ import { EmailService } from './updates/email/email.service';
 import { CookieUpdate } from './updates/cookie/cookie.update';
 import { QrCodeUpdate } from './updates/qr-code/qr-code.update';
 import { QrCodeService } from './updates/qr-code/qr-code.service';
+import { GetInfoOrderUpdate, ProfileUpdate } from './updates/profile/profile.update';
+import { AdminUpdate } from './updates/admin/admin.update';
 
 @Module({
     providers: [
@@ -39,6 +41,8 @@ import { QrCodeService } from './updates/qr-code/qr-code.service';
         ProxyRepository,
         HttpService,
         BaseUpdate,
+        HelpUpdate,
+        AdminUpdate,
         StartUpdate,
         UserService,
         UserRepository,
@@ -66,6 +70,8 @@ import { QrCodeService } from './updates/qr-code/qr-code.service';
         CookieUpdate,
         QrCodeUpdate,
         QrCodeService,
+        ProfileUpdate,
+        GetInfoOrderUpdate,
     ],
 })
 export class TelegramModule {}

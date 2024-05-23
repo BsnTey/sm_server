@@ -635,7 +635,6 @@ export class OrderGetOrders {
         const account = await this.telegramService.getFromCache(telegramId);
         const orders = await this.accountService.orderHistory(account.accountId);
         const keyboard = orderHistoryKeyboard(orders);
-        //
         const text = 'Имеющиеся заказы на аккаунте:';
         try {
             await ctx.editMessageText(text, keyboard);
