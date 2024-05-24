@@ -655,7 +655,7 @@ export class OrderGetOrders {
         //@ts-ignore
         const orderNumber = ctx.match[0].split('_')[1];
         const order = await this.accountService.orderInfo(account.accountId, orderNumber);
-        const keyboard = infoOrderKeyboard(order.data.order.number, order.data.order.isCancelled);
+        const keyboard = infoOrderKeyboard(account.accountId, order.data.order.number, order.data.order.isCancelled);
 
         const text = `Заказ номер: <code>${order.data.order.number}</code>`;
         await ctx.editMessageText(text, {
