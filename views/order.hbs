@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Спортмастер — спортивный магазин для всей семьи!</title>
+    <link rel="icon" href="/img/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="/css/styles.css" type="text/css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+<div class="main">
+
+    <div class="header">
+        <a class="back-arrow" href="#">
+            <img src="/img/arrow.svg" alt="Назад">
+        </a>
+        <p class="text17-black order-number">
+            Заказ №{{order.number}}
+        </p>
+    </div>
+
+    <div class="date-create">
+        <p class="date-create-item text14-grey">
+            Создан {{formatDate order.createdDate}}
+        </p>
+        <a class="button-check" id="check-button" style="background-color: {{order.status.backgroundColor}}; color: {{order.status.textColor}}">
+            <span id="check-button-text">{{trim order.status.statusText}}</span>
+        </a>
+    </div>
+
+    <div class="about-address">
+        <div class="about-address-info" id="about-address-info-id">
+            <p class="type-order text16-black">
+                {{order.deliveryInfo.type.title}}
+            </p>
+            <p class="address text14-black">
+                {{order.deliveryInfo.intPickup.shopAddress}}
+            </p>
+            <p class="operating-mode text14-black" id="operating-mode-id">
+                Ежедневно: с 10:00 до 22:00
+            </p>
+        </div>
+        <div class="button-route" id="button-route-id">
+            <img src="/img/route.svg" alt="Назад" width="20" height="20">
+        </div>
+    </div>
+    <div id="trek-number-block" style="display: {{#if order.deliveryInfo.delivery}}block{{else}}none{{/if}}">
+        <p class="type-order text16-black">
+            Трек-номер
+        </p>
+        <div id="trek-number-link-block">
+            <p class="text14-black">
+                {{extractTrackNumber order.deliveryInfo.delivery.trackNumbers.[0]}}
+            </p>
+            <a href="{{order.deliveryInfo.delivery.trackNumbers.[0]}}" target="_blank" id="trek-number-link">
+                <img src="/img/link.svg" alt="Ссылка" width="20" height="20">
+            </a>
+        </div>
+    </div>
+    <div class="date-delivery">
+        <p class="text16-black">
+            Дата доставки
+        </p>
+        <p class="text14-black">
+            {{formatDate order.deliveryInfo.planReceivingDateTimeFrom}} - {{formatDate order.deliveryInfo.receivingDateTo}}
+        </p>
+    </div>
+
+    <div class="payment-method-info">
+        <p class="text16-black">
+            Способ оплаты
+        </p>
+        <div class="payment-method">
+            <p class="text14-black">
+                {{order.payment.paymentMethod.name}}
+            </p>
+            <p class="text14-orange">
+                {{getPaymentStatus order.payment.isPayed}}
+            </p>
+        </div>
+    </div>
+
+    <div class="about-price">
+        <div class="count-items">
+            <p class="text14-grey">
+                {{order.items.length}}
+                {{getItemName order.items.length}}
+            </p>
+            <p class="price-items text14-grey">
+                {{digitSeparator (divide order.totals.totalCatalogCost.value 100)}} ₽
+            </p>
+        </div>
+        <div class="discount-bonus" id="catalog-discount-block" style="display: {{#if order.totals.catalogDiscount.value}}flex{{else}}none{{/if}}">
+            <p class="text14-grey">
+                Скидка
+            </p>
+            <p class="count-bonus text14-grey">
+                -{{digitSeparator (divide order.totals.catalogDiscount.value 100)}} ₽
+            </p>
+        </div>
+        <div class="discount-bonus" id="promocode-discount-block" style="display: {{#if order.totals.promocodeDiscount.value}}flex{{else}}none{{/if}}">
+            <p class="text14-grey">
+                Скидка по промокоду
+            </p>
+            <p class="count-bonus text14-grey">
+                -{{digitSeparator (divide order.totals.promocodeDiscount.value 100)}} ₽
+            </p>
+        </div>
+        <div class="discount-bonus" id="total-bonuses-used-block" style="display: {{#if order.totals.totalBonusesUsed.value}}flex{{else}}none{{/if}}">
+            <p class="text14-grey">Оплата бонусами</p>
+            <p class="count-bonus text14-grey">-{{digitSeparator (divide order.totals.totalBonusesUsed.value 100)}} ₽</p>
+        </div>
+
+        <div class="total-price">
+            <p class="text14-black-med">
+                Итого
+            </p>
+            <p class="count-total-price text14-black-med">{{digitSeparator (divide order.totals.totalCost.value 100)}} ₽</p>
+        </div>
+    </div>
+
+    <div class="about-buyer">
+        <p class="text16-black">
+            Получатель
+        </p>
+        <p class="fio text14-black">
+            {{order.deliveryInfo.receiver.fio}}
+        </p>
+        <p class="email-buyer text14-black">
+            {{order.deliveryInfo.receiver.email}}
+        </p>
+        <p class="tel-number text14-black">
+            +7 {{formatPhone order.deliveryInfo.receiver.phone.nationalNumber}}
+        </p>
+    </div>
+
+    <div class="about-order">
+        <p class="about-order-count text18-black">
+            {{order.items.length}}
+            {{getItemName order.items.length}}
+            в заказе
+        </p>
+        <ul class="about-order-section">
+            {{#each order.items}}
+                <li class="order-section">
+                    <img class="image_item" src="{{removeImagePath this.image}}" alt="{{this.name}}">
+                    <div class="about-order-info">
+                        <div class="wrapper-order-info">
+                            <p class="text12-black">{{this.name}}</p>
+                            <ul class="param-order text12-grey">
+                                {{#each this.params}}
+                                    <li>{{this.name}}: {{this.value}}</li>
+                                {{/each}}
+                            </ul>
+                        </div>
+                        <div class="about-order-info-price">
+                            <p class="price-item text14-black-bold">{{digitSeparator (divide this.totalPrice.value 100)}} ₽</p>
+                            <p class="price-item-discount text12-grey">{{digitSeparator (divide this.priceWoDiscount.value 100)}} ₽</p>
+                            <p class="count-item text12-grey">{{this.amount}} шт.</p>
+                        </div>
+                    </div>
+                </li>
+            {{/each}}
+        </ul>
+    </div>
+    <div class="buttons-footer">
+        <div class="button-ask" id="electronic-receipt" style="display: {{#if (or (equals order.status.status 'issued') (equals order.status.status 'delivered'))}}block{{else}}none{{/if}}">
+            <p>Электронный чек</p>
+        </div>
+        <div class="button-ask">
+            <p>Задать вопрос по заказу</p>
+        </div>
+        <div class="button-ask" id="cancelled-order" style="display: {{#if (equals order.status.status 'cancelled')}}none{{else}}block{{/if}}">
+            <p>Отменить заказ</p>
+        </div>
+    </div>
+    <div class="footer-menu">
+        <ul>
+            <li class="Home">
+                <img class="grey-wrap" src="/img/home.svg" width="19" height="19">
+            </li>
+            <li class="Catalog">
+                <img class="grey-wrap menu-svg" src="/img/search.svg">
+            </li>
+            <li class="Menu">
+                <img src="/img/menu.png" width="19" height="19">
+            </li>
+            <li class="Cart">
+                <img class="grey-wrap" src="/img/cart.svg" width="24" height="24">
+            </li>
+            <li class="Profile">
+                <img class="grey-wrap current-link" src="/img/person.svg" width="19" height="19">
+            </li>
+        </ul>
+    </div>
+</div>
+</body>
+</html>
