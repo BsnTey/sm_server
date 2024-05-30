@@ -7,8 +7,30 @@ import { IItemsCart } from '../../telegram/utils/cart.utils';
 export interface IRefreshAccount {
     accessToken: string;
     refreshToken: string;
+    expiresIn: string;
+}
+
+export interface IRefreshDataAccount {
+    accessToken: string;
+    refreshToken: string;
     expiresInAccess: Date;
     expiresInRefresh: Date;
+}
+
+export interface IUpdateAccount {
+    accessToken: string;
+    refreshToken: string;
+    xUserId: string;
+    deviceId: string;
+    installationId: string;
+    expiresInAccess: Date;
+    expiresInRefresh: Date;
+}
+
+export interface IEmailFromDb {
+    email: string;
+    passImap: string;
+    passEmail: string;
 }
 
 export interface IAccountCashing {
@@ -22,7 +44,6 @@ export interface IAccountCashing {
     shop?: Shop;
     version?: string;
     potentialOrder?: string;
-    // [key: string]: string;
 }
 
 export interface IAccountWithProxy extends Account {

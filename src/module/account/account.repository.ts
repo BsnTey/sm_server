@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Account, Order, Prisma } from '@prisma/client';
 import { PrismaService } from '@common/database/prisma.service';
 import { AccountEntity } from './entities/account.entity';
-import { IAccountWithProxy, IRefreshAccount } from './interfaces/account.interface';
+import { IAccountWithProxy, IEmailFromDb, IRefreshDataAccount, IUpdateAccount } from './interfaces/account.interface';
 import { CitySMEntity } from './entities/citySM.entity';
 
 @Injectable()
@@ -107,7 +107,7 @@ export class AccountRepository {
         });
     }
 
-    async getAccountEmail(accountId: string): Promise<any> {
+    async getAccountEmail(accountId: string): Promise<IEmailFromDb | null> {
         return this.prisma.account.findUnique({
             where: { accountId },
             select: {
@@ -118,9 +118,35 @@ export class AccountRepository {
         });
     }
 
+    async getEmail(email: string): Promise<Account | null> {
+        return this.prisma.account.findFirst({
+            where: { email },
+        });
+    }
+
+    async updateAccount(
+        accountId: string,
+        { accessToken, refreshToken, xUserId, deviceId, installationId, expiresInAccess, expiresInRefresh }: IUpdateAccount,
+    ): Promise<Account> {
+        return this.prisma.account.update({
+            where: {
+                accountId,
+            },
+            data: {
+                accessToken,
+                refreshToken,
+                xUserId,
+                deviceId,
+                installationId,
+                expiresInAccess,
+                expiresInRefresh,
+            },
+        });
+    }
+
     async updateTokensAccount(
         accountId: string,
-        { accessToken, refreshToken, expiresInAccess, expiresInRefresh }: IRefreshAccount,
+        { accessToken, refreshToken, expiresInAccess, expiresInRefresh }: IRefreshDataAccount,
     ): Promise<Account> {
         return this.prisma.account.update({
             where: {
@@ -135,7 +161,7 @@ export class AccountRepository {
         });
     }
 
-    async setBanMp(accountId: string): Promise<any> {
+    async setBanMp(accountId: string): Promise<Account> {
         return this.prisma.account.update({
             where: {
                 accountId,
@@ -146,13 +172,35 @@ export class AccountRepository {
         });
     }
 
-    async updateBonusCount(accountId: string, bonusCount: number): Promise<any> {
+    async updateBonusCount(accountId: string, bonusCount: number): Promise<Account> {
         return this.prisma.account.update({
             where: {
                 accountId,
             },
             data: {
                 bonusCount,
+            },
+        });
+    }
+
+    async updatePushToken(accountId: string, pushToken: string): Promise<Account> {
+        return this.prisma.account.update({
+            where: {
+                accountId,
+            },
+            data: {
+                pushToken,
+            },
+        });
+    }
+
+    async updateGoogleId(accountId: string, googleId: string): Promise<Account> {
+        return this.prisma.account.update({
+            where: {
+                accountId,
+            },
+            data: {
+                googleId,
             },
         });
     }

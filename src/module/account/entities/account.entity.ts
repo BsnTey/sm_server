@@ -29,6 +29,10 @@ export class AccountEntity implements Account {
     updatedAt: Date;
 
     constructor(account: Partial<Account>) {
+        account = {
+            ...account,
+            cookie: this.formatedCookie(account.cookie!),
+        };
         Object.assign(this, account);
         return this;
     }
@@ -45,5 +49,29 @@ export class AccountEntity implements Account {
     setCity(cityId: string, cityName: string): void {
         this.cityId = cityId;
         this.cityName = cityName;
+    }
+
+    private formatedCookie(cookieString: string) {
+        const cookieInJson: any[] = JSON.parse(cookieString);
+        const smid = cookieInJson.find(cookie => {
+            if (cookie.name == 'SMID') return true;
+        });
+
+        const cookieObject = [
+            {
+                domain: 'www.sportmaster.ru',
+                hostOnly: true,
+                httpOnly: true,
+                name: 'SMID',
+                path: '/',
+                sameSite: 'lax',
+                secure: false,
+                session: false,
+                storeId: null,
+                value: smid.value,
+            },
+        ];
+
+        return JSON.stringify(cookieObject);
     }
 }

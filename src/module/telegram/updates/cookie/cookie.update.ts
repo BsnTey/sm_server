@@ -5,8 +5,7 @@ import { WizardContext } from 'telegraf/typings/scenes';
 import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { TelegramService } from '../../telegram.service';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
-import { NotFoundException, UseFilters } from '@nestjs/common';
-import { ERROR_ACCOUNT_NOT_FOUND } from '../../../account/constants/error.constant';
+import { UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 
 @Scene(COOKIE.scene)
@@ -29,8 +28,7 @@ export class CookieUpdate {
 
     @On('text')
     async findAccount(@Message('text', new isAccountIdPipe()) accountId: string, @Ctx() ctx: WizardContext) {
-        const account = await this.accountService.getAccountCookie(accountId);
-        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
-        await ctx.reply(String(account.cookie));
+        const account = await this.accountService.getAccount(accountId);
+        await ctx.reply(account.cookie);
     }
 }
