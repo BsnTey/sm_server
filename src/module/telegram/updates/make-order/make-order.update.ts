@@ -626,7 +626,7 @@ export class OrderChangeRecipient {
 @Scene(ORDER_GET_ORDERS_SCENE)
 @UseFilters(TelegrafExceptionFilter)
 export class OrderGetOrders {
-    private HOST_SITE = this.configService.getOrThrow('HOST', 'localhost') + ':' + this.configService.getOrThrow('IP', 3001);
+    private DOMAIN = this.configService.getOrThrow('DOMAIN', 'http://localhost:3001');
 
     constructor(
         private accountService: AccountService,
@@ -659,7 +659,7 @@ export class OrderGetOrders {
         //@ts-ignore
         const orderNumber = ctx.match[0].split('_')[1];
         const order = await this.accountService.orderInfo(account.accountId, orderNumber);
-        const keyboard = infoOrderKeyboard(account.accountId, order.data.order.number, order.data.order.isCancelled, this.HOST_SITE);
+        const keyboard = infoOrderKeyboard(account.accountId, order.data.order.number, order.data.order.isCancelled, this.DOMAIN);
 
         const text = `Заказ номер: <code>${order.data.order.number}</code>`;
         await ctx.editMessageText(text, {

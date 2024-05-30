@@ -156,13 +156,13 @@ export const orderHistoryKeyboard = (orders: OrdersInterface) => {
     return Markup.inlineKeyboard(keyboard);
 };
 
-export const infoOrderKeyboard = (accountId: string, orderNumber: string, isCancelled: boolean, HOST_SITE: string) => {
+export const infoOrderKeyboard = (accountId: string, orderNumber: string, isCancelled: boolean, DOMAIN: string) => {
     const keyboard = [];
 
     !isCancelled && keyboard.push([Markup.button.callback(`Отменить заказ`, `cancelled_order_${orderNumber}`)]);
 
     keyboard.push([Markup.button.callback(`Вернуться к заказам`, `go_to_orders`)]);
-    keyboard.push([Markup.button.url(`Посмотреть заказ на сайте`, `http://${HOST_SITE}/api/order/${accountId}/${orderNumber}`)]);
+    keyboard.push([Markup.button.url(`Посмотреть заказ на сайте`, `${DOMAIN}/api/order/${accountId}/${orderNumber}`)]);
 
     return Markup.inlineKeyboard(keyboard);
 };
