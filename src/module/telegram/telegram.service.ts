@@ -5,11 +5,16 @@ import { WizardContext } from 'telegraf/typings/scenes';
 import { getValueKeysMenu } from './updates/base-command/base-command.constants';
 import { IAccountCashing } from '../account/interfaces/account.interface';
 import { ERROR_TIMEOUT_TTL_CASH } from './constants/error.constant';
-import { TTL_CASH } from './constants/admin.constant';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class TelegramService {
-    constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
+    private TTL_CASH = this.configService.getOrThrow('TTL_CASH', 86000000);
+
+    constructor(
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
+        private configService: ConfigService,
+    ) {}
 
     async exitScene(menuBtn: string, @Ctx() ctx: WizardContext) {
         await ctx.scene.leave();
@@ -25,7 +30,7 @@ export class TelegramService {
             await this.cacheManager.del(accountFromCache.accountId);
         }
         await this.cacheManager.del(accountId);
-        await this.cacheManager.set(String(telegramId), { accountId }, TTL_CASH);
+        await this.cacheManager.set(String(telegramId), { accountId }, this.TTL_CASH);
     }
 
     async getFromCache(telegramId: number) {
@@ -39,7 +44,7 @@ export class TelegramService {
         if (dataFromCache) {
             await this.cacheManager.del(dataFromCache.data);
         }
-        await this.cacheManager.set(String(telegramId), data, TTL_CASH);
+        await this.cacheManager.set(String(telegramId), data, this.TTL_CASH);
     }
 
     async getDataFromCache(telegramId: number): Promise<any[]> {

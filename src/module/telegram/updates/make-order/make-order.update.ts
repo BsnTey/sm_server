@@ -45,6 +45,7 @@ import { isAccessShop, prepareForInternalPickupAvailability } from '../../utils/
 import { MakeOrderService } from './make-order.service';
 import { isFioPipe } from '../../pipes/isFio.pipe';
 import { IRecipient, IRecipientOrder } from '../../../account/interfaces/account.interface';
+import { ConfigService } from '@nestjs/config';
 
 @Scene(MAKE_ORDER.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -625,9 +626,12 @@ export class OrderChangeRecipient {
 @Scene(ORDER_GET_ORDERS_SCENE)
 @UseFilters(TelegrafExceptionFilter)
 export class OrderGetOrders {
+    private HOST_SITE = this.configService.getOrThrow('HOST', 'localhost') + ':' + this.configService.getOrThrow('IP', 3001);
+
     constructor(
         private accountService: AccountService,
         private telegramService: TelegramService,
+        private configService: ConfigService,
     ) {}
 
     @SceneEnter()
@@ -655,7 +659,7 @@ export class OrderGetOrders {
         //@ts-ignore
         const orderNumber = ctx.match[0].split('_')[1];
         const order = await this.accountService.orderInfo(account.accountId, orderNumber);
-        const keyboard = infoOrderKeyboard(account.accountId, order.data.order.number, order.data.order.isCancelled);
+        const keyboard = infoOrderKeyboard(account.accountId, order.data.order.number, order.data.order.isCancelled, this.HOST_SITE);
 
         const text = `Заказ номер: <code>${order.data.order.number}</code>`;
         await ctx.editMessageText(text, {

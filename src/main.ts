@@ -6,6 +6,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import './common/helpers/hbs.helper';
 import { engine } from 'express-handlebars';
 import { handlebarsHelpers } from '@common/helpers/hbs.helper';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -22,8 +23,12 @@ async function bootstrap() {
             defaultLayout: false,
         }),
     );
+    const configService = app.get(ConfigService);
+
+    const PORT = configService.getOrThrow('PORT', 3001);
+    const HOST = configService.getOrThrow<string>('HOST', 'localhost');
 
     app.setViewEngine('hbs');
-    await app.listen(3001);
+    await app.listen(PORT, HOST);
 }
 bootstrap();
