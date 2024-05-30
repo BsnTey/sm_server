@@ -5,6 +5,7 @@ export const handlebarsHelpers = {
         return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     },
     formatDate: (dateString: string) => {
+        if (!dateString) return '';
         const date = new Date(dateString);
         const months = [
             'января',
@@ -21,6 +22,31 @@ export const handlebarsHelpers = {
             'декабря',
         ];
         return `${date.getDate()} ${months[date.getMonth()]}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+    },
+    formatDateRange: (startDateString: string, endDateString: string) => {
+        if (!startDateString) return '';
+        const startDate = new Date(startDateString);
+        const months = [
+            'января',
+            'февраля',
+            'марта',
+            'апреля',
+            'мая',
+            'июня',
+            'июля',
+            'августа',
+            'сентября',
+            'октября',
+            'ноября',
+            'декабря',
+        ];
+        const formattedStartDate = `${startDate.getDate()} ${months[startDate.getMonth()]}, ${startDate.getHours()}:${startDate.getMinutes().toString().padStart(2, '0')}`;
+
+        if (!endDateString) return formattedStartDate;
+        const endDate = new Date(endDateString);
+        const formattedEndDate = `${endDate.getDate()} ${months[endDate.getMonth()]}, ${endDate.getHours()}:${endDate.getMinutes().toString().padStart(2, '0')}`;
+
+        return `${formattedStartDate} - ${formattedEndDate}`;
     },
     getPaymentStatus: (isPayed: boolean) => {
         return isPayed ? 'Оплачен' : 'Не оплачен';

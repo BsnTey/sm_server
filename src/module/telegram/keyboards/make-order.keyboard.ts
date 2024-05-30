@@ -4,6 +4,7 @@ import { CartInterface } from '../../account/interfaces/cart.interface';
 import { SearchProductInterface } from '../../account/interfaces/search-product.interface';
 import { PickupAvabilityInterface } from '../../account/interfaces/pickup-avability.interface';
 import { OrdersInterface } from '../../account/interfaces/orders.interface';
+import { HOST_SITE } from '../constants/admin.constant';
 
 export const mainMenuOrderKeyboard = (city: string) => {
     return Markup.inlineKeyboard([
@@ -162,7 +163,7 @@ export const infoOrderKeyboard = (accountId: string, orderNumber: string, isCanc
     !isCancelled && keyboard.push([Markup.button.callback(`Отменить заказ`, `cancelled_order_${orderNumber}`)]);
 
     keyboard.push([Markup.button.callback(`Вернуться к заказам`, `go_to_orders`)]);
-    keyboard.push([Markup.button.url(`Посмотреть заказ на сайте`, `http://nonofficialsport.ru/api/order/${accountId}/${orderNumber}`)]);
+    keyboard.push([Markup.button.url(`Посмотреть заказ на сайте`, `${HOST_SITE}/api/order/${accountId}/${orderNumber}`)]);
 
     return Markup.inlineKeyboard(keyboard);
 };
