@@ -10,14 +10,27 @@ import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter
 import { TelegramService } from '../../telegram.service';
 import { isPhonePipe } from '../../pipes/isPhone.pipe';
 import { isCodePipe } from '../../pipes/isCode.pipe';
+import { Context } from '../../interfaces/telegram.context';
+import { UserService } from '../../../user/user.service';
 
 @Scene(CHANGE_NUMBER.scene)
 @UseFilters(TelegrafExceptionFilter)
 export class ChangeNumberUpdate {
-    constructor(private telegramService: TelegramService) {}
+    constructor(
+        private telegramService: TelegramService,
+        private userService: UserService,
+    ) {}
 
     @SceneEnter()
-    async onSceneEnter(@Ctx() ctx: WizardContext) {
+    async onSceneEnter(@Ctx() ctx: Context, @Sender() telegramUser: any) {
+        // в будующем удалить регу или обновление юзера
+        const { first_name: telegramName, id: telegramId } = telegramUser;
+
+        await this.userService.createOrUpdateUserByTelegram({
+            telegramName,
+            telegramId: String(telegramId),
+        });
+
         await ctx.reply('🔑 Введите номер вашего аккаунта:', mainMenuKeyboard);
     }
 

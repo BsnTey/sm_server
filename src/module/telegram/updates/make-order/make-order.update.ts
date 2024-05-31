@@ -46,14 +46,26 @@ import { MakeOrderService } from './make-order.service';
 import { isFioPipe } from '../../pipes/isFio.pipe';
 import { IRecipient, IRecipientOrder } from '../../../account/interfaces/account.interface';
 import { ConfigService } from '@nestjs/config';
+import { Context } from '../../interfaces/telegram.context';
 
 @Scene(MAKE_ORDER.scene)
 @UseFilters(TelegrafExceptionFilter)
 export class MakeOrderUpdate {
-    constructor(private telegramService: TelegramService) {}
+    constructor(
+        private telegramService: TelegramService,
+        private userService: UserService,
+    ) {}
 
     @SceneEnter()
-    async onSceneEnter(@Ctx() ctx: WizardContext) {
+    async onSceneEnter(@Ctx() ctx: Context, @Sender() telegramUser: any) {
+        // в будующем удалить регу или обновление юзера
+        const { first_name: telegramName, id: telegramId } = telegramUser;
+
+        await this.userService.createOrUpdateUserByTelegram({
+            telegramName,
+            telegramId: String(telegramId),
+        });
+
         await ctx.reply('🔑 Введите номер вашего аккаунта:', mainMenuKeyboard);
     }
 
@@ -426,6 +438,11 @@ export class OrderMenuCart {
     @Action('go_to_menu')
     async goToMenu(@Ctx() ctx: WizardContext) {
         await ctx.scene.enter(ORDER_MENU_ACCOUNT_SCENE);
+    }
+
+    @Action('go_back')
+    async choosingWayCart(@Ctx() ctx: WizardContext) {
+        await ctx.scene.reenter();
     }
 }
 

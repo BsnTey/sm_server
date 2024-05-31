@@ -127,7 +127,7 @@ export const accessShopsKeyboard = (avabilityShops: PickupAvabilityInterface) =>
             ),
         ]);
     }
-    keyboard.push([Markup.button.callback('Назад', 'shop_selection')]);
+    keyboard.push([Markup.button.callback('Назад', 'go_back')]);
     return Markup.inlineKeyboard(keyboard);
 };
 

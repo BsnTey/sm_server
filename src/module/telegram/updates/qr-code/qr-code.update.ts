@@ -50,7 +50,10 @@ export class QrCodeUpdate {
         const { qrCode } = await this.accountService.shortInfo(account.accountId);
         const qrCodeBuff = await this.qrCodeService.generateQrCode(qrCode);
         const keyboard = qrCodeUpdateKeyboard.reply_markup;
-
-        await ctx.editMessageMedia({ type: 'photo', media: { source: qrCodeBuff } }, { reply_markup: keyboard });
+        try {
+            await ctx.editMessageMedia({ type: 'photo', media: { source: qrCodeBuff } }, { reply_markup: keyboard });
+        } catch (err) {
+            await ctx.reply('Не обновлено. Старый QR активен');
+        }
     }
 }
