@@ -14,7 +14,7 @@ export class TelegrafExceptionFilter implements ExceptionFilter {
         const ctx = telegrafHost.getContext<Context>();
         if (exception instanceof AxiosError) {
             if (exception.message == 'Socks5 proxy rejected connection - NotAllowed') {
-                // Ошибка, когда не создается новый обьект SocksProxyAgent. Исправил, но пусть будет
+                exception.message = ERROR_LOGOUT_MP;
             } else {
                 switch (exception.response!.statusText) {
                     case 'Unauthorized':
@@ -46,6 +46,7 @@ export class TelegrafExceptionFilter implements ExceptionFilter {
                 }
             }
         }
+        console.log(exception.message);
         await ctx.replyWithHTML(`<b>❌</b>  ${exception.message}`);
     }
 }

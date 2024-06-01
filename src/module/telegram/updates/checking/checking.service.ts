@@ -20,11 +20,33 @@ export class CheckingService {
     constructor(private readonly accountService: AccountService) {}
 
     async checkingAccounts(accounts: string[]): Promise<string[]> {
-        const resultChecking: Record<string, string> = {};
+        return this.checkAccounts(accounts, this.processCheckingAccount.bind(this));
+    }
 
-        await Promise.all(accounts.map(account => this.processCheckingAccount(resultChecking, account)));
+    async checkingAccountsOnPromocodes(accounts: string[]): Promise<string[]> {
+        return this.checkAccounts(accounts, this.processCheckingAccountOnPromocode.bind(this));
+    }
+
+    private async checkAccounts(
+        accounts: string[],
+        processAccount: (resultChecking: Record<string, string>, accountId: string) => Promise<void>,
+    ): Promise<string[]> {
+        const resultChecking: Record<string, string> = {};
+        const accountChunks = this.chunkArray(accounts, 10);
+
+        for (const chunk of accountChunks) {
+            await Promise.all(chunk.map(account => processAccount(resultChecking, account)));
+        }
 
         return this.bringCompliance(resultChecking, accounts);
+    }
+
+    private chunkArray<T>(array: T[], chunkSize: number): T[][] {
+        const chunks: T[][] = [];
+        for (let i = 0; i < array.length; i += chunkSize) {
+            chunks.push(array.slice(i, i + chunkSize));
+        }
+        return chunks;
     }
 
     private async processCheckingAccount(resultChecking: Record<string, string>, accountId: string): Promise<void> {
@@ -40,18 +62,25 @@ export class CheckingService {
             const { bonusCount, bonusDetails } = await this.accountService.shortInfo(trimmedAccountId);
             await this.accountService.orderHistory(trimmedAccountId);
             let result = `${trimmedAccountId}: ${bonusCount}`;
+            const uniqueBonuses = new Set<string>();
 
             const filteredBonusDetails = bonusDetails.filter(detail => detail.amount >= 100);
             const firstBonusDate = this.getCombustionDates(filteredBonusDetails);
 
             if (firstBonusDate) {
                 const { amount: firstAmount, date: firstDate } = firstBonusDate;
-                result += ` ${firstDate} - ${firstAmount}`;
+                const firstBonusString = `${firstDate} - ${firstAmount}`;
+                uniqueBonuses.add(firstBonusString);
+                result += ` ${firstBonusString}`;
 
                 const secondBonusDate = this.getCombustionDates(filteredBonusDetails, firstDate);
                 if (secondBonusDate) {
                     const { amount: secondAmount, date: secondDate } = secondBonusDate;
-                    result += ` ${secondDate} - ${secondAmount}`;
+                    const secondBonusString = `${secondDate} - ${secondAmount}`;
+                    if (!uniqueBonuses.has(secondBonusString)) {
+                        uniqueBonuses.add(secondBonusString);
+                        result += ` ${secondBonusString}`;
+                    }
                 }
             }
 
@@ -105,14 +134,6 @@ export class CheckingService {
         }
     }
 
-    async checkingAccountsOnPromocodes(accounts: string[]): Promise<string[]> {
-        const resultChecking: Record<string, string> = {};
-
-        await Promise.all(accounts.map(account => this.processCheckingAccountOnPromocode(resultChecking, account)));
-
-        return this.bringCompliance(resultChecking, accounts);
-    }
-
     private async processCheckingAccountOnPromocode(resultChecking: Record<string, string>, accountId: string): Promise<void> {
         const trimmedAccountId = accountId.trim();
         if (trimmedAccountId.length === 0) return;
@@ -143,7 +164,7 @@ export class CheckingService {
                 promocodes += `${actionName} ${couponId} ${endDate} `;
             }
 
-            resultChecking[trimmedAccountId] = accountInfo + (promocodes || 'Нет доступных промокодов') + '\n';
+            resultChecking[trimmedAccountId] = accountInfo + (promocodes || 'Нет промо') + '\n';
         } catch (err: any) {
             this.handleError(err, trimmedAccountId, resultChecking);
         }
