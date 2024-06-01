@@ -3,12 +3,13 @@ import { WizardContext } from 'telegraf/typings/scenes';
 import { ADMIN, ALL_KEYS_MENU_BUTTON_NAME } from '../base-command/base-command.constants';
 import { TelegramService } from '../../telegram.service';
 import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
-import { UseFilters } from '@nestjs/common';
+import { UseFilters, UseGuards } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { createWriteStream, promises as fsPromises } from 'fs';
 import { join } from 'path';
 import axios from 'axios';
 import { AccountService } from '../../../account/account.service';
+import { AdminGuard } from './admin.guard';
 
 @Scene(ADMIN.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -19,6 +20,7 @@ export class AdminUpdate {
     ) {}
 
     @SceneEnter()
+    @UseGuards(AdminGuard)
     async onSceneEnter(@Ctx() ctx: WizardContext) {
         await ctx.reply('Пришли текстовый файл', mainMenuKeyboard);
     }
@@ -29,6 +31,7 @@ export class AdminUpdate {
     }
 
     @On('document')
+    // @UseGuards(AdminGuard)
     async onDocument(@Message('document') document: any, @Ctx() ctx: WizardContext) {
         const fileId = document.file_id;
         const fileUrl = await ctx.telegram.getFileLink(fileId);
