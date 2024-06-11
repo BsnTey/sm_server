@@ -1,5 +1,5 @@
-import { ISportmasterRequestHeaders } from '../interfaces/headers.interface';
 import md5 from 'md5';
+import { ISportmasterRequestHeaders } from '../interfaces/headers.interface';
 
 export class SportmasterHeaders {
     private prefixHash = 'eb1a3e30291bc971c4da0e86375961a4';
@@ -30,8 +30,7 @@ export class SportmasterHeaders {
     }
 
     getHeaders(): ISportmasterRequestHeaders {
-        const timestamp = String(Date.now());
-
+        const timestamp = String(Math.floor(Date.now() / 1000));
         return {
             'User-Agent': this.userAgent,
             Locale: this.locale,
