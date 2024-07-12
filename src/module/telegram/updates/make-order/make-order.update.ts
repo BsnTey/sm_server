@@ -41,7 +41,7 @@ import { isCityPipe } from '../../pipes/isCity.pipe';
 import { ERROR_FIND_CITY } from '../../constants/error.constant';
 import { getTextCart } from '../../utils/cart.utils';
 import { isUrlPipe } from '../../pipes/isUrl.pipe';
-import { isAccessShop, prepareForInternalPickupAvailability } from '../../utils/order.utils';
+import { prepareForInternalPickupAvailability } from '../../utils/order.utils';
 import { MakeOrderService } from './make-order.service';
 import { isFioPipe } from '../../pipes/isFio.pipe';
 import { IRecipient, IRecipientOrder } from '../../../account/interfaces/account.interface';
@@ -319,9 +319,11 @@ export class OrderMenuCart {
     @Action('shop_selection')
     async choosingShopOrder(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         const account = await this.telegramService.getFromCache(telegramId);
-        const nonAccessItems = isAccessShop(account.cartResponse!);
 
-        if (nonAccessItems.length != 0) return await ctx.reply(`❌ ${nonAccessItems.join(', ')} Нет доступности для заказа`);
+        //Не понятно, как определить, что есть самовывоз
+        // const nonAccessItems = isAccessShop(account.cartResponse!);
+
+        // if (nonAccessItems.length != 0) return await ctx.reply(`❌ ${nonAccessItems.join(', ')} Нет доступности для заказа`);
 
         const internalPickupAvabilityItems = prepareForInternalPickupAvailability(account.cartResponse!);
         const accessItemsPickupAvailability = await this.accountService.internalPickupAvailability(
@@ -411,12 +413,18 @@ export class OrderMenuCart {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const productId = ctx.match[0].split('_')[2];
+        const item = account.cartResponse?.data.cartFull.availableItems.filter(item => item.cartItemId.productId == productId);
+        if (item && item.length == 0) return;
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        //@ts-ignore
+        const linesIds = item[0].cartItemId.linesIds;
 
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const sku = ctx.match[0].split('_')[3];
-
-        await this.accountService.removeFromCart(account.accountId, [{ productId, sku }]);
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        await this.accountService.removeFromCart(account.accountId, [{ productId, sku, linesIds }]);
         await ctx.scene.reenter();
     }
 

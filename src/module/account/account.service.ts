@@ -431,33 +431,38 @@ export class AccountService {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const cart = await this.getCart(accountWithProxyEntity);
         const mainFromCart = selectMainFromCart(cart);
-        await this.removeFromCart(accountWithProxyEntity, mainFromCart);
+        for (const item of mainFromCart) {
+            const arr = [];
+            arr.push(item);
+            await this.removeFromCart(accountWithProxyEntity, arr);
+        }
     }
 
     async removeFromCart(accountWithProxyEntity: string | AccountWithProxyEntity, removeList: IItemsCart[]): Promise<any> {
         if (typeof accountWithProxyEntity == 'string') {
             accountWithProxyEntity = await this.getAccountEntity(accountWithProxyEntity);
         }
-        const url = this.url + 'v1/cart/remove';
+        const url = this.url + 'v1/cart2/remove';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const ids = removeList.map((item: IItemsCart) => {
             return {
                 productId: item.productId,
                 sku: item.sku,
+                linesIds: removeList[0].linesIds,
             };
         });
 
         const payload = {
             ids: ids,
-            cartFormat: 'FULL',
+            cartFormat: 'FULL2',
         };
         await this.httpService.post(url, payload, httpOptions);
     }
 
     async addInCart(accountId: string, { productId, sku }: IItemsCart): Promise<any> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
-        const url = this.url + 'v2/cart/add';
+        const url = this.url + 'v1/cart2/add';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const payload = {
             productList: [

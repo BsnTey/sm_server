@@ -11,7 +11,7 @@ export class StartUpdate {
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: Context, @Sender() telegramUser: any) {
         const { first_name: telegramName, id: telegramId } = telegramUser;
-
+        const msg = ctx.msg;
         await this.userService.createOrUpdateUserByTelegram({
             telegramName,
             telegramId: String(telegramId),
