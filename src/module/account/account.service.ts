@@ -400,7 +400,7 @@ export class AccountService {
 
     async addPromocode(accountId: string, promocode: string): Promise<boolean> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
-        const url = this.url + 'v1/cart/promoCode';
+        const url = this.url + 'v1/cart2/promoCode';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const payload = {
             promoCode: promocode,
