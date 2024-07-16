@@ -540,15 +540,14 @@ export class AccountService {
 
     async approveRecipientOrder(accountId: string, recipient: IRecipientOrder): Promise<any> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
-        const url = this.url + `v1/cart/order/${recipient.potentialOrder}/receiver`;
+        // const url = this.url + `v1/cart/order/${recipient.potentialOrder}/receiver`;
+        const url = this.url + `v1/cart2/receiver`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
-            receiver: {
-                fio: `${recipient.firstName} ${recipient.lastName}`,
-                phone: { countryCode: 7, nationalNumber: `${recipient.number}`, isoCode: 'RU' },
-                email: `${recipient.email}`,
-            },
+            fio: `${recipient.firstName} ${recipient.lastName}`,
+            phone: { countryCode: 7, nationalNumber: `${recipient.number}`, isoCode: 'RU' },
+            email: `${recipient.email}`,
         };
 
         const response = await this.httpService.post(url, payload, httpOptions);
