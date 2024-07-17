@@ -176,6 +176,7 @@ export class OrderCity {
         const cityId = ctx.match[0].split('_')[2];
         const account = await this.telegramService.getFromCache(telegramId);
         await this.accountService.setAccountCity(account.accountId, cityId);
+        await this.accountService.getProfile(account.accountId);
         await ctx.scene.enter(ORDER_MENU_ACCOUNT_SCENE);
     }
 

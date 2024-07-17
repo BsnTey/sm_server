@@ -605,6 +605,14 @@ export class AccountService {
         return response.data;
     }
 
+    async getProfile(accountId: string): Promise<PromocodeInterface> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const url = this.url + `v1/profile`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const response = await this.httpService.get(url, httpOptions);
+        return response.data;
+    }
+
     async pushToken(accountId: string, pushToken: string): Promise<any> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/profile/pushToken';
