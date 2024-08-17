@@ -25,6 +25,7 @@ export interface IUpdateAccount {
     installationId: string;
     expiresInAccess: Date;
     expiresInRefresh: Date;
+    isAccessMp: boolean;
 }
 
 export interface IEmailFromDb {

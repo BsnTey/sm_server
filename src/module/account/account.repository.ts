@@ -126,7 +126,7 @@ export class AccountRepository {
 
     async updateAccount(
         accountId: string,
-        { accessToken, refreshToken, xUserId, deviceId, installationId, expiresInAccess, expiresInRefresh }: IUpdateAccount,
+        { accessToken, refreshToken, xUserId, deviceId, installationId, expiresInAccess, expiresInRefresh, isAccessMp }: IUpdateAccount,
     ): Promise<Account> {
         return this.prisma.account.update({
             where: {
@@ -140,6 +140,7 @@ export class AccountRepository {
                 installationId,
                 expiresInAccess,
                 expiresInRefresh,
+                isAccessMp,
             },
         });
     }

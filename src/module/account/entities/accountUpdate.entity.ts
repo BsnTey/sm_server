@@ -6,6 +6,7 @@ export class AccountUpdateEntity extends RefreshTokensEntity implements IUpdateA
     xUserId: string;
     deviceId: string;
     installationId: string;
+    isAccessMp: boolean;
 
     constructor(account: UpdateAccountRequestDto) {
         super(account);
@@ -14,6 +15,7 @@ export class AccountUpdateEntity extends RefreshTokensEntity implements IUpdateA
         this.xUserId = account.xUserId;
         this.deviceId = account.deviceId;
         this.installationId = account.installationId;
+        this.isAccessMp = true;
 
         Object.assign(this, account);
         return this;
