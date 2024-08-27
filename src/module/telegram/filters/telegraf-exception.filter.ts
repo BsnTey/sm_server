@@ -38,11 +38,9 @@ export class TelegrafExceptionFilter implements ExceptionFilter {
                         }
                         // exception.message = ERROR_UNKNOWN;
                         exception.message = exception.response!.data.error.message;
-                        console.log(exception.response!.data.error.code);
-                        console.log(exception.response!.data.error.message);
                         break;
                     default:
-                        console.log(exception.message);
+                        console.log('pass');
                 }
             }
         }

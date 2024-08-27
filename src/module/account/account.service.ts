@@ -31,6 +31,7 @@ import { v4 as uuidv4 } from 'uuid';
 @Injectable()
 export class AccountService {
     private url = this.configService.getOrThrow('API_DONOR');
+    private urlSite = this.configService.getOrThrow('API_DONOR_SITE');
     private adminsId: string[] = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
     private durationTimeProxyBlock = this.configService.getOrThrow('TIME_DURATION_PROXY_BLOCK_IN_MIN');
 
@@ -189,6 +190,13 @@ export class AccountService {
     }
 
     private async getHttpOptions(url: string, accountWithProxy: AccountWithProxyEntity): Promise<any> {
+        const headers = new SportmasterHeaders(url, accountWithProxy).getHeaders();
+        const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
+
+        return { headers, httpsAgent };
+    }
+
+    private async getHttpOptionsSite(url: string, accountWithProxy: AccountWithProxyEntity): Promise<any> {
         const headers = new SportmasterHeaders(url, accountWithProxy).getHeaders();
         const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
 
@@ -624,6 +632,22 @@ export class AccountService {
         };
 
         const response = await this.httpService.post(url, payload, httpOptions);
+        return response.data;
+    }
+
+    async getUserGateToken(accountId: string): Promise<PromocodeInterface> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const url = this.url + `v1/profile/userGateToken`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const response = await this.httpService.get(url, httpOptions);
+        return response.data;
+    }
+
+    async getCourses(accountId: string): Promise<PromocodeInterface> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const url = this.urlSite + `courses/?webview=true`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const response = await this.httpService.get(url, httpOptions);
         return response.data;
     }
 }

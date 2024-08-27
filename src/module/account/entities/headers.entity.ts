@@ -51,6 +51,28 @@ export class SportmasterHeaders {
         };
     }
 
+    getHeadersSite(): ISportmasterRequestHeaders {
+        const timestamp = String(Math.floor(Date.now() / 1000));
+        return {
+            'User-Agent': this.userAgent,
+            Locale: this.locale,
+            Country: this.country,
+            'Device-Id': this.deviceId,
+            'Account-Id': this.accountId,
+            'Installation-Id': this.installationId,
+            'City-Id': this.cityId,
+            Eutc: this.eutc,
+            'x-user-id': this.xUserId,
+            Authorization: this.accessToken,
+            Host: this.host,
+            'Accept-Encoding': this.acceptEncoding,
+            'Content-Type': this.contentType,
+            Timestamp: timestamp,
+            'Aplaut-Id': this.generateHash(timestamp),
+            'Aplaut-Build': this.aplautBuild,
+        };
+    }
+
     private generateHash(timestamp: string): string {
         const combinedString = this.prefixHash + this.url + timestamp + this.xUserId;
         return md5(combinedString);

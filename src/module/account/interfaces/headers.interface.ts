@@ -18,3 +18,5 @@ interface IRequestHeaders {
 }
 
 export type ISportmasterRequestHeaders = Partial<IRequestHeaders>;
+
+interface IRequestHeadersCourse {}
