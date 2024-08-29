@@ -16,31 +16,35 @@ export class TelegrafExceptionFilter implements ExceptionFilter {
             if (exception.message == 'Socks5 proxy rejected connection - NotAllowed') {
                 exception.message = ERROR_LOGOUT_MP;
             } else {
-                switch (exception.response!.statusText) {
-                    case 'Unauthorized':
-                        if (exception.response!.data.error.code == 'UNAUTHORIZED') {
-                            const accountId = exception.config!.headers['Account-Id'];
-                            // await this.accountRep.setBanMp(accountId);
-                            exception.message = ERROR_LOGOUT_MP;
-                            break;
-                        }
-                    case 'Bad Request':
-                        if (exception.response!.data.error.code == 'WRONG_TOKEN') {
-                            exception.message = ERROR_LOGOUT_MP;
-                            const accountId = exception.config!.headers['Account-Id'];
-                            await this.accountRep.setBanMp(accountId);
-                        }
-                        if (exception.response!.data.error.code == 'TOO_MANY_INCORRECT_CODE_INPUTS') {
+                if (exception.response) {
+                    switch (exception.response.statusText) {
+                        case 'Unauthorized':
+                            if (exception.response!.data.error.code == 'UNAUTHORIZED') {
+                                const accountId = exception.config!.headers['Account-Id'];
+                                // await this.accountRep.setBanMp(accountId);
+                                exception.message = ERROR_LOGOUT_MP;
+                                break;
+                            }
+                        case 'Bad Request':
+                            if (exception.response!.data.error.code == 'WRONG_TOKEN') {
+                                exception.message = ERROR_LOGOUT_MP;
+                                const accountId = exception.config!.headers['Account-Id'];
+                                await this.accountRep.setBanMp(accountId);
+                            }
+                            if (exception.response!.data.error.code == 'TOO_MANY_INCORRECT_CODE_INPUTS') {
+                                exception.message = exception.response!.data.error.message;
+                            }
+                            if (exception.response!.data.error.code == 'TOO_MANY_DIFFERENT_PHONES_TO_REQUEST_CODE') {
+                                exception.message = exception.response!.data.error.message; //
+                            }
+                            // exception.message = ERROR_UNKNOWN;
                             exception.message = exception.response!.data.error.message;
-                        }
-                        if (exception.response!.data.error.code == 'TOO_MANY_DIFFERENT_PHONES_TO_REQUEST_CODE') {
-                            exception.message = exception.response!.data.error.message; //
-                        }
-                        // exception.message = ERROR_UNKNOWN;
-                        exception.message = exception.response!.data.error.message;
-                        break;
-                    default:
-                        console.log('pass');
+                            break;
+                        default:
+                            console.log(exception.response);
+                    }
+                } else {
+                    console.log('pass');
                 }
             }
         }

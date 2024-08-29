@@ -52,6 +52,7 @@ model Account {
   deviceId          String       @map("device_id")
   installationId    String       @map("installation_id")
   googleId          String?      @map("google_id")
+  userGateToken     String?      @map("user_gate_token")
   pushToken         String?      @map("push_token")
   expiresInAccess   DateTime     @map("expires_in_access")
   expiresInRefresh  DateTime     @map("expires_in_refresh")

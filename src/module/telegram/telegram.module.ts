@@ -33,6 +33,7 @@ import { QrCodeUpdate } from './updates/qr-code/qr-code.update';
 import { QrCodeService } from './updates/qr-code/qr-code.service';
 import { GetInfoOrderUpdate, ProfileUpdate } from './updates/profile/profile.update';
 import { AdminUpdate } from './updates/admin/admin.update';
+import { SportmasterHeadersService } from '../account/entities/headers.entity';
 
 @Module({
     providers: [
@@ -72,6 +73,7 @@ import { AdminUpdate } from './updates/admin/admin.update';
         QrCodeService,
         ProfileUpdate,
         GetInfoOrderUpdate,
+        SportmasterHeadersService,
     ],
 })
 export class TelegramModule {}

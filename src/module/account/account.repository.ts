@@ -173,6 +173,17 @@ export class AccountRepository {
         });
     }
 
+    async updateUserGateToken(accountId: string, userGateToken: string): Promise<Account> {
+        return this.prisma.account.update({
+            where: {
+                accountId,
+            },
+            data: {
+                userGateToken,
+            },
+        });
+    }
+
     async updateBonusCount(accountId: string, bonusCount: number): Promise<Account> {
         return this.prisma.account.update({
             where: {

@@ -6,9 +6,10 @@ import { AccountRepository } from '../account/account.repository';
 import { ProxyService } from '../proxy/proxy.service';
 import { HttpService } from '../http/http.service';
 import { ProxyRepository } from '../proxy/proxy.repository';
+import { SportmasterHeadersService } from '../account/entities/headers.entity';
 
 @Module({
     controllers: [OrderController],
-    providers: [OrderService, AccountService, AccountRepository, ProxyService, HttpService, ProxyRepository],
+    providers: [OrderService, AccountService, AccountRepository, ProxyService, HttpService, ProxyRepository, SportmasterHeadersService],
 })
 export class OrderModule {}

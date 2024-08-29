@@ -10,6 +10,7 @@ import { Account } from '@prisma/client';
 import { UpdatingBonusCountRequestDto, UpdatingBonusCountResponseDto } from './dto/updateBonusCount-account.dto';
 import { UpdatePushTokenRequestDto, UpdatePushTokenResponseDto } from './dto/updatePushToken-account.dto';
 import { UpdateGoogleIdRequestDto, UpdateGoogleIdResponseDto } from './dto/updateGoogleId-account.dto';
+import { AccessTokenCourseResponseDto } from './dto/getAccessTokenCourse-account.dto';
 
 @Controller('account')
 export class AccountController {
@@ -90,5 +91,19 @@ export class AccountController {
         @Param() params: AccountIdParamsDto,
     ): Promise<UpdateGoogleIdResponseDto> {
         return await this.accountService.updateGoogleId(params.accountId, dto);
+    }
+
+    @HasZenno()
+    @Get(':accountId/accessTokenCourse')
+    @HttpCode(200)
+    async getAccessTokenCourseAccount(@Param() params: AccountIdParamsDto): Promise<AccessTokenCourseResponseDto> {
+        return await this.accountService.getAccessTokenCourse(params.accountId);
+    }
+
+    @HasZenno()
+    @Get(':accountId/courses')
+    @HttpCode(200)
+    async getCoursesAccount(@Param() params: AccountIdParamsDto): Promise<any> {
+        //сделать получение списка курсов
     }
 }

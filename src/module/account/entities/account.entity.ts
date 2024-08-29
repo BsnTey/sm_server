@@ -12,6 +12,7 @@ export class AccountEntity implements Account {
     deviceId: string;
     installationId: string;
     googleId: string | null;
+    userGateToken: string | null;
     pushToken: string | null;
     expiresInAccess: Date;
     expiresInRefresh: Date;

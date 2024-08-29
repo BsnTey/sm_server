@@ -5,11 +5,10 @@ import { AccountEntity } from './entities/account.entity';
 import { IAccountWithProxy, IFindCitiesAccount, IRecipientOrder, IRefreshAccount } from './interfaces/account.interface';
 import { Order } from '@prisma/client';
 import { ProxyService } from '../proxy/proxy.service';
-import { ERROR_ACCOUNT_NOT_FOUND, ERROR_LOGOUT_MP } from './constants/error.constant';
+import { ERROR_ACCESS_TOKEN_COURSE, ERROR_ACCOUNT_NOT_FOUND, ERROR_LOGOUT_MP } from './constants/error.constant';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '../http/http.service';
 import { SocksProxyAgent } from 'socks-proxy-agent';
-import { SportmasterHeaders } from './entities/headers.entity';
 import { AccountWithProxyEntity } from './entities/accountWithProxy.entity';
 import { CitySMEntity } from './entities/citySM.entity';
 import { CartInterface } from './interfaces/cart.interface';
@@ -27,6 +26,8 @@ import { UpdatingBonusCountRequestDto } from './dto/updateBonusCount-account.dto
 import { UpdatePushTokenRequestDto } from './dto/updatePushToken-account.dto';
 import { UpdateGoogleIdRequestDto } from './dto/updateGoogleId-account.dto';
 import { v4 as uuidv4 } from 'uuid';
+import { SportmasterHeadersService } from './entities/headers.entity';
+import { UserGateTokenInterface } from './interfaces/userGateToken.interface';
 
 @Injectable()
 export class AccountService {
@@ -40,6 +41,7 @@ export class AccountService {
         private accountRep: AccountRepository,
         private proxyService: ProxyService,
         private httpService: HttpService,
+        private sportmasterHeaders: SportmasterHeadersService,
     ) {}
 
     async addingAccount(accountDto: AddingAccountRequestDto): Promise<AccountEntity> {
@@ -152,6 +154,22 @@ export class AccountService {
         return { pushToken };
     }
 
+    async getAccessTokenCourse(accountId: string): Promise<{ accessTokenCourse: string }> {
+        let accountWithProxyEntity = await this.getAccountEntity(accountId);
+
+        if (!accountWithProxyEntity.userGateToken) {
+            const respUserGateToken = await this.getUserGateToken(accountWithProxyEntity);
+            const userGateToken = respUserGateToken.data.userGateToken;
+            await this.accountRep.updateUserGateToken(accountId, userGateToken);
+            accountWithProxyEntity = await this.getAccountEntity(accountId);
+        }
+
+        const htmlCourse = await this.getCoursesApi(accountWithProxyEntity);
+
+        const accessTokenCourse = this.getAccessTokenCourseFromResponse(htmlCourse);
+        return { accessTokenCourse };
+    }
+
     private generateRandomString(length: number) {
         const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
         let result = '';
@@ -190,18 +208,28 @@ export class AccountService {
     }
 
     private async getHttpOptions(url: string, accountWithProxy: AccountWithProxyEntity): Promise<any> {
-        const headers = new SportmasterHeaders(url, accountWithProxy).getHeaders();
+        const headers = this.sportmasterHeaders.getHeadersMobile(url, accountWithProxy);
         const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
 
         return { headers, httpsAgent };
     }
 
-    private async getHttpOptionsSite(url: string, accountWithProxy: AccountWithProxyEntity): Promise<any> {
-        const headers = new SportmasterHeaders(url, accountWithProxy).getHeaders();
+    private async getHttpOptionsSiteCourse(accountWithProxy: AccountWithProxyEntity): Promise<any> {
+        const headers = this.sportmasterHeaders.getHeadersCourse(accountWithProxy.userGateToken!);
         const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
 
         return { headers, httpsAgent };
     }
+    //
+    // private async getOrCreateUserGateToken(accountWithProxy: AccountWithProxyEntity): Promise<string> {
+    //     let userGateToken = accountWithProxy.userGateToken;
+    //     if (!userGateToken) {
+    //         const respUserGateToken = await this.getUserGateToken(accountWithProxy);
+    //         userGateToken = respUserGateToken.data.userGateToken;
+    //         await this.accountRep.updateUserGateToken(accountWithProxy.accountId, userGateToken);
+    //     }
+    //     return userGateToken;
+    // }
 
     private async refreshPrivate(accountWithProxy: AccountWithProxyEntity) {
         const tokens = await this.refreshForValidation(accountWithProxy);
@@ -548,7 +576,6 @@ export class AccountService {
 
     async approveRecipientOrder(accountId: string, recipient: IRecipientOrder): Promise<any> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
-        // const url = this.url + `v1/cart/order/${recipient.potentialOrder}/receiver`;
         const url = this.url + `v1/cart2/receiver`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
@@ -635,19 +662,32 @@ export class AccountService {
         return response.data;
     }
 
-    async getUserGateToken(accountId: string): Promise<PromocodeInterface> {
-        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+    private async getUserGateToken(accountWithProxyEntity: AccountWithProxyEntity): Promise<UserGateTokenInterface> {
         const url = this.url + `v1/profile/userGateToken`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
         return response.data;
     }
 
-    async getCourses(accountId: string): Promise<PromocodeInterface> {
-        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+    async getCoursesApi(accountWithProxyEntity: AccountWithProxyEntity): Promise<string> {
         const url = this.urlSite + `courses/?webview=true`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = await this.getHttpOptionsSiteCourse(accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
         return response.data;
     }
+
+    private getAccessTokenCourseFromResponse(html: string): string {
+        const regex = /(?<=},token:")[\w\W]*?(?=")/;
+        const match = html.match(regex);
+        if (match) {
+            return match[0];
+        }
+        throw new HttpException(ERROR_ACCESS_TOKEN_COURSE, HttpStatus.BAD_REQUEST);
+    }
+
+    // async getCoursesList(accountId: string): Promise<string> {
+    //     const respCourseApi = await this.getCoursesApi(accountId);
+    //
+    //
+    // }
 }

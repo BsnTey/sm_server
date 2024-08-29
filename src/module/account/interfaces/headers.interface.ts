@@ -19,4 +19,14 @@ interface IRequestHeaders {
 
 export type ISportmasterRequestHeaders = Partial<IRequestHeaders>;
 
-interface IRequestHeadersCourse {}
+export interface IRequestHeadersCourse {
+    'User-Agent': string;
+    Host: string;
+    'Upgrade-Insecure-Requests': number;
+    Accept: string;
+    'Ug-Token': string;
+    'Accept-Encoding': string;
+    'Accept-Language': string;
+    'X-Requested-With': string;
+    Referer: string;
+}
