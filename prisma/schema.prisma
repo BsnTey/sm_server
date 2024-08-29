@@ -118,3 +118,25 @@ model Proxy {
 
   @@map("proxy")
 }
+
+model Todo {
+  id        Int      @id @default(autoincrement())
+  todo      String   @unique
+  name      String
+  active    Boolean
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("todo")
+}
+
+model Course {
+  id        Int      @id
+  name      String   @unique
+  count     Int
+  active    Boolean
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("course")
+}

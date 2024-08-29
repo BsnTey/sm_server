@@ -9,6 +9,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { ProxyModule } from './module/proxy/proxy.module';
 import { HttpModule } from './module/http/http.module';
 import { OrderModule } from './module/order/order.module';
+import { ZennoModule } from './module/zenno/zenno.module';
 
 @Module({
     imports: [
@@ -27,6 +28,7 @@ import { OrderModule } from './module/order/order.module';
         ProxyModule,
         HttpModule,
         OrderModule,
+        ZennoModule,
     ],
     controllers: [],
 })
