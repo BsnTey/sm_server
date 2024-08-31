@@ -220,16 +220,6 @@ export class AccountService {
 
         return { headers, httpsAgent };
     }
-    //
-    // private async getOrCreateUserGateToken(accountWithProxy: AccountWithProxyEntity): Promise<string> {
-    //     let userGateToken = accountWithProxy.userGateToken;
-    //     if (!userGateToken) {
-    //         const respUserGateToken = await this.getUserGateToken(accountWithProxy);
-    //         userGateToken = respUserGateToken.data.userGateToken;
-    //         await this.accountRep.updateUserGateToken(accountWithProxy.accountId, userGateToken);
-    //     }
-    //     return userGateToken;
-    // }
 
     private async refreshPrivate(accountWithProxy: AccountWithProxyEntity) {
         const tokens = await this.refreshForValidation(accountWithProxy);
