@@ -1,13 +1,21 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
+// const UserLoginRequestSchema = z.object({
+//     email: z.string().email(),
+//     password: z.string(),
+// });
+
 const UserLoginRequestSchema = z.object({
-    email: z.string().email(),
-    password: z.string(),
+    key: z.string(),
 });
 
+// const UserLoginResponseSchema = z.object({
+//     accessToken: z.string(),
+// });
+
 const UserLoginResponseSchema = z.object({
-    accessToken: z.string(),
+    key: z.string(),
 });
 
 export namespace UserLoginCommand {

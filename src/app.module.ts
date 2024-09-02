@@ -10,6 +10,7 @@ import { ProxyModule } from './module/proxy/proxy.module';
 import { HttpModule } from './module/http/http.module';
 import { OrderModule } from './module/order/order.module';
 import { ZennoModule } from './module/zenno/zenno.module';
+import { AuthModule } from './module/auth/auth.module';
 
 @Module({
     imports: [
@@ -22,6 +23,7 @@ import { ZennoModule } from './module/zenno/zenno.module';
             max: 1000,
         }),
         TelegrafModule.forRootAsync(getTelegramConfig()),
+        AuthModule,
         TelegramModule,
         UserModule,
         AccountModule,
