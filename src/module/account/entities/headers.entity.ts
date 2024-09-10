@@ -1,5 +1,5 @@
 import md5 from 'md5';
-import { IRequestHeadersCourse, ISportmasterRequestHeaders } from '../interfaces/headers.interface';
+import { IRequestHeadersCourse, IRequestHeadersUserGate, ISportmasterRequestHeaders } from '../interfaces/headers.interface';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -16,7 +16,12 @@ export class SportmasterHeadersService {
     private acceptLanguage: string = 'ru-RU,en-US;q=0.9';
     private contentType: string = 'application/json; charset=utf-8';
     private accept: string = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8';
+    private acceptCourse: string = 'application/json, text/plain, */*';
     private aplautBuild: string = '2';
+    private secFetchSite: string = 'same-origin';
+    private secFetchMode: string = 'cors';
+    private secFetchDest: string = 'empty';
+
     private host: string = this.configService.getOrThrow('HOST_DONOR');
     private hostSite: string = 'www.' + this.configService.getOrThrow('HOST_DONOR_SITE');
     private xRequestedWith: string = this.configService.getOrThrow('X_REQUESTED_WITH');
@@ -46,7 +51,7 @@ export class SportmasterHeadersService {
         };
     }
 
-    getHeadersCourse(userGateToken: string): IRequestHeadersCourse {
+    getHeadersUserGate(userGateToken: string): IRequestHeadersUserGate {
         return {
             'User-Agent': this.userAgentMobileWeb,
             Host: this.hostSite,
@@ -56,6 +61,22 @@ export class SportmasterHeadersService {
             'Accept-Encoding': this.acceptEncoding + ', br',
             'Accept-Language': this.acceptLanguage,
             'X-Requested-With': this.xRequestedWith,
+            Referer: this.onlineCourses,
+        };
+    }
+
+    getHeadersWithAccessToken(accessToken: string): IRequestHeadersCourse {
+        return {
+            'User-Agent': this.userAgentMobileWeb,
+            Host: this.hostSite,
+            Accept: this.acceptCourse,
+            Accesstoken: accessToken,
+            'X-Requested-With': this.xRequestedWith,
+            'Sec-Fetch-Site': this.secFetchSite,
+            'Sec-Fetch-Mode': this.secFetchMode,
+            'Sec-Fetch-Dest': this.secFetchDest,
+            'Accept-Encoding': this.acceptEncoding + ', br',
+            'Accept-Language': this.acceptLanguage,
             Referer: this.onlineCourses,
         };
     }

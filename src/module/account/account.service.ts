@@ -28,6 +28,7 @@ import { UpdateGoogleIdRequestDto } from './dto/updateGoogleId-account.dto';
 import { v4 as uuidv4 } from 'uuid';
 import { SportmasterHeadersService } from './entities/headers.entity';
 import { UserGateTokenInterface } from './interfaces/userGateToken.interface';
+import { CourseList } from './interfaces/course-list.interface';
 
 @Injectable()
 export class AccountService {
@@ -155,19 +156,28 @@ export class AccountService {
     }
 
     async getAccessTokenCourse(accountId: string): Promise<{ accessTokenCourse: string }> {
-        let accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        return this.createAccessTokenCourse(accountWithProxyEntity);
+    }
 
+    async createAccessTokenCourse(accountWithProxyEntity: AccountWithProxyEntity): Promise<{ accessTokenCourse: string }> {
         if (!accountWithProxyEntity.userGateToken) {
             const respUserGateToken = await this.getUserGateToken(accountWithProxyEntity);
             const userGateToken = respUserGateToken.data.userGateToken;
-            await this.accountRep.updateUserGateToken(accountId, userGateToken);
-            accountWithProxyEntity = await this.getAccountEntity(accountId);
+            await this.accountRep.updateUserGateToken(accountWithProxyEntity.accountId, userGateToken);
+            accountWithProxyEntity = await this.getAccountEntity(accountWithProxyEntity.accountId);
         }
 
-        const htmlCourse = await this.getCoursesApi(accountWithProxyEntity);
+        const htmlCourse = await this.getCoursesHtml(accountWithProxyEntity);
 
         const accessTokenCourse = this.getAccessTokenCourseFromResponse(htmlCourse);
         return { accessTokenCourse };
+    }
+
+    async getCoursesList(accountId: string): Promise<CourseList> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const { accessTokenCourse } = await this.createAccessTokenCourse(accountWithProxyEntity);
+        return this.getCourses(accessTokenCourse, accountWithProxyEntity);
     }
 
     private generateRandomString(length: number) {
@@ -195,13 +205,6 @@ export class AccountService {
         return await this.accountRep.setCityToAccount(accountId, cityId);
     }
 
-    //
-    // async setBanMp(accountId: string) {
-    //     const account = await this.accountRep.setBanMp(accountId);
-    //     return account;
-    // }
-    //
-
     async openForceRefresh(accountId: string) {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         await this.refreshForValidation(accountWithProxyEntity);
@@ -214,8 +217,15 @@ export class AccountService {
         return { headers, httpsAgent };
     }
 
-    private async getHttpOptionsSiteCourse(accountWithProxy: AccountWithProxyEntity): Promise<any> {
-        const headers = this.sportmasterHeaders.getHeadersCourse(accountWithProxy.userGateToken!);
+    private async getHttpOptionsSiteUserGate(accountWithProxy: AccountWithProxyEntity): Promise<any> {
+        const headers = this.sportmasterHeaders.getHeadersUserGate(accountWithProxy.userGateToken!);
+        const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
+
+        return { headers, httpsAgent };
+    }
+
+    private async getHttpOptionsSiteCourse(accountWithProxy: AccountWithProxyEntity, accessTokenCourse: string): Promise<any> {
+        const headers = this.sportmasterHeaders.getHeadersWithAccessToken(accessTokenCourse);
         const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
 
         return { headers, httpsAgent };
@@ -659,9 +669,9 @@ export class AccountService {
         return response.data;
     }
 
-    async getCoursesApi(accountWithProxyEntity: AccountWithProxyEntity): Promise<string> {
+    async getCoursesHtml(accountWithProxyEntity: AccountWithProxyEntity): Promise<string> {
         const url = this.urlSite + `courses/?webview=true`;
-        const httpOptions = await this.getHttpOptionsSiteCourse(accountWithProxyEntity);
+        const httpOptions = await this.getHttpOptionsSiteUserGate(accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
         return response.data;
     }
@@ -675,9 +685,10 @@ export class AccountService {
         throw new HttpException(ERROR_ACCESS_TOKEN_COURSE, HttpStatus.BAD_REQUEST);
     }
 
-    // async getCoursesList(accountId: string): Promise<string> {
-    //     const respCourseApi = await this.getCoursesApi(accountId);
-    //
-    //
-    // }
+    private async getCourses(accessTokenCourse: string, accountWithProxyEntity: AccountWithProxyEntity): Promise<CourseList> {
+        const url = this.urlSite + `courses/api/courses?limit=10`;
+        const httpOptions = await this.getHttpOptionsSiteCourse(accountWithProxyEntity, accessTokenCourse);
+        const response = await this.httpService.get(url, httpOptions);
+        return response.data;
+    }
 }

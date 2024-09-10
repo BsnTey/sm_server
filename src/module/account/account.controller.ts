@@ -104,6 +104,6 @@ export class AccountController {
     @Get(':accountId/courses')
     @HttpCode(200)
     async getCoursesAccount(@Param() params: AccountIdParamsDto): Promise<any> {
-        //сделать получение списка курсов
+        return await this.accountService.getCoursesList(params.accountId);
     }
 }
