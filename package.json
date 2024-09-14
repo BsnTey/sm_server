@@ -40,6 +40,7 @@
     "cache-manager": "^5.5.2",
     "date-fns": "^3.6.0",
     "dotenv": "^16.4.5",
+    "email-validator": "^2.0.4",
     "emailjs-mime-codec": "^2.0.9",
     "express-handlebars": "^7.1.2",
     "handlebars": "^4.7.8",
