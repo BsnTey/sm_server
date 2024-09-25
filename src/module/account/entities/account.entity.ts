@@ -1,4 +1,5 @@
 import { Account } from '@prisma/client';
+import { Cookie } from '../interfaces/cookie.interface';
 
 export class AccountEntity implements Account {
     accountId: string;
@@ -58,7 +59,7 @@ export class AccountEntity implements Account {
             if (cookie.name == 'SMID') return true;
         });
 
-        const cookieObject = [
+        const cookieObject: Cookie[] = [
             {
                 domain: 'www.sportmaster.ru',
                 hostOnly: true,

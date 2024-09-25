@@ -11,6 +11,7 @@ import { HttpModule } from './module/http/http.module';
 import { OrderModule } from './module/order/order.module';
 import { ZennoModule } from './module/zenno/zenno.module';
 import { AuthModule } from './module/auth/auth.module';
+import { MirrorModule } from './module/mirror/mirror.module';
 
 @Module({
     imports: [
@@ -31,6 +32,7 @@ import { AuthModule } from './module/auth/auth.module';
         HttpModule,
         OrderModule,
         ZennoModule,
+        MirrorModule,
     ],
     controllers: [],
 })
