@@ -1,5 +1,6 @@
 import {
     ADMIN_SCENE,
+    AUTH_MIRROR_SCENE,
     CALCULATE_SCENE,
     CASH_RECEIPT_SCENE,
     CHANGE_NUMBER_SCENE,
@@ -12,18 +13,23 @@ import {
     START_SCENE,
 } from '../../scenes/base.scene-constant';
 
+export const AUTH_MIRROR = {
+    name: '✅ Авторизация',
+    scene: AUTH_MIRROR_SCENE,
+};
+
 export const CALCULATE_BONUS = {
     name: '💵 Рассчитать стоимость',
     scene: CALCULATE_SCENE,
 };
 
 export const CHANGE_NUMBER = {
-    name: '📱 Смена номера',
+    name: '📱 Смена',
     scene: CHANGE_NUMBER_SCENE,
 };
 
 export const MAKE_ORDER = {
-    name: '🛒 Сделать заказ',
+    name: '🛒 Заказ',
     scene: ORDER_SCENE,
 };
 
@@ -68,6 +74,7 @@ export const ADMIN = {
 };
 
 export const ALL_KEYS_MENU_BUTTON = [
+    AUTH_MIRROR,
     CALCULATE_BONUS,
     CHANGE_NUMBER,
     MAKE_ORDER,

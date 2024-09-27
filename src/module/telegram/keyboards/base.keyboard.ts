@@ -1,5 +1,6 @@
 import { Markup } from 'telegraf';
 import {
+    AUTH_MIRROR,
     CALCULATE_BONUS,
     CASH_RECEIPT,
     CHANGE_NUMBER,
@@ -13,7 +14,7 @@ import {
 
 function getMainMenuKeyboard() {
     return Markup.keyboard([
-        [CHANGE_NUMBER.name, MAKE_ORDER.name],
+        [AUTH_MIRROR.name, CHANGE_NUMBER.name, MAKE_ORDER.name],
         [CALCULATE_BONUS.name, CHECK.name],
         [COOKIE.name, QR_CODE.name, CASH_RECEIPT.name],
         [PROFILE.name, HELP.name],

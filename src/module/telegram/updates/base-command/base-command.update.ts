@@ -4,6 +4,7 @@ import { WizardContext } from 'telegraf/typings/scenes';
 import {
     ADMIN,
     ALL_KEYS_MENU_BUTTON_NAME,
+    AUTH_MIRROR,
     CALCULATE_BONUS,
     CASH_RECEIPT,
     CHANGE_NUMBER,
@@ -38,6 +39,11 @@ export class BaseUpdate {
     @Hears([CHANGE_NUMBER.name])
     async onStartChangeNumber(@Ctx() ctx: WizardContext) {
         await ctx.scene.enter(CHANGE_NUMBER.scene);
+    }
+
+    @Hears([AUTH_MIRROR.name])
+    async onStartMirror(@Ctx() ctx: WizardContext) {
+        await ctx.scene.enter(AUTH_MIRROR.scene);
     }
 
     @Hears([MAKE_ORDER.name])

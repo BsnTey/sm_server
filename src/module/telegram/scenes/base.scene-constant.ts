@@ -7,5 +7,6 @@ export const QR_CODE_SCENE = 'getQrCodeScene';
 export const CASH_RECEIPT_SCENE = 'getCashReceiptScene';
 export const PROFILE_SCENE = 'profileScene';
 export const HELP_SCENE = 'helpScene';
+export const AUTH_MIRROR_SCENE = 'authMirrorScene';
 export const START_SCENE = 'startScene';
 export const ADMIN_SCENE = 'adminScene';
