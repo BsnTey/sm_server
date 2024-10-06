@@ -11,7 +11,7 @@ import { StatusPayment } from '@prisma/client';
 import { ERROR_SCRINSHOT } from '../../constants/error.constant';
 import { BottService } from '../../../bott/bott.service';
 import { FileService } from '../../../shared/file.service';
-import { getFileNameReceipt } from '../../utils/receipt.utils';
+import { getFileNameForReceipt } from '../../utils/receipt.utils';
 import { extractAmountFTransferedPay } from '../../utils/payment.utils';
 
 @Scene(MAKE_DEPOSIT_SCENE)
@@ -97,8 +97,14 @@ export class PaymentUpdate {
     async inputReceipt(@Sender() { id: telegramId }: any, @Ctx() ctx: WizardContext) {
         try {
             const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            //@ts-ignore
+            const photos = ctx!.message!.photo;
+            const fileId = photos[photos.length - 2].file_id;
+            const fileLink = await ctx.telegram.getFileLink(fileId);
 
-            const { fileName, fileLink } = await getFileNameReceipt(ctx);
+            const fileExtension = fileLink.href.split('.').pop() || 'jpg';
+            const fileName = getFileNameForReceipt(String(telegramId), fileExtension);
             await this.fileService.saveFileFromTg(fileName, fileLink);
 
             const orderPayment = await this.bottService.makeDepositUserBalance(paymentId, fileName);
@@ -112,18 +118,30 @@ export class PaymentUpdate {
 
     @On('document')
     async inputReceiptDoc(@Sender() { id: telegramId }: any, @Ctx() ctx: WizardContext) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        //@ts-ignore
-        const document = ctx.message!.document!;
+        try {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            //@ts-ignore
+            const document = ctx.message!.document!;
 
-        if (document?.mime_type !== 'application/pdf') {
-            await ctx.reply('Пожалуйста, отправьте файл в формате скриншота чека или файл PDF из приложения банка.');
-            return;
+            if (document?.mime_type === 'application/pdf') {
+                const fileLink = await ctx.telegram.getFileLink(document.file_id);
+                const pdfBuffer = await this.fileService.downloadFile(fileLink.href);
+                const fileName = getFileNameForReceipt(String(telegramId), 'jpg');
+                const jpgBuffer = await this.fileService.convertPdfToJpg(pdfBuffer, fileName);
+
+                await this.fileService.saveFile(fileName, jpgBuffer);
+
+                const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
+                await this.bottService.makeDepositUserBalance(paymentId, fileName);
+                await ctx.reply(`Заявка исполнена. Квитанция сохранена в формате JPG.`);
+
+                await ctx.scene.leave();
+            } else {
+                await ctx.reply('Пожалуйста, отправьте файл в формате PDF.');
+            }
+        } catch (error) {
+            await ctx.reply('Ошибка при обработке документа квитанции');
         }
-
-        const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
-        const orderPayment = await this.bottService.updatePaymentOrderStatus(paymentId, StatusPayment.Transfered);
-        await ctx.reply(`Заявка на сумму ${orderPayment.amount}р исполнена`);
     }
 
     @On('text')
