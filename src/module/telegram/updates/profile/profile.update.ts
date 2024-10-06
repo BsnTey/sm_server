@@ -1,4 +1,4 @@
-import { Action, Ctx, Hears, Message, On, Scene, SceneEnter } from 'nestjs-telegraf';
+import { Action, Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { ALL_KEYS_MENU_BUTTON_NAME, PROFILE } from '../base-command/base-command.constants';
 import { TelegramService } from '../../telegram.service';
@@ -6,9 +6,11 @@ import { AccountService } from '../../../account/account.service';
 import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { CheckingService } from '../checking/checking.service';
 import { profileKeyboard } from '../../keyboards/profile.keyboard';
-import { UseFilters } from '@nestjs/common';
+import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
-import { PROFILE_GET_INFO_ORDER } from '../../scenes/profile.scene-constant';
+import { MAKE_DEPOSIT_SCENE, PROFILE_GET_INFO_ORDER } from '../../scenes/profile.scene-constant';
+import { UserService } from '../../../user/user.service';
+import { ERROR_FOUND_USER } from '../../constants/error.constant';
 
 @Scene(PROFILE.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -16,11 +18,14 @@ export class ProfileUpdate {
     constructor(
         private telegramService: TelegramService,
         private checkingService: CheckingService,
+        private userService: UserService,
     ) {}
 
     @SceneEnter()
-    async onSceneEnter(@Ctx() ctx: WizardContext) {
-        await ctx.reply('Выберете действие', profileKeyboard);
+    async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
+        await ctx.reply('Выберете действие', profileKeyboard(user?.role));
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
@@ -44,6 +49,11 @@ export class ProfileUpdate {
     @Action('get_info_order')
     async getInfoOrder(@Ctx() ctx: WizardContext) {
         await ctx.scene.enter(PROFILE_GET_INFO_ORDER);
+    }
+
+    @Action('payment')
+    async makeDeposit(@Ctx() ctx: WizardContext) {
+        await ctx.scene.enter(MAKE_DEPOSIT_SCENE);
     }
 }
 

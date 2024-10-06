@@ -1,6 +1,4 @@
-import { UserTelegram } from '@prisma/client';
-
-export type UserRole = 'User' | 'Admin';
+import { UserRole, UserTelegram } from '@prisma/client';
 
 export class UserTelegramEntity implements UserTelegram {
     telegramId: string;

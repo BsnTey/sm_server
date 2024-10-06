@@ -1,9 +1,9 @@
 import { Markup } from 'telegraf';
 import { CitySMEntity } from '../../account/entities/citySM.entity';
-import { CartInterface } from '../../account/interfaces/cart.interface';
 import { SearchProductInterface } from '../../account/interfaces/search-product.interface';
 import { PickupAvabilityInterface } from '../../account/interfaces/pickup-avability.interface';
 import { OrdersInterface } from '../../account/interfaces/orders.interface';
+import { ICartItemsInfo } from '../../account/interfaces/cart.interface';
 
 export const mainMenuOrderKeyboard = (city: string) => {
     return Markup.inlineKeyboard([
@@ -54,10 +54,10 @@ export const getUserCitiesKeyboard = (userCities: CitySMEntity[]) => {
 
 export const comebackBtn = Markup.inlineKeyboard([[Markup.button.callback('Назад', 'go_back')]]);
 
-export const cartItemsKeyboard = (cartItems: CartInterface) => {
+export const cartItemsKeyboard = (cartItems: ICartItemsInfo[]) => {
     const keyboard = [];
-    const items = cartItems.data.cartFull.availableItems;
-    for (const item of items) {
+    // const items = cartItems.data.cartFull.availableItems;
+    for (const item of cartItems) {
         keyboard.push([Markup.button.callback(item.name, `id_remove_${item.cartItemId.productId}_${item.cartItemId.sku}`)]);
     }
 

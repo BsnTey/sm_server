@@ -10,12 +10,13 @@ datasource db {
 enum UserRole {
   User
   Admin
+  Seller
 }
 
 model User {
   uuid           String       @id @default(uuid()) @db.Uuid
   firstName      String       @map("first_name")
-  email          String
+  email          String       @unique
   passwordHash   String       @map("password_hash")
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
@@ -26,16 +27,17 @@ model User {
 }
 
 model UserTelegram {
-  telegramId   String       @id @unique @map("telegram_id")
-  telegramName String       @map("telegram_name")
-  countBonuses Int          @default(0) @map("count_bonuses")
-  role         UserRole     @default(User)
-  isBan        Boolean      @default(false) @map("is_ban")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
-  user         User?
-  accounts     Account[]
-  userCities   UserCitySM[]
+  telegramId    String         @id @unique @map("telegram_id")
+  telegramName  String         @map("telegram_name")
+  countBonuses  Int            @default(0) @map("count_bonuses")
+  role          UserRole       @default(User)
+  isBan         Boolean        @default(false) @map("is_ban")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  user          User?
+  accounts      Account[]
+  userCities    UserCitySM[]
+  paymentOrders PaymentOrder[]
 
   @@map("user_telegram")
 }
@@ -139,4 +141,43 @@ model Course {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("course")
+}
+
+enum StatusPayment {
+  Created
+  Transfered
+  Completed
+  Cancelled
+  Proceedings
+}
+
+model PaymentOrder {
+  id             String                      @id @default(uuid()) @db.Uuid
+  transactionId  Int?                        @unique @map("transaction_id")
+  amount         Int
+  amountCredited Int                         @map("amount_credited")
+  status         StatusPayment               @default(Created) @map("status")
+  receiptUrl     String?                     @map("receipt_url")
+  isPositive     Boolean?                    @map("is_positive")
+  completedAt    DateTime?                   @map("completed_at")
+  userTelegramId String                      @map("user_telegram_id")
+  userTelegram   UserTelegram                @relation(fields: [userTelegramId], references: [telegramId])
+  statusHistory  PaymentOrderStatusHistory[]
+  createdAt      DateTime                    @default(now()) @map("created_at")
+  updatedAt      DateTime                    @updatedAt @map("updated_at")
+
+  @@index([userTelegramId])
+  @@index([status])
+  @@map("payment_order")
+}
+
+model PaymentOrderStatusHistory {
+  id             Int           @id @default(autoincrement())
+  paymentOrderId String        @map("payment_order_id") @db.Uuid
+  paymentOrder   PaymentOrder  @relation(fields: [paymentOrderId], references: [id])
+  status         StatusPayment @map("status")
+  changedAt      DateTime      @default(now()) @map("changed_at")
+
+  @@index([paymentOrderId])
+  @@map("payment_order_status_history")
 }

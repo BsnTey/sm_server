@@ -12,6 +12,8 @@ import { OrderModule } from './module/order/order.module';
 import { ZennoModule } from './module/zenno/zenno.module';
 import { AuthModule } from './module/auth/auth.module';
 import { MirrorModule } from './module/mirror/mirror.module';
+import { SharedModule } from './module/shared/shared.module';
+import { BottModule } from './module/bott/bott.module';
 
 @Module({
     imports: [
@@ -33,7 +35,10 @@ import { MirrorModule } from './module/mirror/mirror.module';
         OrderModule,
         ZennoModule,
         MirrorModule,
+        BottModule,
+        SharedModule,
     ],
     controllers: [],
+    providers: [],
 })
 export class AppModule {}

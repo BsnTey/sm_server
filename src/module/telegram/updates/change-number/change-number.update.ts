@@ -60,7 +60,7 @@ export class ChangeNumberInputNumber {
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.telegramService.getFromCache(String(telegramId));
 
         const shortInfo = await this.accountService.shortInfo(account.accountId);
         const text = `📱 Аккаунт найден. Баланс: ${shortInfo.bonusCount}.\nВведите номер телефона, на который хотите перепривязать его`;
@@ -78,7 +78,7 @@ export class ChangeNumberInputNumber {
         @Ctx() ctx: WizardContext,
         @Sender() { id: telegramId }: any,
     ) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.telegramService.getFromCache(String(telegramId));
         account.requestId = await this.accountService.sendSmsWithAnalytics(account.accountId, phoneNumber);
         await ctx.scene.enter(CHANGE_NUMBER_CODE_SCENE);
     }
@@ -110,7 +110,7 @@ export class ChangeNumberInputCode {
         @Ctx() ctx: WizardContext,
         @Sender() { id: telegramId }: any,
     ) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.telegramService.getFromCache(String(telegramId));
         await this.accountService.phoneChange(account.accountId, account.requestId, code);
         await ctx.reply('✅ Номер успешно изменен. Можете авторизоваться в аккаунт', mainMenuKeyboard);
         await ctx.scene.leave();

@@ -24,7 +24,7 @@ export class TelegramService {
         }
     }
 
-    async setTelegramAccountCache(telegramId: number, accountId: string) {
+    async setTelegramAccountCache(telegramId: string, accountId: string) {
         const accountFromCache = await this.cacheManager.get<IAccountCashing>(String(telegramId));
         if (accountFromCache) {
             await this.cacheManager.del(accountFromCache.accountId);
@@ -33,13 +33,13 @@ export class TelegramService {
         await this.cacheManager.set(String(telegramId), { accountId }, this.TTL_CASH);
     }
 
-    async getFromCache(telegramId: number) {
+    async getFromCache(telegramId: string) {
         const account = await this.cacheManager.get<IAccountCashing>(String(telegramId));
         if (!account) throw new HttpException(ERROR_TIMEOUT_TTL_CASH, HttpStatus.FORBIDDEN);
         return account;
     }
 
-    async setDataCache(telegramId: number, data: any[]) {
+    async setDataCache<T>(telegramId: string, data: T) {
         const dataFromCache = await this.cacheManager.get<any>(String(telegramId));
         if (dataFromCache) {
             await this.cacheManager.del(dataFromCache.data);
@@ -47,8 +47,8 @@ export class TelegramService {
         await this.cacheManager.set(String(telegramId), data, this.TTL_CASH);
     }
 
-    async getDataFromCache(telegramId: number): Promise<any[]> {
-        const data = await this.cacheManager.get<any>(String(telegramId));
+    async getDataFromCache<T>(telegramId: string): Promise<T> {
+        const data = await this.cacheManager.get<T>(String(telegramId));
         if (!data) throw new HttpException(ERROR_TIMEOUT_TTL_CASH, HttpStatus.FORBIDDEN);
         return data;
     }

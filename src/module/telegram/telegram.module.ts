@@ -35,6 +35,11 @@ import { GetInfoOrderUpdate, ProfileUpdate } from './updates/profile/profile.upd
 import { AdminUpdate } from './updates/admin/admin.update';
 import { SportmasterHeadersService } from '../account/entities/headers.entity';
 import { AuthMirrorUpdate } from './updates/auth-mirror/auth-mirror.update';
+import { PaymentUpdate } from './updates/payment/payment.update';
+import { BotTHeadersService } from '../bott/entities/headers-bot-t.entity';
+import { BottService } from '../bott/bott.service';
+import { BottRepository } from '../bott/bott.repository';
+import { FileService } from '../shared/file.service';
 
 @Module({
     providers: [
@@ -75,7 +80,12 @@ import { AuthMirrorUpdate } from './updates/auth-mirror/auth-mirror.update';
         ProfileUpdate,
         GetInfoOrderUpdate,
         SportmasterHeadersService,
+        BotTHeadersService,
         AuthMirrorUpdate,
+        PaymentUpdate,
+        BottService,
+        BottRepository,
+        FileService,
     ],
 })
 export class TelegramModule {}

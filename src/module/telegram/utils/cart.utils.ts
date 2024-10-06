@@ -1,4 +1,4 @@
-import { CartInterface } from '../../account/interfaces/cart.interface';
+import { CartInterface, ICartItemsInfo } from '../../account/interfaces/cart.interface';
 
 export interface IItemsCart {
     sku: string;
@@ -8,7 +8,8 @@ export interface IItemsCart {
 }
 
 export function selectMainFromCart(cart: CartInterface): IItemsCart[] {
-    const items = cart.data.cartFull.availableItems;
+    const items: ICartItemsInfo[] = [];
+    items.push(...cart.data.cartFull.availableItems);
     const itemsDelivery = cart.data.cartFull.obtainPoints;
     const itemsOutStock = cart.data.cartFull.soldOutLines;
 
@@ -16,10 +17,7 @@ export function selectMainFromCart(cart: CartInterface): IItemsCart[] {
         const itemsTemp = itemsDelivery[0].cartItems[0];
         items.push(itemsTemp);
     }
-
-    if (itemsOutStock.length > 0) {
-        items.push(...itemsOutStock);
-    }
+    items.push(...itemsOutStock);
 
     return items.map(item => ({
         sku: String(item.cartItemId.sku),

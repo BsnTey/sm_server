@@ -95,7 +95,7 @@ export class OrderMenuAccount {
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.telegramService.getFromCache(String(telegramId));
 
         const shortInfo = await this.accountService.shortInfo(account.accountId);
         const text = `📱 Аккаунт найден. Баланс: ${shortInfo.bonusCount}`;
@@ -279,14 +279,18 @@ export class OrderMenuCart {
         account.email = cartResponse.data.cartFull.owner.email;
         let keyboard;
         let text;
-        if (cartResponse.data.cartFull.availableItems.length != 0) {
-            keyboard = cartItemsKeyboard(cartResponse);
+        if (cartResponse.data.cartFull.soldOutLines.length != 0) {
+            keyboard = cartItemsKeyboard(cartResponse.data.cartFull.soldOutLines);
+            text = 'В корзине есть товары, которые нельзя заказать';
+        } else if (cartResponse.data.cartFull.availableItems.length != 0) {
+            keyboard = cartItemsKeyboard(cartResponse.data.cartFull.availableItems);
             text = getTextCart(cartResponse);
             account.cartResponse = cartResponse;
         } else {
             keyboard = emptyCartKeyboard;
             text = 'Выберете действие';
         }
+
         try {
             await ctx.editMessageText(text, keyboard);
         } catch (err) {

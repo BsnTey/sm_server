@@ -13,7 +13,7 @@ export interface CartFull {
     unselectedItems?: any;
     unallocatedItems: CartItemId[];
     deletedItems: any[];
-    soldOutLines: any[];
+    soldOutLines: SoldOutLine[];
     promoCodes: any[];
     obtainPoints: any[];
     owner: Owner;
@@ -113,6 +113,20 @@ export interface AvailableItem {
     catalogDiscount: ItemPrice;
 }
 
+export interface SoldOutLine {
+    cartItemId: CartItemId;
+    name: string;
+    image: string;
+    params: Param[];
+    quantity: number;
+    itemPrice: ItemPrice;
+    itemPriceWoDiscount: ItemPrice;
+    totalPrice: ItemPrice;
+    totalPriceWoDiscount: ItemPrice;
+    catalogPrice: ItemPrice;
+    catalogDiscount: ItemPrice;
+}
+
 export interface DeliveryInfo {
     deliveryTypes: DeliveryType[];
     onlyIntPickup: boolean;
@@ -149,4 +163,9 @@ export interface CartItemId {
     productId: string;
     sku: number;
     linesIds: string[];
+}
+
+export interface ICartItemsInfo {
+    cartItemId: CartItemId;
+    name: string;
 }

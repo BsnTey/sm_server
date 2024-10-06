@@ -76,7 +76,7 @@ export class CalculateUpdate {
                     priceDiscountPromo,
                 });
             }
-            await this.telegramService.setDataCache(telegramId, outputPrices);
+            await this.telegramService.setDataCache<any[]>(String(telegramId), outputPrices);
             await ctx.reply(
                 `Расчет без промо:
 Цена на кассу: ${totalPrice}
@@ -95,7 +95,7 @@ export class CalculateUpdate {
 
     @Action('go_to_calculate_show')
     async goToCalculateShow(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const calculatePrices = await this.telegramService.getDataFromCache(telegramId);
+        const calculatePrices = await this.telegramService.getDataFromCache<any[]>(String(telegramId));
 
         let message = '';
         calculatePrices.forEach(value => {

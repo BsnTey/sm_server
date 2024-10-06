@@ -9,11 +9,11 @@ export class CitySMEntity implements CitySM {
     createdAt: Date;
     updatedAt: Date;
 
-    constructor(account: Partial<IFindCitiesAccount>) {
+    constructor(city: Partial<IFindCitiesAccount>) {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
-        this.cityId = account.id;
-        Object.assign(this, account);
+        this.cityId = city.id;
+        Object.assign(this, city);
         return this;
     }
 }

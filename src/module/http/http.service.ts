@@ -1,29 +1,20 @@
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import { Injectable } from '@nestjs/common';
-import { HttpOptions, IHttpInterface } from './interfaces/http.interface';
+import { IHttpInterface } from './interfaces/http.interface';
 
 @Injectable()
 export class HttpService implements IHttpInterface {
     constructor() {}
 
-    async get(url: string, { headers, httpsAgent }: HttpOptions): Promise<any> {
-        return await axios.get(url, {
-            headers,
-            httpsAgent,
-        });
+    async get<T = any>(url: string, options: any = {}): Promise<AxiosResponse<T>> {
+        return axios.get<T>(url, options);
     }
 
-    async post(url: string, payload: any, { headers, httpsAgent }: HttpOptions): Promise<any> {
-        return await axios.post(url, payload, {
-            headers,
-            httpsAgent,
-        });
+    async post<T = any>(url: string, payload: any, options: any = {}): Promise<AxiosResponse<T>> {
+        return await axios.post<T>(url, payload, options);
     }
 
-    async delete(url: string, { headers, httpsAgent }: HttpOptions): Promise<any> {
-        return await axios.delete(url, {
-            headers,
-            httpsAgent,
-        });
+    async delete<T = any>(url: string, options: any = {}): Promise<AxiosResponse<T>> {
+        return await axios.delete<T>(url, options);
     }
 }

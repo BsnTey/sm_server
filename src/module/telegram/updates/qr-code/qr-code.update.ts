@@ -35,7 +35,7 @@ export class QrCodeUpdate {
         @Sender() { id: telegramId }: any,
         @Ctx() ctx: WizardContext,
     ) {
-        await this.telegramService.setTelegramAccountCache(telegramId, accountId);
+        await this.telegramService.setTelegramAccountCache(String(telegramId), accountId);
         const { qrCode, bonusCount } = await this.accountService.shortInfo(accountId);
 
         const qrCodeBuff = await this.qrCodeService.generateQrCode(qrCode);
@@ -46,7 +46,7 @@ export class QrCodeUpdate {
 
     @Action('update_qrcode')
     async updateQrCode(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.telegramService.getFromCache(String(telegramId));
         const { qrCode } = await this.accountService.shortInfo(account.accountId);
         const qrCodeBuff = await this.qrCodeService.generateQrCode(qrCode);
         const keyboard = qrCodeUpdateKeyboard.reply_markup;

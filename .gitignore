@@ -4,6 +4,7 @@
 /build
 downloads/*
 !downloads/.gitkeep
+public/receipts
 
 
 # Logs

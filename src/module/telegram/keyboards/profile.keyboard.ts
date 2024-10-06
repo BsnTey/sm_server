@@ -1,6 +1,26 @@
 import { Markup } from 'telegraf';
+import { PaymentOrderEntity } from '../../bott/entities/payment.entities';
+import { UserRole } from '@prisma/client';
 
-export const profileKeyboard = Markup.inlineKeyboard([
-    [Markup.button.callback(`Чекер промо`, 'check_promo')],
-    [Markup.button.callback(`Получить инфо по заказу`, 'get_info_order')],
-]);
+export const profileKeyboard = (role: UserRole) => {
+    const btnArr: any[] = [];
+    role != 'User' ? btnArr.push([Markup.button.callback('Пополнить баланс', 'payment')]) : null;
+    btnArr.push([Markup.button.callback('Чекер промо', 'check_promo')]);
+    btnArr.push([Markup.button.callback('Получить инфо по заказу', 'get_info_order')]);
+    return Markup.inlineKeyboard(btnArr);
+};
+
+export function cancelPaymentKeyboard(idPayment: string) {
+    return Markup.inlineKeyboard([
+        [Markup.button.callback(`Отменить заявку`, `cancelPayment_${idPayment}`)],
+        [Markup.button.callback(`Назад`, 'goBack')],
+    ]);
+}
+
+export function createdPaymentKeyboard(payments: PaymentOrderEntity[]) {
+    const keyboardPay = payments.map(pay => [
+        Markup.button.callback(`Заявка на сумму ${pay.amount}`, `createdPayment_${pay.id}|${pay.amount}|${pay.amountCredited}`),
+    ]);
+
+    return Markup.inlineKeyboard([...keyboardPay]);
+}
