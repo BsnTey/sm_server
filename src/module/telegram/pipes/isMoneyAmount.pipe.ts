@@ -1,5 +1,5 @@
 import { ArgumentMetadata, BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
-import { ERROR_INTEGER } from '../constants/error.constant';
+import { ERROR_INTEGER, ERROR_LOW_MONEY_COUNT, ERROR_NOT_MULTIPLE_OF_50 } from '../constants/error.constant';
 
 @Injectable()
 export class isMoneyAmountPipe implements PipeTransform<string> {
@@ -9,12 +9,12 @@ export class isMoneyAmountPipe implements PipeTransform<string> {
         if (!Number.isInteger(amount)) {
             throw new BadRequestException(ERROR_INTEGER);
         }
-        // if (amount < 500) {
-        //     throw new BadRequestException(ERROR_LOW_MONEY_COUNT);
-        // }
-        // if (amount % 50 !== 0) {
-        //     throw new BadRequestException(ERROR_NOT_MULTIPLE_OF_50);
-        // }
+        if (amount < 500) {
+            throw new BadRequestException(ERROR_LOW_MONEY_COUNT);
+        }
+        if (amount % 50 !== 0) {
+            throw new BadRequestException(ERROR_NOT_MULTIPLE_OF_50);
+        }
 
         return amount;
     }
