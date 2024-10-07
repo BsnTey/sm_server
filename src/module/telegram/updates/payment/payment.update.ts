@@ -132,8 +132,8 @@ export class PaymentUpdate {
                 await this.fileService.saveFile(fileName, jpgBuffer);
 
                 const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
-                await this.bottService.makeDepositUserBalance(paymentId, fileName);
-                await ctx.reply(`Заявка исполнена. Квитанция сохранена в формате JPG.`);
+                const orderPayment = await this.bottService.makeDepositUserBalance(paymentId, fileName);
+                await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
 
                 await ctx.scene.leave();
             } else {

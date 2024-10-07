@@ -44,11 +44,16 @@ export class FileService {
 
         const pageToConvertAsImage = 1;
 
-        const result = await converter(pageToConvertAsImage, { responseType: 'buffer' });
+        try {
+            const result = await converter(pageToConvertAsImage, { responseType: 'buffer' });
 
-        if (result && result.buffer) {
-            return result.buffer;
-        } else {
+            if (result && result.buffer) {
+                return result.buffer; // Верни буфер
+            } else {
+                throw new Error('Результат не содержит буфер');
+            }
+        } catch (error) {
+            console.error('Ошибка при конвертации PDF в JPG:', error);
             throw new Error('Ошибка при конвертации PDF в изображение');
         }
     }
