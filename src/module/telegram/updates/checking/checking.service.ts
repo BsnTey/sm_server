@@ -133,7 +133,7 @@ export class CheckingService {
             resultChecking[accountId] = `${accountId}: Не найден\n`;
         } else if (err instanceof AxiosError) {
             try {
-                const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Axios Error: ${err.response?.data?.error?.message || 'Ошибка сети'}\n`;
+                const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Axios Error: ${JSON.stringify(err.response?.data || err.toJSON(), null, 2)}\n`;
                 fs.appendFileSync(logFilePath, errorMessage, 'utf8');
             } catch (writeError: any) {
                 const writeErrorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Write Error: ${writeError.message}\n`;
