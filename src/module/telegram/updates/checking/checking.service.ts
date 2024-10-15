@@ -127,20 +127,29 @@ export class CheckingService {
     }
 
     private handleError(err: any, accountId: string, resultChecking: Record<string, string>): void {
-        const logFilePath = path.join(__dirname, 'error_log.txt'); // Путь к файлу для записи ошибок
+        const logFilePath = path.join(__dirname, 'error_log.txt');
 
         if (err instanceof NotFoundException) {
             resultChecking[accountId] = `${accountId}: Не найден\n`;
         } else if (err instanceof AxiosError) {
-            resultChecking[accountId] = `${accountId}: ${err.response?.data.error.message || 'Ошибка сети'}\n`;
+            try {
+                const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Axios Error: ${err.response?.data?.error?.message || 'Ошибка сети'}\n`;
+                fs.appendFileSync(logFilePath, errorMessage, 'utf8');
+            } catch (writeError: any) {
+                const writeErrorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Write Error: ${writeError.message}\n`;
+                fs.appendFileSync(logFilePath, writeErrorMessage, 'utf8');
+            }
+            resultChecking[accountId] = `${accountId}: Ошибка запроса, повторите\n`;
         } else {
             try {
                 const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Error: ${err.message}\n`;
                 fs.appendFileSync(logFilePath, errorMessage, 'utf8');
 
                 resultChecking[accountId] = `${accountId}: Неизвестная ошибка\n`;
-            } catch (writeError) {
-                fs.appendFileSync(logFilePath, `${new Date().toISOString()} - Account ID: ${accountId} - Unknown error occurred\n`, 'utf8');
+            } catch (writeError: any) {
+                const writeErrorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Write Error: ${writeError.message}\n`;
+                fs.appendFileSync(logFilePath, writeErrorMessage, 'utf8');
+
                 resultChecking[accountId] = `${accountId}: Неизвестная ошибка\n`;
             }
         }
