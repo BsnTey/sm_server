@@ -133,23 +133,33 @@ export class CheckingService {
             resultChecking[accountId] = `${accountId}: Не найден\n`;
         } else if (err instanceof AxiosError) {
             try {
-                const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Axios Error: ${JSON.stringify(err.response?.data || err.toJSON(), null, 2)}\n`;
-                fs.appendFileSync(logFilePath, errorMessage, 'utf8');
+                const errorResponse = err.response?.data?.error;
+
+                if (errorResponse?.message) {
+                    const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Axios Error: ${JSON.stringify(errorResponse, null, 2)}\n`;
+                    fs.appendFileSync(logFilePath, errorMessage, 'utf8');
+
+                    resultChecking[accountId] = `${accountId}: ${errorResponse.message}\n`;
+                } else {
+                    const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Axios Error: Ошибка запроса, повторите\n`;
+                    fs.appendFileSync(logFilePath, errorMessage, 'utf8');
+
+                    resultChecking[accountId] = `${accountId}: Ошибка запроса, повторите\n`;
+                }
             } catch (writeError: any) {
                 const writeErrorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Write Error: ${writeError.message}\n`;
                 fs.appendFileSync(logFilePath, writeErrorMessage, 'utf8');
+
+                resultChecking[accountId] = `${accountId}: Ошибка запроса, повторите\n`;
             }
-            resultChecking[accountId] = `${accountId}: Ошибка запроса, повторите\n`;
         } else {
             try {
                 const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Error: ${err.message}\n`;
                 fs.appendFileSync(logFilePath, errorMessage, 'utf8');
-
-                resultChecking[accountId] = `${accountId}: Неизвестная ошибка\n`;
+                resultChecking[accountId] = `${accountId}: ${err.message || 'Неизвестная ошибка'}\n`;
             } catch (writeError: any) {
                 const writeErrorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Write Error: ${writeError.message}\n`;
                 fs.appendFileSync(logFilePath, writeErrorMessage, 'utf8');
-
                 resultChecking[accountId] = `${accountId}: Неизвестная ошибка\n`;
             }
         }
