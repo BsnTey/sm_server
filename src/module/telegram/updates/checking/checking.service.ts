@@ -3,6 +3,8 @@ import { AccountService } from '../../../account/account.service';
 import validate from 'uuid-validate';
 import { AxiosError } from 'axios';
 import { addDays, isBefore, parseISO } from 'date-fns';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 
 interface IOutputBonusDate {
     amount: number;
@@ -125,12 +127,22 @@ export class CheckingService {
     }
 
     private handleError(err: any, accountId: string, resultChecking: Record<string, string>): void {
+        const logFilePath = path.join(__dirname, 'error_log.txt'); // Путь к файлу для записи ошибок
+
         if (err instanceof NotFoundException) {
             resultChecking[accountId] = `${accountId}: Не найден\n`;
         } else if (err instanceof AxiosError) {
             resultChecking[accountId] = `${accountId}: ${err.response?.data.error.message || 'Ошибка сети'}\n`;
         } else {
-            resultChecking[accountId] = `${accountId}: ${err.message}\n`;
+            try {
+                const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Error: ${err.message}\n`;
+                fs.appendFileSync(logFilePath, errorMessage, 'utf8');
+
+                resultChecking[accountId] = `${accountId}: Неизвестная ошибка\n`;
+            } catch (writeError) {
+                fs.appendFileSync(logFilePath, `${new Date().toISOString()} - Account ID: ${accountId} - Unknown error occurred\n`, 'utf8');
+                resultChecking[accountId] = `${accountId}: Неизвестная ошибка\n`;
+            }
         }
     }
 
