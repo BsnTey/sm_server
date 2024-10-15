@@ -141,7 +141,7 @@ export class CheckingService {
 
                     resultChecking[accountId] = `${accountId}: ${errorResponse.message}\n`;
                 } else {
-                    const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Axios Error: Ошибка запроса, повторите\n`;
+                    const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Axios Error: ${JSON.stringify(err.response?.data || err.toJSON(), null, 2)}\n`;
                     fs.appendFileSync(logFilePath, errorMessage, 'utf8');
 
                     resultChecking[accountId] = `${accountId}: Ошибка запроса, повторите\n`;
