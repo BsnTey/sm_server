@@ -1,5 +1,5 @@
 import { ALL_KEYS_MENU_BUTTON_NAME, AUTH_MIRROR } from '../base-command/base-command.constants';
-import { Ctx, Hears, Message, On, Scene, SceneEnter } from 'nestjs-telegraf';
+import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { AccountService } from '../../../account/account.service';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
@@ -31,7 +31,9 @@ export class AuthMirrorUpdate {
     }
 
     @On('text')
-    async findAccount(@Message('text', new isAccountIdPipe()) accountId: string, @Ctx() ctx: WizardContext) {
+    async findAccount(@Message('text', new isAccountIdPipe()) accountId: string, @Ctx() ctx: WizardContext, @Sender() telegramUser: any) {
+        const { first_name: telegramName } = telegramUser;
+        console.log('Запрос зеркала', telegramName);
         await this.accountService.getAccount(accountId);
         const url = `${this.DOMAIN}/api/mirror/${accountId}`;
 

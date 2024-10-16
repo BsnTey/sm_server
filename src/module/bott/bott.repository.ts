@@ -98,7 +98,7 @@ export class BottRepository {
             amount: order.amount,
             amountCredited: order.amountCredited,
             status: order.status,
-            receiptUrl: `${this.domain}/receipts/${order.receiptUrl}`,
+            receiptUrl: order.receiptUrl ? `${this.domain}/receipts/${order.receiptUrl}` : null,
             statusHistory: order.statusHistory.map(history => ({
                 status: history.status,
                 date: history.changedAt.toISOString().replace('T', ' ').substring(0, 16),

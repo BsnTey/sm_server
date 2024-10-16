@@ -55,9 +55,7 @@ export class BottService {
     }
 
     async getAllPaymentOrders(): Promise<any> {
-        const paymentOrderModel = await this.paymentRepository.getAllPaymentOrders();
-        console.log(paymentOrderModel);
-        return paymentOrderModel;
+        return await this.paymentRepository.getAllPaymentOrders();
     }
 
     async updatePaymentOrderStatus(id: string, status: StatusPayment): Promise<PaymentOrderEntity> {
