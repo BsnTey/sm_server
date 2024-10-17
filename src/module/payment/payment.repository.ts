@@ -2,9 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@common/database/prisma.service';
 import { PaymentOrder, PaymentOrderStatusHistory, StatusPayment } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
+import { Payment } from './interfaces/payment.interface';
 
 @Injectable()
-export class BottRepository {
+export class PaymentRepository {
     private domain: string = this.configService.getOrThrow('DOMAIN');
 
     constructor(
@@ -28,7 +29,7 @@ export class BottRepository {
         });
     }
 
-    async updatePaymentOrderStatus(id: string, status: StatusPayment): Promise<PaymentOrder> {
+    async updatePaymentOrderStatus(id: string, status: StatusPayment): Promise<PaymentOrder | null> {
         return this.prisma.paymentOrder.update({
             where: { id },
             data: { status },
@@ -71,7 +72,7 @@ export class BottRepository {
         });
     }
 
-    async getAllPaymentOrders() {
+    async getAllPaymentOrders(): Promise<Payment[]> {
         const paymentOrders = await this.prisma.paymentOrder.findMany({
             include: {
                 userTelegram: {
@@ -95,13 +96,14 @@ export class BottRepository {
             id: order.id,
             transactionId: order.transactionId,
             userTelegramName: order.userTelegram.telegramName,
+            completedAt: order.completedAt,
             amount: order.amount,
             amountCredited: order.amountCredited,
             status: order.status,
             receiptUrl: order.receiptUrl ? `${this.domain}/receipts/${order.receiptUrl}` : null,
             statusHistory: order.statusHistory.map(history => ({
                 status: history.status,
-                date: history.changedAt.toISOString().replace('T', ' ').substring(0, 16),
+                date: history.changedAt.toISOString(),
             })),
         }));
     }

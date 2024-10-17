@@ -33,7 +33,7 @@ export class AuthMirrorUpdate {
     @On('text')
     async findAccount(@Message('text', new isAccountIdPipe()) accountId: string, @Ctx() ctx: WizardContext, @Sender() telegramUser: any) {
         const { first_name: telegramName } = telegramUser;
-        console.log('Запрос зеркала', telegramName, 'Аккаунт: ', accountId);
+        console.log('Запрос зеркала', telegramName, '   Аккаунт: ', accountId);
         await this.accountService.getAccount(accountId);
         const url = `${this.DOMAIN}/api/mirror/${accountId}`;
 

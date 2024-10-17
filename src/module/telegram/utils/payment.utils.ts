@@ -1,4 +1,4 @@
-import { PaymentOrderEntity } from '../../bott/entities/payment.entities';
+import { PaymentOrderEntity } from '../../payment/entities/payment.entities';
 import dayjs from 'dayjs';
 
 export const extractCsrf = (html: string) => {

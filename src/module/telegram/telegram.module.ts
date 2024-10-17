@@ -38,8 +38,9 @@ import { AuthMirrorUpdate } from './updates/auth-mirror/auth-mirror.update';
 import { PaymentUpdate } from './updates/payment/payment.update';
 import { BotTHeadersService } from '../bott/entities/headers-bot-t.entity';
 import { BottService } from '../bott/bott.service';
-import { BottRepository } from '../bott/bott.repository';
 import { FileService } from '../shared/file.service';
+import { PaymentService } from '../payment/payment.service';
+import { PaymentRepository } from '../payment/payment.repository';
 
 @Module({
     providers: [
@@ -84,8 +85,10 @@ import { FileService } from '../shared/file.service';
         AuthMirrorUpdate,
         PaymentUpdate,
         BottService,
-        BottRepository,
         FileService,
+        PaymentService,
+        PaymentRepository,
+        HttpService,
     ],
 })
 export class TelegramModule {}

@@ -1,5 +1,5 @@
 import { Markup } from 'telegraf';
-import { PaymentOrderEntity } from '../../bott/entities/payment.entities';
+import { PaymentOrderEntity } from '../../payment/entities/payment.entities';
 import { UserRole } from '@prisma/client';
 
 export const profileKeyboard = (role: UserRole) => {

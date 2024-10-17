@@ -14,6 +14,7 @@ import { AuthModule } from './module/auth/auth.module';
 import { MirrorModule } from './module/mirror/mirror.module';
 import { SharedModule } from './module/shared/shared.module';
 import { BottModule } from './module/bott/bott.module';
+import { PaymentModule } from './module/payment/payment.module';
 
 @Module({
     imports: [
@@ -37,6 +38,7 @@ import { BottModule } from './module/bott/bott.module';
         MirrorModule,
         BottModule,
         SharedModule,
+        PaymentModule,
     ],
     controllers: [],
     providers: [],

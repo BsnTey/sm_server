@@ -9,23 +9,23 @@ import { isMoneyAmountPipe } from '../../pipes/isMoneyAmount.pipe';
 import { cancelPaymentKeyboard, createdPaymentKeyboard } from '../../keyboards/profile.keyboard';
 import { StatusPayment } from '@prisma/client';
 import { ERROR_SCRINSHOT } from '../../constants/error.constant';
-import { BottService } from '../../../bott/bott.service';
 import { FileService } from '../../../shared/file.service';
 import { getFileNameForReceipt } from '../../utils/receipt.utils';
 import { extractAmountFTransferedPay } from '../../utils/payment.utils';
+import { PaymentService } from '../../../payment/payment.service';
 
 @Scene(MAKE_DEPOSIT_SCENE)
 @UseFilters(TelegrafExceptionFilter)
 export class PaymentUpdate {
     constructor(
         private telegramService: TelegramService,
-        private bottService: BottService,
+        private paymentService: PaymentService,
         private fileService: FileService,
     ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const allPayments = await this.bottService.getUserPaymentOrders(String(telegramId));
+        const allPayments = await this.paymentService.getUserPaymentOrders(String(telegramId));
 
         const createdPayments = allPayments.filter(payment => payment.status == StatusPayment.Created);
         const transferedPayments = allPayments.filter(payment => payment.status == StatusPayment.Transfered);
@@ -53,7 +53,7 @@ export class PaymentUpdate {
         @Ctx() ctx: WizardContext,
         @Sender() { id: telegramId }: any,
     ) {
-        const createOrder = await this.bottService.createPaymentOrder(amountCount, String(telegramId));
+        const createOrder = await this.paymentService.createPaymentOrder(amountCount, String(telegramId));
         await this.telegramService.setDataCache<string>(String(telegramId), createOrder.id);
         await ctx.reply(
             `Создана заявка на пополнение на сумму ${createOrder.amount}р.\nК зачислению ${createOrder.amountCredited}р\n
@@ -73,7 +73,7 @@ export class PaymentUpdate {
         //@ts-ignore
         const paymentId = ctx.match[0].split('_')[1];
 
-        const orderPayment = await this.bottService.updatePaymentOrderStatus(paymentId, StatusPayment.Cancelled);
+        const orderPayment = await this.paymentService.updatePaymentOrderStatus(paymentId, StatusPayment.Cancelled);
 
         await ctx.editMessageText(`Заявка на сумму ${orderPayment.amount}р отменена`);
     }
@@ -107,7 +107,7 @@ export class PaymentUpdate {
             const fileName = getFileNameForReceipt(String(telegramId), fileExtension);
             await this.fileService.saveFileFromTg(fileName, fileLink);
 
-            const orderPayment = await this.bottService.makeDepositUserBalance(paymentId, fileName);
+            const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
             await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
             await ctx.scene.leave();
         } catch (error) {
@@ -132,7 +132,7 @@ export class PaymentUpdate {
                 await this.fileService.saveFile(fileName, jpgBuffer);
 
                 const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
-                const orderPayment = await this.bottService.makeDepositUserBalance(paymentId, fileName);
+                const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
                 await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
 
                 await ctx.scene.leave();
