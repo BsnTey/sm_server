@@ -31,7 +31,7 @@ import { EmailService } from './updates/email/email.service';
 import { CookieUpdate } from './updates/cookie/cookie.update';
 import { QrCodeUpdate } from './updates/qr-code/qr-code.update';
 import { QrCodeService } from './updates/qr-code/qr-code.service';
-import { GetInfoOrderUpdate, ProfileUpdate } from './updates/profile/profile.update';
+import { GetInfoOrderUpdate, ProfileUpdate, PromocodeBotUpdate } from './updates/profile/profile.update';
 import { AdminUpdate } from './updates/admin/admin.update';
 import { SportmasterHeadersService } from '../account/entities/headers.entity';
 import { AuthMirrorUpdate } from './updates/auth-mirror/auth-mirror.update';
@@ -80,6 +80,7 @@ import { PaymentRepository } from '../payment/payment.repository';
         QrCodeService,
         ProfileUpdate,
         GetInfoOrderUpdate,
+        PromocodeBotUpdate,
         SportmasterHeadersService,
         BotTHeadersService,
         AuthMirrorUpdate,
@@ -89,6 +90,7 @@ import { PaymentRepository } from '../payment/payment.repository';
         PaymentService,
         PaymentRepository,
         HttpService,
+        PaymentService,
     ],
 })
 export class TelegramModule {}

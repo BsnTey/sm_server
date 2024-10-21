@@ -7,4 +7,4 @@ export interface Result {
     text: string;
 }
 
-export type HtmlWCsrfToken = string;
+export type Html = string;

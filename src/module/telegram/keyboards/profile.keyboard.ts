@@ -5,6 +5,7 @@ import { UserRole } from '@prisma/client';
 export const profileKeyboard = (role: UserRole) => {
     const btnArr: any[] = [];
     role != 'User' ? btnArr.push([Markup.button.callback('Пополнить баланс', 'payment')]) : null;
+    btnArr.push([Markup.button.callback('Получить промокод для бота продаж', 'get_promocode')]);
     btnArr.push([Markup.button.callback('Чекер промо', 'check_promo')]);
     btnArr.push([Markup.button.callback('Получить инфо по заказу', 'get_info_order')]);
     return Markup.inlineKeyboard(btnArr);
@@ -24,3 +25,9 @@ export function createdPaymentKeyboard(payments: PaymentOrderEntity[]) {
 
     return Markup.inlineKeyboard([...keyboardPay]);
 }
+
+export const comebackProfile = Markup.inlineKeyboard([[Markup.button.callback('Назад', 'comeback_profile')]]);
+export const createPromocodeScene = Markup.inlineKeyboard([
+    [Markup.button.callback('Выпустить промо', 'create_promocode')],
+    [Markup.button.callback(`Назад`, 'comeback_profile')],
+]);

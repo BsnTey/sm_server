@@ -4,3 +4,5 @@ export const ERROR_GET_TOKEN = 'Ошибка в получении токена 
 export const ERROR_CHANGE_BALANCE = 'Ошибка изменения баланса пользователя';
 export const ERROR_NOT_FOUND_TRANSACTION = 'Не найдена транзакция на пополнение';
 export const ERROR_GET_TRANSACTIONS = 'Ошибка в получении списка транзакций';
+export const ERROR_GET_STATISTICS = 'Ошибка в получении статистики пользователей';
+export const ERROR_CREATE_PROMOCODE = 'Ошибка в создании промокода';

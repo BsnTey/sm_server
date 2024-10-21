@@ -6,14 +6,16 @@ import { PaymentRepository } from './payment.repository';
 import { BottService } from '../bott/bott.service';
 import {
     ERROR_CHANGE_BALANCE,
+    ERROR_CREATE_PROMOCODE,
     ERROR_GET_BOT_ID,
     ERROR_GET_SEARCH_ID,
-    ERROR_GET_TOKEN,
+    ERROR_GET_STATISTICS,
     ERROR_GET_TRANSACTIONS,
     ERROR_NOT_FOUND_TRANSACTION,
 } from './constants/error.constants';
-import { extractCsrf, extractUserBotId } from '../telegram/utils/payment.utils';
+import { extractCsrf, extractUserBotId, extractUsersStatistics, getPromoCodeDetailsFromHtml } from '../telegram/utils/payment.utils';
 import { IReplenishmentUsersBotT } from '../bott/interfaces/replenishment-bot-t.interface';
+import { UserStatistic } from './interfaces/statistic.interface';
 
 @Injectable()
 export class PaymentService {
@@ -24,6 +26,7 @@ export class PaymentService {
 
     async changeUserBalance(id: string, telegramId: string, amount: number, isPositive: boolean = true) {
         let searchId;
+        let csrfToken;
         try {
             const response = await this.bottService.searchSearchIdByTelegramId(telegramId);
             searchId = response.results[0].id;
@@ -34,16 +37,11 @@ export class PaymentService {
         try {
             const response = await this.bottService.getUserBotId(searchId);
             userBotId = extractUserBotId(response);
+            csrfToken = extractCsrf(response);
         } catch (err) {
             throw new NotFoundException(ERROR_GET_BOT_ID);
         }
-        let csrfToken;
-        try {
-            const htmlWCsrfToken = await this.bottService.getUserBalanceEdit(userBotId);
-            csrfToken = extractCsrf(htmlWCsrfToken);
-        } catch (err) {
-            throw new BadRequestException(ERROR_GET_TOKEN);
-        }
+
         try {
             await this.bottService.userBalanceEdit(userBotId, csrfToken, String(amount), isPositive);
         } catch (err) {
@@ -128,4 +126,54 @@ export class PaymentService {
             completedAt: transaction.created_at,
         };
     }
+
+    async getUsersStatistic() {
+        try {
+            return await this.bottService.getStatistics();
+        } catch (err) {
+            throw new BadRequestException(ERROR_GET_STATISTICS);
+        }
+    }
+
+    async findRemainingActivations(telegramId: string, userName: string) {
+        const responseCouponsPage = await this.bottService.getCouponPage();
+
+        return getPromoCodeDetailsFromHtml(responseCouponsPage, userName) || getPromoCodeDetailsFromHtml(responseCouponsPage, telegramId);
+    }
+
+    async createPromocode(telegramId: string, userName: string) {
+        const responseStatistics = await this.getUsersStatistic();
+        const csrfToken = extractCsrf(responseStatistics);
+        const usersStatistic = extractUsersStatistics(responseStatistics);
+        const promoName = userName || telegramId;
+        const discountPercent = this.getDiscountFromStatistic(telegramId, userName, usersStatistic);
+        const responseStatus = await this.bottService.createPromocode(csrfToken, promoName, 50, 2);
+        if (responseStatus != 200) throw new BadRequestException(ERROR_CREATE_PROMOCODE);
+        return { promoName, discountPercent };
+    }
+
+    async getInfoAboutPromocode(telegramId: string, userName: string) {
+        const responseStatistics = await this.getUsersStatistic();
+        const usersStatistic = extractUsersStatistics(responseStatistics);
+        return this.getDiscountFromStatistic(telegramId, userName, usersStatistic);
+    }
+
+    private getDiscountFromStatistic(telegramId: string, userName: string, usersStatistic: UserStatistic[]) {
+        const user = usersStatistic.find(user => telegramId === user.tgId || userName === user.name);
+        if (!user) return 5;
+
+        switch (true) {
+            case user.row === 1:
+                return 20;
+            case [2, 3, 4, 5].includes(user.row):
+                return 15;
+            case [6, 7, 8, 9, 10].includes(user.row):
+                return 10;
+            default:
+                return 5;
+        }
+    }
 }
+
+//по кнопке получить промокод, открываем блок кнопок, где будет текст "У вас еще осталось (3) активации промокода 'ПРОМО' на 10% скидки"
+//если активаций нет, то выводим "Вы можете создать промо на 10% скидку" и кнопка создать промокод и назад

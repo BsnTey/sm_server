@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '../http/http.service';
 import { BotTHeadersService } from './entities/headers-bot-t.entity';
-import { HtmlWCsrfToken, ISearchByTelegramId } from './interfaces/bot-t.interface';
+import { Html, ISearchByTelegramId } from './interfaces/bot-t.interface';
 import { IReplenishmentUsersBotT } from './interfaces/replenishment-bot-t.interface';
 import qs from 'qs';
 
@@ -46,17 +46,6 @@ export class BottService {
         return response.data;
     }
 
-    async getUserBalanceEdit(userBotId: string): Promise<HtmlWCsrfToken> {
-        const params = {
-            id: userBotId,
-            bot_id: this.sellerTradeBotId,
-        };
-
-        const url = this.urlBotT + `lk/common/users/user/balance-edit`;
-        const response = await this.httpService.get(url, { headers: this.headers, params });
-        return response.data;
-    }
-
     async userBalanceEdit(userBotId: string, csrfToken: string, amount: string, isPositive: boolean): Promise<string> {
         const params = {
             id: userBotId,
@@ -87,5 +76,46 @@ export class BottService {
         const url = this.apiUrlBotT + `v1/bot/replenishment/user/index`;
         const response = await this.httpService.post(url, payload, { params });
         return response.data;
+    }
+
+    async getStatistics(): Promise<Html> {
+        const params = {
+            bot_id: this.sellerTradeBotId,
+        };
+
+        const url = this.urlBotT + `lk/common/replenishment/main/statistics`;
+        const response = await this.httpService.get(url, { headers: this.headers, params });
+        return response.data;
+    }
+
+    async getCouponPage(page = 1): Promise<Html> {
+        const params = {
+            bot_id: this.sellerTradeBotId,
+            page,
+        };
+
+        const url = this.urlBotT + `lk/common/shop/coupon/index`;
+        const response = await this.httpService.get(url, { headers: this.headers, params });
+        return response.data;
+    }
+
+    async createPromocode(csrfToken: string, promoName: string, discountPercent: number, countActivation = 5) {
+        const params = {
+            bot_id: this.sellerTradeBotId,
+            type: '0',
+        };
+        const payload = qs.stringify({
+            '_csrf-frontend': csrfToken,
+            'ShopCouponCreateForm[code]': promoName,
+            'ShopCouponCreateForm[count]': countActivation,
+            'ShopCouponCreateForm[min_price]': 1,
+            'ShopCouponCreateForm[only_first]': 0,
+            'ShopCouponCreateForm[only_one_user_one_coupon]': 0,
+            'ShopCouponCreateForm[discount]': discountPercent,
+        });
+
+        const url = this.urlBotT + `lk/common/shop/coupon/create`;
+        const response = await this.httpService.post(url, payload, { headers: this.headers, params });
+        return response.status;
     }
 }
