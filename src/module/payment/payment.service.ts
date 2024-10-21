@@ -136,9 +136,22 @@ export class PaymentService {
     }
 
     async findRemainingActivations(telegramId: string, userName: string) {
-        const responseCouponsPage = await this.bottService.getCouponPage();
+        let promoCodeDetails = null;
 
-        return getPromoCodeDetailsFromHtml(responseCouponsPage, userName) || getPromoCodeDetailsFromHtml(responseCouponsPage, telegramId);
+        for (let page = 1; page <= 5; page++) {
+            const responseCouponsPage = await this.bottService.getCouponPage(page);
+
+            promoCodeDetails = getPromoCodeDetailsFromHtml(responseCouponsPage, userName);
+            if (promoCodeDetails) {
+                return promoCodeDetails;
+            }
+
+            promoCodeDetails = getPromoCodeDetailsFromHtml(responseCouponsPage, telegramId);
+            if (promoCodeDetails) {
+                return promoCodeDetails;
+            }
+        }
+        return null;
     }
 
     async createPromocode(telegramId: string, userName: string) {
