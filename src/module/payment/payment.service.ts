@@ -147,7 +147,7 @@ export class PaymentService {
         const usersStatistic = extractUsersStatistics(responseStatistics);
         const promoName = userName || telegramId;
         const discountPercent = this.getDiscountFromStatistic(telegramId, userName, usersStatistic);
-        const responseStatus = await this.bottService.createPromocode(csrfToken, promoName, 50, 2);
+        const responseStatus = await this.bottService.createPromocode(csrfToken, promoName, discountPercent);
         if (responseStatus != 200) throw new BadRequestException(ERROR_CREATE_PROMOCODE);
         return { promoName, discountPercent };
     }
@@ -174,6 +174,3 @@ export class PaymentService {
         }
     }
 }
-
-//по кнопке получить промокод, открываем блок кнопок, где будет текст "У вас еще осталось (3) активации промокода 'ПРОМО' на 10% скидки"
-//если активаций нет, то выводим "Вы можете создать промо на 10% скидку" и кнопка создать промокод и назад

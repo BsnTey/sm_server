@@ -108,7 +108,7 @@ export class BottService {
             '_csrf-frontend': csrfToken,
             'ShopCouponCreateForm[code]': promoName,
             'ShopCouponCreateForm[count]': countActivation,
-            'ShopCouponCreateForm[min_price]': 1,
+            'ShopCouponCreateForm[min_price]': 50,
             'ShopCouponCreateForm[only_first]': 0,
             'ShopCouponCreateForm[only_one_user_one_coupon]': 0,
             'ShopCouponCreateForm[discount]': discountPercent,
