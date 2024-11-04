@@ -4,7 +4,7 @@ import { ERROR_INTEGER, ERROR_LOW_MONEY_COUNT, ERROR_NOT_MULTIPLE_OF_50 } from '
 @Injectable()
 export class isMoneyAmountPipe implements PipeTransform<string> {
     transform(amountCount: string, metadata: ArgumentMetadata): number {
-        const amount = Math.floor(Number(amountCount)); // Округляем вниз
+        const amount = Math.floor(Number(amountCount));
 
         if (!Number.isInteger(amount)) {
             throw new BadRequestException(ERROR_INTEGER);

@@ -180,7 +180,7 @@ export class PaymentService {
                 return 20;
             case [2, 3, 4, 5].includes(user.row):
                 return 15;
-            case [6, 7, 8, 9, 10].includes(user.row):
+            case [6, 7, 8, 9, 10, 11, 12, 13, 14, 15].includes(user.row):
                 return 10;
             default:
                 return 5;
