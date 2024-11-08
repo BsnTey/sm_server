@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, NotFoundException, Param, Patch, Post, Put } from '@nestjs/common';
 import { AccountService } from './account.service';
 import { HasZenno } from '@common/decorators/zenno.decorator';
 import { AddingAccountRequestDto, AddingAccountResponseDto } from './dto/create-account.dto';
@@ -11,6 +11,7 @@ import { UpdatingBonusCountRequestDto, UpdatingBonusCountResponseDto } from './d
 import { UpdatePushTokenRequestDto, UpdatePushTokenResponseDto } from './dto/updatePushToken-account.dto';
 import { UpdateGoogleIdRequestDto, UpdateGoogleIdResponseDto } from './dto/updateGoogleId-account.dto';
 import { AccessTokenCourseResponseDto } from './dto/getAccessTokenCourse-account.dto';
+import { AxiosError } from 'axios';
 
 @Controller('account')
 export class AccountController {
@@ -110,7 +111,23 @@ export class AccountController {
     @Get('checking/:accountId')
     @HttpCode(200)
     async getBonusAccount(@Param() params: AccountIdParamsDto): Promise<any> {
-        console.log(params.accountId);
-        return await this.accountService.shortInfo(params.accountId);
+        try {
+            return await this.accountService.shortInfo(params.accountId);
+        } catch (err: any) {
+            return this.handleError(err);
+        }
+    }
+
+    private handleError(err: any): { error: string } {
+        let errorMessage = '';
+        if (err instanceof NotFoundException) {
+            errorMessage = `Не найден`;
+        } else if (err instanceof AxiosError) {
+            const errorResponse = err.response?.data?.error;
+            errorMessage = errorResponse?.message || 'Ошибка запроса, повторите';
+        } else {
+            errorMessage = err.message || 'Неизвестная ошибка';
+        }
+        return { error: errorMessage };
     }
 }
