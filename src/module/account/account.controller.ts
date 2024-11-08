@@ -106,4 +106,11 @@ export class AccountController {
     async getCoursesAccount(@Param() params: AccountIdParamsDto): Promise<any> {
         return await this.accountService.getCoursesList(params.accountId);
     }
+
+    @Get('checking/:accountId')
+    @HttpCode(200)
+    async getBonusAccount(@Param() params: AccountIdParamsDto): Promise<any> {
+        console.log(params.accountId);
+        return await this.accountService.shortInfo(params.accountId);
+    }
 }
