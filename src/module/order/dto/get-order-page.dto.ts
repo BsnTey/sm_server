@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 export const OrderParamsSchema = z.object({
     accountId: z.string().uuid(),
-    orderNumber: z.string().regex(/^\d{7,8,9}-\d{6}$/, { message: 'Invalid numberOrder format' }),
+    orderNumber: z.string().regex(/^\d{7,9}-\d{6}$/, { message: 'Invalid numberOrder format' }),
 });
 
 export namespace GetOrderCommand {
