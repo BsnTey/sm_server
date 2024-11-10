@@ -19,6 +19,8 @@ interface IBonusDetail {
 
 @Injectable()
 export class CheckingService {
+    private readonly TIMEOUT = 15000; // 15 seconds timeout
+
     constructor(private readonly accountService: AccountService) {}
 
     async checkingAccounts(accounts: string[]): Promise<string[]> {
@@ -34,10 +36,10 @@ export class CheckingService {
         processAccount: (resultChecking: Record<string, string>, accountId: string) => Promise<void>,
     ): Promise<string[]> {
         const resultChecking: Record<string, string> = {};
-        const accountChunks = this.chunkArray(accounts, 10);
+        const accountChunks = this.chunkArray(accounts, 5);
 
         for (const chunk of accountChunks) {
-            await Promise.all(chunk.map(account => processAccount(resultChecking, account)));
+            await Promise.all(chunk.map(account => this.processWithTimeout(processAccount, resultChecking, account)));
         }
 
         return this.bringCompliance(resultChecking, accounts);
@@ -49,6 +51,22 @@ export class CheckingService {
             chunks.push(array.slice(i, i + chunkSize));
         }
         return chunks;
+    }
+
+    private async processWithTimeout(
+        processAccount: (resultChecking: Record<string, string>, accountId: string) => Promise<void>,
+        resultChecking: Record<string, string>,
+        accountId: string,
+    ): Promise<void> {
+        const timeoutPromise = new Promise<void>((_, reject) =>
+            setTimeout(() => reject(new Error(`Timeout: ${accountId} took too long to process`)), this.TIMEOUT),
+        );
+
+        try {
+            await Promise.race([processAccount(resultChecking, accountId), timeoutPromise]);
+        } catch (error: any) {
+            resultChecking[accountId] = `${accountId}: Ошибка тайм-аута\n`;
+        }
     }
 
     private async processCheckingAccount(resultChecking: Record<string, string>, accountId: string): Promise<void> {
