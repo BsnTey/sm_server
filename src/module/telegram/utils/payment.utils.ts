@@ -31,16 +31,23 @@ export const extractAmountFTransferedPay = (payments: PaymentOrderEntity[]) => {
     return text;
 };
 
-export const extractUsersStatistics = (html: string): UserStatistic[] => {
+export const extractUsersStatistics = (html: string, usersException: string[]): UserStatistic[] => {
     const regex =
         /<th scope="row">(\d+)<\/th>\s*<td>(?:<a href="tg:\/\/user\?id=(\d+)">([^<]+)<\/a>|(@[\w_]+))<\/td>\s*<td>([\d\s]+) ₽<\/td>/g;
     const usersStatistics: Array<UserStatistic> = [];
     let match: RegExpExecArray | null;
+    let exceptionCount = 0;
 
     while ((match = regex.exec(html)) !== null) {
-        const row = parseInt(match[1], 10);
+        let row = parseInt(match[1], 10);
         const tgId = match[2] || null;
         const name = match[3] ? match[3].trim() : match[4].trim().replace(/^@/, '');
+
+        if (usersException.includes(name)) {
+            exceptionCount++;
+            continue;
+        }
+        row -= exceptionCount;
 
         usersStatistics.push({ row, name, tgId });
     }

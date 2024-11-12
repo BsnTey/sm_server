@@ -16,12 +16,17 @@ import {
 import { extractCsrf, extractUserBotId, extractUsersStatistics, getPromoCodeDetailsFromHtml } from '../telegram/utils/payment.utils';
 import { IReplenishmentUsersBotT } from '../bott/interfaces/replenishment-bot-t.interface';
 import { UserStatistic } from './interfaces/statistic.interface';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class PaymentService {
+    private tgNamesExceptionStatistic: string[] = this.configService.getOrThrow('TELEGRAM_NAMES_EXCEPTION_STATISTIC').split(',');
+    private tgIdVipCoef: string[] = this.configService.getOrThrow('TELEGRAM_ID_VIP_COEF').split(',');
+
     constructor(
         private paymentRepository: PaymentRepository,
         private bottService: BottService,
+        private configService: ConfigService,
     ) {}
 
     async changeUserBalance(id: string, telegramId: string, amount: number, isPositive: boolean = true) {
@@ -67,7 +72,7 @@ export class PaymentService {
     }
 
     async createPaymentOrder(amount: number, userTelegramId: string): Promise<PaymentOrderEntity> {
-        const amountCredited = this.calculateAmountWithBonus(amount);
+        const amountCredited = this.calculateAmountWithBonus(amount, userTelegramId);
 
         const paymentOrderModel: PaymentOrderModel = await this.paymentRepository.createPaymentOrder({
             amount,
@@ -78,7 +83,10 @@ export class PaymentService {
         return new PaymentOrderEntity(paymentOrderModel);
     }
 
-    private calculateAmountWithBonus(amount: number): number {
+    private calculateAmountWithBonus(amount: number, userTelegramId: string): number {
+        if (this.tgIdVipCoef.includes(userTelegramId)) {
+            return Math.floor(amount * 1.25);
+        }
         return amount < 2000 ? amount : Math.floor(amount * 1.1);
     }
 
@@ -157,7 +165,7 @@ export class PaymentService {
     async createPromocode(telegramId: string, userName: string) {
         const responseStatistics = await this.getUsersStatistic();
         const csrfToken = extractCsrf(responseStatistics);
-        const usersStatistic = extractUsersStatistics(responseStatistics);
+        const usersStatistic = extractUsersStatistics(responseStatistics, this.tgNamesExceptionStatistic);
         const promoName = userName || telegramId;
         const discountPercent = this.getDiscountFromStatistic(telegramId, userName, usersStatistic);
         const responseStatus = await this.bottService.createPromocode(csrfToken, promoName, discountPercent);
@@ -167,7 +175,7 @@ export class PaymentService {
 
     async getInfoAboutPromocode(telegramId: string, userName: string) {
         const responseStatistics = await this.getUsersStatistic();
-        const usersStatistic = extractUsersStatistics(responseStatistics);
+        const usersStatistic = extractUsersStatistics(responseStatistics, this.tgNamesExceptionStatistic);
         return this.getDiscountFromStatistic(telegramId, userName, usersStatistic);
     }
 
