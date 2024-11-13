@@ -61,18 +61,23 @@ export const extractUsersStatistics = (html: string, usersException: string[]): 
 
 export const getPromoCodeDetailsFromHtml = (html: string, promoCodeName: string): USerPromocodeActivations | null => {
     const regex = new RegExp(
-        `<tr class="border" data-key="\\d+">\\s*<td class="border border-light">${promoCodeName}</td>\\s*<td class="border border-light">\\s*<span class="label label-default">Не активирован</span>\\s*</td>\\s*<td class="border border-light"><span class="label label-info">.*?<\\/span><\\/td>\\s*<td class="border border-light" aria-label="Ник пользователя">.*?<\\/td>\\s*<td class="border border-light" aria-label="Минимальная сумма">.*?<\\/td>\\s*<td class="border border-light" aria-label="Размер скидки">\\s*<span class="label label-warning">(\\d+\\s?%)<\\/span>\\s*<\\/td>\\s*<td class="border border-light" aria-label="Кол-во активаций">(\\d+|Одноразовый)<\\/td>`,
+        `<tr>\\s*<td>${promoCodeName}<\\/td>\\s*<td>Не активирован<\\/td>\\s*<td>Скидка в процентах<\\/td>\\s*<td>-<\\/td>\\s*<td>(\\d+)<\\/td>\\s*<td>(\\d+\\s?%)<\\/td>\\s*<td>(\\d+|Одноразовый)<\\/td>`,
+        'i',
+    );
+    const regex2 = new RegExp(
+        `<tr[^>]*?>\\s*<td[^>]*?>${promoCodeName}<\\/td>\\s*<td[^>]*?aria-label=\\"Статус\\"[^>]*?>Не активирован<\\/td>\\s*<td[^>]*?aria-label=\\"Тип\\"[^>]*?>Скидка в процентах<\\/td>\\s*<td[^>]*?aria-label=\\"Ник пользователя\\"[^>]*?>-<\\/td>\\s*<td[^>]*?aria-label=\\"Минимальная сумма\\"[^>]*?>(\\d+)<\\/td>\\s*<td[^>]*?aria-label=\\"Размер скидки\\"[^>]*?><span[^>]*?>(\\d+\\s?%)<\\/span><\\/td>\\s*<td[^>]*?aria-label=\\"Кол-во активаций\\"[^>]*?>(\\d+|Одноразовый)<\\/td>`,
         'i',
     );
 
-    const match = regex.exec(html);
+    const match1 = regex.exec(html);
+    const match2 = regex2.exec(html);
 
-    if (match) {
-        const activationsLeft = match[2] === 'Одноразовый' ? 1 : parseInt(match[2], 10);
-
+    if (match1 || match2) {
+        const match = match1 || match2;
+        const activationsLeft = match![3] === 'Одноразовый' ? 1 : parseInt(match![3], 10);
         return {
             activationsLeft: activationsLeft,
-            discount: parseInt(match[1], 10),
+            discount: parseInt(match![2], 10),
         };
     }
     return null;
