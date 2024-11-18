@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { FileService } from './file.service';
-import { HttpService } from '../http/http.service';
+import { HttpModule } from '../http/http.module';
 
 @Module({
-    providers: [FileService, HttpService],
+    providers: [FileService],
+    exports: [FileService],
+    imports: [HttpModule],
 })
 export class SharedModule {}

@@ -1,15 +1,8 @@
 import { Module } from '@nestjs/common';
 import { BaseUpdate, HelpUpdate } from './updates/base-command/base-command.update';
 import { StartUpdate } from './updates/start/start.update';
-import { UserService } from '../user/user.service';
-import { UserRepository } from '../user/user.repository';
 import { ChangeNumberInputCode, ChangeNumberInputNumber, ChangeNumberUpdate } from './updates/change-number/change-number.update';
-import { AccountService } from '../account/account.service';
-import { AccountRepository } from '../account/account.repository';
-import { ProxyService } from '../proxy/proxy.service';
 import { TelegramService } from './telegram.service';
-import { HttpService } from '../http/http.service';
-import { ProxyRepository } from '../proxy/proxy.repository';
 import {
     MakeOrderUpdate,
     OrderChangeRecipient,
@@ -33,30 +26,24 @@ import { QrCodeUpdate } from './updates/qr-code/qr-code.update';
 import { QrCodeService } from './updates/qr-code/qr-code.service';
 import { GetInfoOrderUpdate, ProfileUpdate, PromocodeBotUpdate } from './updates/profile/profile.update';
 import { AdminUpdate } from './updates/admin/admin.update';
-import { SportmasterHeadersService } from '../account/entities/headers.entity';
 import { AuthMirrorUpdate } from './updates/auth-mirror/auth-mirror.update';
 import { PaymentUpdate } from './updates/payment/payment.update';
-import { BotTHeadersService } from '../bott/entities/headers-bot-t.entity';
-import { BottService } from '../bott/bott.service';
-import { FileService } from '../shared/file.service';
-import { PaymentService } from '../payment/payment.service';
-import { PaymentRepository } from '../payment/payment.repository';
+import { AccountModule } from '../account/account.module';
+import { ProxyModule } from '../proxy/proxy.module';
+import { SharedModule } from '../shared/shared.module';
+import { HttpModule } from '../http/http.module';
+import { UserModule } from '../user/user.module';
+import { PaymentModule } from '../payment/payment.module';
 
 @Module({
+    imports: [AccountModule, ProxyModule, SharedModule, HttpModule, UserModule, PaymentModule],
     providers: [
         TelegramService,
         MakeOrderService,
-        ProxyRepository,
-        HttpService,
         BaseUpdate,
         HelpUpdate,
         AdminUpdate,
         StartUpdate,
-        UserService,
-        UserRepository,
-        AccountService,
-        AccountRepository,
-        ProxyService,
         ChangeNumberUpdate,
         ChangeNumberInputNumber,
         ChangeNumberInputCode,
@@ -81,16 +68,8 @@ import { PaymentRepository } from '../payment/payment.repository';
         ProfileUpdate,
         GetInfoOrderUpdate,
         PromocodeBotUpdate,
-        SportmasterHeadersService,
-        BotTHeadersService,
         AuthMirrorUpdate,
         PaymentUpdate,
-        BottService,
-        FileService,
-        PaymentService,
-        PaymentRepository,
-        HttpService,
-        PaymentService,
     ],
 })
 export class TelegramModule {}

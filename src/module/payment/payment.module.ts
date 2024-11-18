@@ -2,12 +2,13 @@ import { Module } from '@nestjs/common';
 import { PaymentController } from './payment.controller';
 import { PaymentService } from './payment.service';
 import { PaymentRepository } from './payment.repository';
-import { BottService } from '../bott/bott.service';
-import { HttpService } from '../http/http.service';
-import { BotTHeadersService } from '../bott/entities/headers-bot-t.entity';
+import { HttpModule } from '../http/http.module';
+import { BottModule } from '../bott/bott.module';
 
 @Module({
     controllers: [PaymentController],
-    providers: [PaymentService, PaymentRepository, BottService, HttpService, BotTHeadersService],
+    providers: [PaymentService, PaymentRepository],
+    exports: [PaymentService],
+    imports: [BottModule, HttpModule],
 })
 export class PaymentModule {}

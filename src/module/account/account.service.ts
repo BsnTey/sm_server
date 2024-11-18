@@ -29,6 +29,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { SportmasterHeadersService } from './entities/headers.entity';
 import { UserGateTokenInterface } from './interfaces/userGateToken.interface';
 import { CourseList } from './interfaces/course-list.interface';
+import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class AccountService {
@@ -690,5 +691,10 @@ export class AccountService {
         const httpOptions = await this.getHttpOptionsSiteCourse(accountWithProxyEntity, accessTokenCourse);
         const response = await this.httpService.get(url, httpOptions);
         return response.data;
+    }
+
+    @Cron('15 * * * * *')
+    handleCron() {
+        console.log('вызов крон', new Date());
     }
 }

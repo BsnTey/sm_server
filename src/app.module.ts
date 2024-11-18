@@ -15,12 +15,14 @@ import { MirrorModule } from './module/mirror/mirror.module';
 import { SharedModule } from './module/shared/shared.module';
 import { BottModule } from './module/bott/bott.module';
 import { PaymentModule } from './module/payment/payment.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
     imports: [
         ConfigModule.forRoot({
             isGlobal: true,
         }),
+        ScheduleModule.forRoot(),
         CacheModule.register({
             isGlobal: true,
             ttl: 18000000,

@@ -2,14 +2,14 @@ import { Module } from '@nestjs/common';
 import { AccountController } from './account.controller';
 import { AccountService } from './account.service';
 import { AccountRepository } from './account.repository';
-import { ProxyService } from '../proxy/proxy.service';
-import { ConfigService } from '@nestjs/config';
-import { HttpService } from '../http/http.service';
-import { ProxyRepository } from '../proxy/proxy.repository';
 import { SportmasterHeadersService } from './entities/headers.entity';
+import { ProxyModule } from '../proxy/proxy.module';
+import { HttpModule } from '../http/http.module';
 
 @Module({
     controllers: [AccountController],
-    providers: [ConfigService, AccountService, AccountRepository, ProxyService, HttpService, ProxyRepository, SportmasterHeadersService],
+    providers: [AccountService, AccountRepository, SportmasterHeadersService],
+    exports: [AccountService, AccountRepository, SportmasterHeadersService],
+    imports: [ProxyModule, HttpModule],
 })
 export class AccountModule {}
