@@ -16,6 +16,7 @@ import { SharedModule } from './module/shared/shared.module';
 import { BottModule } from './module/bott/bott.module';
 import { PaymentModule } from './module/payment/payment.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { CronModule } from './module/cron/cron.module';
 
 @Module({
     imports: [
@@ -41,6 +42,7 @@ import { ScheduleModule } from '@nestjs/schedule';
         BottModule,
         SharedModule,
         PaymentModule,
+        CronModule,
     ],
     controllers: [],
     providers: [],

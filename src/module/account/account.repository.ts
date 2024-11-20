@@ -1,11 +1,10 @@
-// @ts-ignore
-
 import { Injectable } from '@nestjs/common';
-import { Account, Order, Prisma } from '@prisma/client';
+import { Account, CourseStatus, Order, Prisma } from '@prisma/client';
 import { PrismaService } from '@common/database/prisma.service';
 import { AccountEntity } from './entities/account.entity';
-import { IAccountCourse, IAccountWithProxy, IEmailFromDb, IRefreshDataAccount, IUpdateAccount } from './interfaces/account.interface';
+import { IAccountWithProxy, ICourseTokens, IEmailFromDb, IRefreshDataAccount, IUpdateAccount } from './interfaces/account.interface';
 import { CitySMEntity } from './entities/citySM.entity';
+import { IAccountCourse } from './interfaces/course.interface';
 
 @Injectable()
 export class AccountRepository {
@@ -29,6 +28,7 @@ export class AccountRepository {
             expiresInRefresh: account.expiresInRefresh,
             accessTokenCourse: account.accessTokenCourse,
             refreshTokenCourse: account.refreshTokenCourse,
+            userGateToken: account.userGateToken,
             statusCourse: account.statusCourse,
             isValidAccessTokenCourse: account.isValidAccessTokenCourse,
             isAccessMp: account.isAccessMp,
@@ -132,7 +132,20 @@ export class AccountRepository {
 
     async updateAccount(
         accountId: string,
-        { accessToken, refreshToken, xUserId, deviceId, installationId, expiresInAccess, expiresInRefresh, isAccessMp }: IUpdateAccount,
+        {
+            accessToken,
+            refreshToken,
+            xUserId,
+            deviceId,
+            installationId,
+            expiresInAccess,
+            expiresInRefresh,
+            isAccessMp,
+            userGateToken,
+            accessTokenCourse,
+            refreshTokenCourse,
+            isValidAccessTokenCourse,
+        }: IUpdateAccount,
     ): Promise<Account> {
         return this.prisma.account.update({
             where: {
@@ -147,6 +160,10 @@ export class AccountRepository {
                 expiresInAccess,
                 expiresInRefresh,
                 isAccessMp,
+                userGateToken,
+                accessTokenCourse,
+                refreshTokenCourse,
+                isValidAccessTokenCourse,
             },
         });
     }
@@ -164,6 +181,23 @@ export class AccountRepository {
                 refreshToken,
                 expiresInAccess,
                 expiresInRefresh,
+            },
+        });
+    }
+
+    async updateCourseTokensAccount(
+        accountId: string,
+        { userGateToken, accessTokenCourse, refreshTokenCourse, isValidAccessTokenCourse }: ICourseTokens,
+    ): Promise<Account> {
+        return this.prisma.account.update({
+            where: {
+                accountId,
+            },
+            data: {
+                userGateToken,
+                accessTokenCourse,
+                refreshTokenCourse,
+                isValidAccessTokenCourse,
             },
         });
     }
@@ -223,6 +257,17 @@ export class AccountRepository {
         });
     }
 
+    async promblemCourses(accountId: string): Promise<Account> {
+        return this.prisma.account.update({
+            where: {
+                accountId,
+            },
+            data: {
+                statusCourse: 'NONE',
+            },
+        });
+    }
+
     async finishedCourses(accountId: string): Promise<Account> {
         return this.prisma.account.update({
             where: {
@@ -261,8 +306,6 @@ export class AccountRepository {
     }
 
     async getActiveCourseAccount(): Promise<IAccountCourse[]> {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
         const foundAccounts = await this.prisma.account.findMany({
             where: {
                 statusCourse: 'ACTIVE',
@@ -305,6 +348,31 @@ export class AccountRepository {
                     };
                 }).sort((a, b) => a.course.courseId.localeCompare(b.course.courseId)),
             };
+        });
+    }
+
+    async addAccountCourses(accountId: string): Promise<void> {
+        const courses = await this.prisma.originalCourse.findMany();
+        const data = courses.map(course => ({
+            accountId,
+            courseId: course.courseId,
+            status: CourseStatus.BLOCKED,
+        }));
+        await this.prisma.accountCourse.createMany({
+            data,
+        });
+    }
+
+    async addAccountLessonProgress(accountId: string): Promise<void> {
+        const lessons = await this.prisma.lesson.findMany();
+        const data = lessons.map(lesson => ({
+            accountId,
+            lessonId: lesson.lessonId,
+            status: CourseStatus.BLOCKED,
+            nextViewAt: null,
+        }));
+        await this.prisma.accountLessonProgress.createMany({
+            data,
         });
     }
 }

@@ -66,16 +66,12 @@ export class SportmasterHeadersService {
     }
 
     getHeadersWithAccessToken(accessToken: string, videoId?: string, lessonId?: string, mnemocode?: string): IRequestHeadersCourse {
-        const referer = videoId
-            ? this.onlineCourses
-            : 'https://' +
-              this.hostSite +
-              'courses/mobile-player/?videoId=' +
-              videoId +
-              '&type=video&lessonId=' +
-              lessonId +
-              '&mnemocode=' +
-              mnemocode;
+        let referer;
+        if (!mnemocode) {
+            referer = this.onlineCourses;
+        } else {
+            referer = `https://${this.hostSite}courses/mobile-player/?videoId=${videoId}&type=video&lessonId=${lessonId}&mnemocode=${mnemocode}`;
+        }
 
         return {
             'User-Agent': this.userAgentMobileWeb,

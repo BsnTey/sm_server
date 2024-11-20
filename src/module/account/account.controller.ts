@@ -1,8 +1,8 @@
 import { Body, Controller, Get, HttpCode, NotFoundException, Param, Patch, Post, Put } from '@nestjs/common';
 import { AccountService } from './account.service';
 import { HasZenno } from '@common/decorators/zenno.decorator';
-import { AddingAccountRequestDto, AddingAccountResponseDto } from './dto/create-account.dto';
-import { UpdatingAccountRequestDto, UpdatingAccountResponseDto } from './dto/update-tokens-account.dto';
+import { AddingAccountRequestDto } from './dto/create-account.dto';
+import { UpdatingAccountRequestDto } from './dto/update-tokens-account.dto';
 import { AccountIdParamsDto } from './dto/uuid-account.dto';
 import { UpdateAccountRequestDto, UpdateAccountResponseDto } from './dto/update-account.dto';
 import { IsEmailRequestDto, IsEmailResponseDto } from './dto/isEmail-account.dto';
@@ -11,6 +11,7 @@ import { UpdatingBonusCountRequestDto, UpdatingBonusCountResponseDto } from './d
 import { UpdatePushTokenRequestDto, UpdatePushTokenResponseDto } from './dto/updatePushToken-account.dto';
 import { UpdateGoogleIdRequestDto, UpdateGoogleIdResponseDto } from './dto/updateGoogleId-account.dto';
 import { AxiosError } from 'axios';
+import { UpdatingCourseTokensAccountRequestDto } from './dto/update-course-tokens-account.dto';
 
 @Controller('account')
 export class AccountController {
@@ -19,7 +20,7 @@ export class AccountController {
     @HasZenno()
     @Post()
     @HttpCode(200)
-    async addAccount(@Body() dto: AddingAccountRequestDto): Promise<AddingAccountResponseDto> {
+    async addAccount(@Body() dto: AddingAccountRequestDto): Promise<string> {
         const account = await this.accountService.addingAccount(dto);
         return account ? 'success' : 'error';
     }
@@ -38,12 +39,27 @@ export class AccountController {
     @HasZenno()
     @Patch(':accountId/token')
     @HttpCode(200)
-    async updateTokenAccount(
-        @Body() dto: UpdatingAccountRequestDto,
-        @Param() params: AccountIdParamsDto,
-    ): Promise<UpdatingAccountResponseDto> {
+    async updateTokenAccount(@Body() dto: UpdatingAccountRequestDto, @Param() params: AccountIdParamsDto): Promise<string> {
         const account = await this.accountService.updateTokensAccount(params.accountId, dto);
         return account ? 'success' : 'error';
+    }
+
+    @HasZenno()
+    @Patch(':accountId/courseToken')
+    @HttpCode(200)
+    async updateCourseTokenAccount(
+        @Body() dto: UpdatingCourseTokensAccountRequestDto,
+        @Param() params: AccountIdParamsDto,
+    ): Promise<string> {
+        const account = await this.accountService.updateCourseTokensAccount(params.accountId, dto);
+        return account ? 'success' : 'error';
+    }
+
+    @HasZenno()
+    @Patch(':accountId/connectionCourse')
+    @HttpCode(200)
+    async connectionCourseAccount(@Param() params: AccountIdParamsDto): Promise<void> {
+        await this.accountService.connectionCourseAccount(params.accountId);
     }
 
     @HasZenno()

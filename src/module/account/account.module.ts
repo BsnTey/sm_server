@@ -11,7 +11,7 @@ import { CourseRepository } from './course.repository';
 @Module({
     controllers: [AccountController],
     providers: [AccountService, AccountRepository, SportmasterHeadersService, CourseService, CourseRepository],
-    exports: [AccountService, SportmasterHeadersService],
+    exports: [AccountService, SportmasterHeadersService, CourseService],
     imports: [ProxyModule, HttpModule],
 })
 export class AccountModule {}

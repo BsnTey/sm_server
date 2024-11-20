@@ -5,7 +5,12 @@ import { AccountEntity } from './entities/account.entity';
 import { IAccountWithProxy, IFindCitiesAccount, IRecipientOrder, IRefreshAccount } from './interfaces/account.interface';
 import { Order } from '@prisma/client';
 import { ProxyService } from '../proxy/proxy.service';
-import { ERROR_ACCOUNT_NOT_FOUND, ERROR_GET_ACCESS_TOKEN_COURSE, ERROR_LOGOUT_MP } from './constants/error.constant';
+import {
+    ERROR_ACCESS_TOKEN_COURSE,
+    ERROR_ACCOUNT_NOT_FOUND,
+    ERROR_GET_ACCESS_TOKEN_COURSE,
+    ERROR_LOGOUT_MP,
+} from './constants/error.constant';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '../http/http.service';
 import { SocksProxyAgent } from 'socks-proxy-agent';
@@ -30,6 +35,9 @@ import { SportmasterHeadersService } from './entities/headers.entity';
 import { UserGateTokenInterface } from './interfaces/userGateToken.interface';
 import { CourseList } from './interfaces/course-list.interface';
 import { CourseService } from './course.service';
+import { IAccountCourse, IWatchLesson } from './interfaces/course.interface';
+import { CourseTokensEntity } from './entities/courseTokens.entity';
+import { UpdatingCourseTokensAccountRequestDto } from './dto/update-course-tokens-account.dto';
 
 @Injectable()
 export class AccountService {
@@ -58,6 +66,7 @@ export class AccountService {
             refreshToken,
             accessTokenCourse,
             refreshTokenCourse,
+            userGateToken,
             xUserId,
             deviceId,
             installationId,
@@ -79,6 +88,7 @@ export class AccountService {
             refreshToken: refreshTokensEntity.refreshToken,
             accessTokenCourse,
             refreshTokenCourse,
+            userGateToken,
             isValidAccessTokenCourse: true,
             statusCourse: statusCourse ? statusCourse : 'ACTIVE',
             xUserId,
@@ -108,11 +118,6 @@ export class AccountService {
         const account = await this.getAccountFromDb(accountId);
         if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
         return new AccountEntity(account);
-    }
-
-    async getActiveCourseAccount(): Promise<any> {
-        const accounts = await this.accountRep.getActiveCourseAccount();
-        console.log(accounts);
     }
 
     private async getAccountFromDb(accountId: string) {
@@ -163,6 +168,32 @@ export class AccountService {
         const refreshTokensEntity = new RefreshTokensEntity(dataAccount);
         await this.accountRep.updateTokensAccount(accountId, refreshTokensEntity);
         return refreshTokensEntity;
+    }
+
+    async updateCourseTokensAccount(accountId: string, data: UpdatingCourseTokensAccountRequestDto) {
+        const account = await this.getAccountFromDb(accountId);
+        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        return await this.updateCourseTokensAccountPrivate(accountId, data);
+    }
+
+    async connectionCourseAccount(accountId: string) {
+        const account = await this.getAccountFromDb(accountId);
+        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+
+        await this.accountRep.addAccountCourses(accountId);
+        await this.accountRep.addAccountLessonProgress(accountId);
+    }
+
+    private async updateCourseTokensAccountPrivate(
+        accountId: string,
+        dataAccount: UpdatingCourseTokensAccountRequestDto,
+    ): Promise<CourseTokensEntity> {
+        const courseTokensEntity = new CourseTokensEntity({
+            ...dataAccount,
+            isValidAccessTokenCourse: true,
+        });
+        await this.accountRep.updateCourseTokensAccount(accountId, courseTokensEntity);
+        return courseTokensEntity;
     }
 
     async updateGoogleId(accountId: string, data: UpdateGoogleIdRequestDto): Promise<{ googleId: string }> {
@@ -733,25 +764,51 @@ export class AccountService {
         return response.data;
     }
 
-    // private async watchingLesson(idLesson: string, accountWithProxyEntity: AccountWithProxyEntity): Promise<CourseList> {
-    //     const lesson = await this.courseService.getInfoLesson(idLesson);
-    //
-    //     if (!accountWithProxyEntity.accessTokenCourse) throw new HttpException(ERROR_ACCESS_TOKEN_COURSE, HttpStatus.BAD_REQUEST);
-    //
-    //     const url = this.urlSite + `courses/api/courses/lessons/${lesson.mnemocode}/${lesson.courseId}/watching`;
-    //     const httpOptions = await this.getHttpOptionsSiteCourseVideo(
-    //         accountWithProxyEntity.accessTokenCourse,
-    //         accountWithProxyEntity.proxy!.proxy,
-    //         lesson.videoId,
-    //         lesson.lessonId,
-    //         lesson.mnemocode,
-    //     );
-    //     const payload = {
-    //         startTime: 0,
-    //         endTime: lesson.duration,
-    //     };
-    //
-    //     const response = await this.httpService.post(url, payload, httpOptions);
-    //     return response.data;
-    // }
+    async finishedCourses(accountId: string): Promise<void> {
+        await this.accountRep.finishedCourses(accountId);
+    }
+
+    async promblemCourses(accountId: string): Promise<void> {
+        await this.accountRep.promblemCourses(accountId);
+    }
+
+    async getActiveCourseAccount(): Promise<IAccountCourse[]> {
+        return await this.accountRep.getActiveCourseAccount();
+    }
+
+    async watchingLesson(lesson: IWatchLesson, accountId: string): Promise<boolean> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+
+        const status = await this.privateWatchingLesson(lesson, accountWithProxyEntity);
+        return status == 204;
+    }
+
+    private async privateWatchingLesson(
+        { mnemocode, videoId, lessonId, duration }: IWatchLesson,
+        accountWithProxyEntity: AccountWithProxyEntity,
+    ): Promise<number> {
+        if (!accountWithProxyEntity.accessTokenCourse) {
+            await this.promblemCourses(accountWithProxyEntity.accountId);
+            throw new HttpException(ERROR_ACCESS_TOKEN_COURSE, HttpStatus.FORBIDDEN);
+        }
+
+        const url = this.urlSite + `courses/api/courses/lessons/${mnemocode}/${lessonId}/watching`;
+        const httpOptions = await this.getHttpOptionsSiteCourseVideo(
+            accountWithProxyEntity.accessTokenCourse,
+            accountWithProxyEntity.proxy!.proxy,
+            videoId,
+            lessonId,
+            mnemocode,
+        );
+        const payload = {
+            startTime: 0,
+            endTime: duration,
+        };
+        try {
+            const response = await this.httpService.post(url, payload, httpOptions);
+            return response.status;
+        } catch (e: any) {
+            return 404;
+        }
+    }
 }

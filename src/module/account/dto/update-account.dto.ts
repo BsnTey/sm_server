@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { CourseStatusEnum } from './create-account.dto';
 
 const UpdateAccountRequestSchema = z.object({
     accessToken: z.string(),
@@ -8,6 +9,10 @@ const UpdateAccountRequestSchema = z.object({
     deviceId: z.string().uuid(),
     installationId: z.string().uuid(),
     expiresIn: z.string(),
+    accessTokenCourse: z.string(),
+    refreshTokenCourse: z.string(),
+    statusCourse: CourseStatusEnum,
+    userGateToken: z.string(),
 });
 
 const UpdateAccountResponseSchema = z.object({});

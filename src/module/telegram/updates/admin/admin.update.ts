@@ -70,6 +70,10 @@ export class AdminUpdate {
 
     private async addAccounts(accounts: any[][]) {
         for (const account of accounts) {
+            let xUserId;
+            if (account[7].charAt(0) === 'A') {
+                xUserId = account[7].substring(1);
+            }
             await this.accountService.addingAccount({
                 accountId: account[0],
                 email: account[1],
@@ -78,7 +82,7 @@ export class AdminUpdate {
                 cookie: account[4],
                 accessToken: account[5],
                 refreshToken: account[6],
-                xUserId: account[7],
+                xUserId,
                 deviceId: account[8],
                 installationId: account[9],
                 expiresIn: '0',

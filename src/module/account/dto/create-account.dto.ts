@@ -15,6 +15,7 @@ const AddingAccountRequestSchema = z.object({
     accessTokenCourse: z.string().optional(),
     refreshTokenCourse: z.string().optional(),
     statusCourse: CourseStatusEnum.optional(),
+    userGateToken: z.string().optional(),
     xUserId: z.string(),
     deviceId: z.string().uuid(),
     installationId: z.string().uuid(),
