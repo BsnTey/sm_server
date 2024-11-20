@@ -2,7 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { Account, CourseStatus, Order, Prisma } from '@prisma/client';
 import { PrismaService } from '@common/database/prisma.service';
 import { AccountEntity } from './entities/account.entity';
-import { IAccountWithProxy, ICourseTokens, IEmailFromDb, IRefreshDataAccount, IUpdateAccount } from './interfaces/account.interface';
+import {
+    IAccountWithProxy,
+    ICourseStatus,
+    ICourseTokens,
+    IEmailFromDb,
+    IRefreshDataAccount,
+    IUpdateAccount,
+} from './interfaces/account.interface';
 import { CitySMEntity } from './entities/citySM.entity';
 import { IAccountCourse } from './interfaces/course.interface';
 
@@ -198,6 +205,17 @@ export class AccountRepository {
                 accessTokenCourse,
                 refreshTokenCourse,
                 isValidAccessTokenCourse,
+            },
+        });
+    }
+
+    async updateCourseStatusAccount(accountId: string, { statusCourse }: ICourseStatus): Promise<Account> {
+        return this.prisma.account.update({
+            where: {
+                accountId,
+            },
+            data: {
+                statusCourse,
             },
         });
     }

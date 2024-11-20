@@ -1,11 +1,9 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { CourseStatusEnum } from './create-account.dto';
 
 const UpdatingCourseTokenAccountRequestSchema = z.object({
     accessTokenCourse: z.string(),
     refreshTokenCourse: z.string(),
-    statusCourse: CourseStatusEnum,
     userGateToken: z.string(),
 });
 

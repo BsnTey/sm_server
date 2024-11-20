@@ -44,6 +44,7 @@ export class CronService {
                     try {
                         const isWatched = await this.viewLesson(lessonView, progressId, accountId);
                         if (!isWatched) continue;
+                        console.log('просмотрел первое видео');
                     } catch (err: any) {
                         await this.accountService.promblemCourses(account.accountId);
                         console.error('Проблема с курсом first isWatched', account.accountId);

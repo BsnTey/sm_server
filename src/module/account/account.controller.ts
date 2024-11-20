@@ -12,6 +12,7 @@ import { UpdatePushTokenRequestDto, UpdatePushTokenResponseDto } from './dto/upd
 import { UpdateGoogleIdRequestDto, UpdateGoogleIdResponseDto } from './dto/updateGoogleId-account.dto';
 import { AxiosError } from 'axios';
 import { UpdatingCourseTokensAccountRequestDto } from './dto/update-course-tokens-account.dto';
+import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
 
 @Controller('account')
 export class AccountController {
@@ -52,6 +53,17 @@ export class AccountController {
         @Param() params: AccountIdParamsDto,
     ): Promise<string> {
         const account = await this.accountService.updateCourseTokensAccount(params.accountId, dto);
+        return account ? 'success' : 'error';
+    }
+
+    @HasZenno()
+    @Patch(':accountId/courseStatus')
+    @HttpCode(200)
+    async updateCourseStatusAccount(
+        @Body() dto: UpdatingCourseStatusAccountRequestDto,
+        @Param() params: AccountIdParamsDto,
+    ): Promise<string> {
+        const account = await this.accountService.updateCourseStatusAccount(params.accountId, dto);
         return account ? 'success' : 'error';
     }
 

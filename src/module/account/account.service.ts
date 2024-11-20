@@ -38,6 +38,7 @@ import { CourseService } from './course.service';
 import { IAccountCourse, IWatchLesson } from './interfaces/course.interface';
 import { CourseTokensEntity } from './entities/courseTokens.entity';
 import { UpdatingCourseTokensAccountRequestDto } from './dto/update-course-tokens-account.dto';
+import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
 
 @Injectable()
 export class AccountService {
@@ -174,6 +175,12 @@ export class AccountService {
         const account = await this.getAccountFromDb(accountId);
         if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
         return await this.updateCourseTokensAccountPrivate(accountId, data);
+    }
+
+    async updateCourseStatusAccount(accountId: string, data: UpdatingCourseStatusAccountRequestDto) {
+        const account = await this.getAccountFromDb(accountId);
+        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        return await this.accountRep.updateCourseStatusAccount(accountId, data);
     }
 
     async connectionCourseAccount(accountId: string) {

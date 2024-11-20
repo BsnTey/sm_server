@@ -17,6 +17,10 @@ export interface ICourseTokens {
     isValidAccessTokenCourse: boolean;
 }
 
+export interface ICourseStatus {
+    statusCourse: CourseStatus;
+}
+
 export interface IRefreshDataAccount {
     accessToken: string;
     refreshToken: string;
