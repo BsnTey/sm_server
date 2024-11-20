@@ -14,8 +14,6 @@ export class CronService {
 
     // @Cron('*/2 * * * *')
     async processLessons(): Promise<void> {
-        console.log('---------------------------');
-        console.log('попадаем в processLessons', new Date());
         if (this.isRunning) {
             return;
         }
@@ -30,13 +28,11 @@ export class CronService {
 
                 if (!firstCourse) {
                     await this.accountService.promblemCourses(account.accountId);
-                    console.log('Проблема с курсом', account.accountId);
                     continue;
                 }
 
                 if (firstCourse.status == CourseStatus.BLOCKED) {
                     await this.courseService.unBlockCourse(accountCourses[0].accountCourseId);
-                    console.log('Начинается просмотр первой лекции', new Date());
                     const accountId = accountCourses[0].accountId;
                     const progressId = accountCourses[0].course.lessons[0].AccountLessonProgress[0].progressId;
 
@@ -53,7 +49,6 @@ export class CronService {
                     }
                     const nextLesson = accountCourses[0].course.lessons[1];
                     const timeUnblock = this.getTimeUnblock(nextLesson.duration);
-                    console.log('Выставил первый разблок', timeUnblock);
                     await this.courseService.updateUnblockLesson(nextLesson.AccountLessonProgress[0].progressId, timeUnblock);
                     continue;
                 }
@@ -93,14 +88,10 @@ export class CronService {
                                 console.error('Проблема с курсом isWatched', account.accountId);
                             }
 
-                            console.log(`Просмотрено: Курс ${accountCourse.course.mnemocode}, Лекция позиция ${lesson.position}`);
-
                             // Если это последняя лекция в курсе
                             if (j === lessons.length - 1) {
                                 // Помечаем курс как завершённый
                                 await this.courseService.finishCourse(accountCourse.accountCourseId);
-
-                                console.log(`Курс завершён: ${accountCourse.course.title}`);
 
                                 // Если есть следующий курс, разблокируем первую лекцию
                                 if (i < accountCourses.length - 1) {
@@ -113,17 +104,11 @@ export class CronService {
 
                                     if (firstLessonProgress) {
                                         const timeUnblock = this.getTimeUnblock(firstLesson.duration);
-                                        console.log('Время разблокировки первой лекции след курса', timeUnblock);
                                         await this.courseService.updateUnblockLesson(firstLessonProgress.progressId, timeUnblock);
                                         await this.courseService.unBlockCourse(nextCourse.accountCourseId);
-
-                                        console.log(
-                                            `Разблокировано: Курс ${nextCourse.course.title}, Лекция позиция ${firstLesson.position}`,
-                                        );
                                     }
                                 } else {
                                     await this.accountService.finishedCourses(accountLessonProgress.accountId);
-                                    console.log(`Финиш ${accountLessonProgress.accountId}`);
                                 }
                             } else {
                                 // Если не последняя лекция, разблокируем следующую
@@ -134,14 +119,10 @@ export class CronService {
                                 if (!nextLessonProgress) continue;
 
                                 const timeUnblock = this.getTimeUnblock(nextLesson.duration);
-                                console.log(`Время разблокировки след урока ${timeUnblock}`);
                                 await this.courseService.updateUnblockLesson(nextLessonProgress.progressId, timeUnblock);
                                 nextLessonProgress.nextViewAt = timeUnblock;
-
-                                console.log(`Разблокировано: Лекция позиция ${nextLesson.position}`);
                             }
                         } else {
-                            console.log('время не пришло, идем к след аккаунту');
                             continue accountsLoop;
                         }
                     }
