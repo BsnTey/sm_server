@@ -1,4 +1,4 @@
-import { Account } from '@prisma/client';
+import { Account, CourseStatus } from '@prisma/client';
 import { Cookie } from '../interfaces/cookie.interface';
 
 export class AccountEntity implements Account {
@@ -14,6 +14,10 @@ export class AccountEntity implements Account {
     installationId: string;
     googleId: string | null;
     userGateToken: string | null;
+    statusCourse: CourseStatus;
+    accessTokenCourse: string | null;
+    refreshTokenCourse: string | null;
+    isValidAccessTokenCourse: boolean;
     pushToken: string | null;
     expiresInAccess: Date;
     expiresInRefresh: Date;
@@ -42,10 +46,7 @@ export class AccountEntity implements Account {
     updateTokensByTime() {
         const nowDate = new Date();
         const oneHourNext = new Date(nowDate.getTime() + 60 * 60 * 1000);
-        if (this.expiresInAccess && oneHourNext < this.expiresInAccess) {
-            return false;
-        }
-        return true;
+        return !(this.expiresInAccess && oneHourNext < this.expiresInAccess);
     }
 
     setCity(cityId: string, cityName: string): void {

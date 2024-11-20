@@ -10,7 +10,6 @@ import { Account } from '@prisma/client';
 import { UpdatingBonusCountRequestDto, UpdatingBonusCountResponseDto } from './dto/updateBonusCount-account.dto';
 import { UpdatePushTokenRequestDto, UpdatePushTokenResponseDto } from './dto/updatePushToken-account.dto';
 import { UpdateGoogleIdRequestDto, UpdateGoogleIdResponseDto } from './dto/updateGoogleId-account.dto';
-import { AccessTokenCourseResponseDto } from './dto/getAccessTokenCourse-account.dto';
 import { AxiosError } from 'axios';
 
 @Controller('account')
@@ -94,12 +93,12 @@ export class AccountController {
         return await this.accountService.updateGoogleId(params.accountId, dto);
     }
 
-    @HasZenno()
-    @Get(':accountId/accessTokenCourse')
-    @HttpCode(200)
-    async getAccessTokenCourseAccount(@Param() params: AccountIdParamsDto): Promise<AccessTokenCourseResponseDto> {
-        return await this.accountService.getAccessTokenCourse(params.accountId);
-    }
+    // @HasZenno()
+    // @Get(':accountId/accessTokenCourse')
+    // @HttpCode(200)
+    // async getAccessTokenCourseAccount(@Param() params: AccountIdParamsDto): Promise<AccessTokenCourseResponseDto> {
+    //     return await this.accountService.getAccessTokenCourse(params.accountId);
+    // }
 
     @HasZenno()
     @Get(':accountId/courses')

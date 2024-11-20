@@ -84,6 +84,8 @@ export class AdminUpdate {
                 expiresIn: '0',
                 bonusCount: '0',
                 isOnlyAccessOrder: account[10],
+                accessTokenCourse: undefined,
+                refreshTokenCourse: undefined,
             });
         }
     }

@@ -1,5 +1,8 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { CourseStatus } from '@prisma/client';
+
+export const CourseStatusEnum = z.enum(Object.values(CourseStatus) as [keyof typeof CourseStatus]);
 
 const AddingAccountRequestSchema = z.object({
     accountId: z.string().uuid(),
@@ -9,6 +12,9 @@ const AddingAccountRequestSchema = z.object({
     cookie: z.preprocess(val => (typeof val === 'string' ? decodeURIComponent(val.replace(/\+/g, ' ')) : val), z.string()),
     accessToken: z.string(),
     refreshToken: z.string(),
+    accessTokenCourse: z.string().optional(),
+    refreshTokenCourse: z.string().optional(),
+    statusCourse: CourseStatusEnum.optional(),
     xUserId: z.string(),
     deviceId: z.string().uuid(),
     installationId: z.string().uuid(),

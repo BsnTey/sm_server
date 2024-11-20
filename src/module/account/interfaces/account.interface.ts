@@ -1,4 +1,4 @@
-import { Account, CitySM, Proxy } from '@prisma/client';
+import { Account, AccountCourse, AccountLessonProgress, CitySM, Lesson, OriginalCourse, Proxy } from '@prisma/client';
 import { SearchProductInterface } from './search-product.interface';
 import { CartInterface } from './cart.interface';
 import { PickupAvabilityInterface, Shop } from './pickup-avability.interface';
@@ -50,6 +50,24 @@ export interface IAccountCashing {
 export interface IAccountWithProxy extends Account {
     proxy: Proxy | null;
     citySM: CitySM;
+}
+
+export interface IAccountCourse {
+    accountId: string;
+    statusCourse: string;
+    AccountCourse: IAccountCourseWLesson[];
+}
+
+interface ICourseWLesson extends OriginalCourse {
+    lessons: IAccountCourseWProgress[];
+}
+
+interface IAccountCourseWLesson extends AccountCourse {
+    course: ICourseWLesson;
+}
+
+interface IAccountCourseWProgress extends Lesson {
+    AccountLessonProgress: AccountLessonProgress[];
 }
 
 export interface IFindCitiesAccount {

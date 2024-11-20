@@ -1,6 +1,7 @@
 export const ERROR_LOGOUT_MP = 'Разлогин аккаунта, в боте не работает';
 export const ERROR_LOGOUT_MP_BAN = 'Возможно бан, обновите аутентификацию';
 export const ERROR_ACCOUNT_NOT_FOUND = 'Аккаунт не найден';
-export const ERROR_ACCESS_TOKEN_COURSE = 'Ошибка в получении токена';
+export const ERROR_GET_ACCESS_TOKEN_COURSE = 'Ошибка в получении токена';
 export const ERROR_UNKNOWN = 'Необработанная ошибка';
 export const ERROR_PROXY = 'Ошибка с прокси. Обратитесь в поддержку';
+export const ERROR_ACCESS_TOKEN_COURSE = 'Нет accessToken курса';

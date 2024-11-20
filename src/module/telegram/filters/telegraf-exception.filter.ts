@@ -1,13 +1,13 @@
 import { ArgumentsHost, Catch, ExceptionFilter } from '@nestjs/common';
 import { TelegrafArgumentsHost } from 'nestjs-telegraf';
 import { Context } from 'telegraf';
-import { AccountRepository } from '../../account/account.repository';
 import { AxiosError } from 'axios';
 import { ERROR_LOGOUT_MP } from '../../account/constants/error.constant';
+import { AccountService } from '../../account/account.service';
 
 @Catch()
 export class TelegrafExceptionFilter implements ExceptionFilter {
-    constructor(private accountRep: AccountRepository) {}
+    constructor(private accountService: AccountService) {}
 
     async catch(exception: Error, host: ArgumentsHost): Promise<void> {
         const telegrafHost = TelegrafArgumentsHost.create(host);
@@ -21,7 +21,7 @@ export class TelegrafExceptionFilter implements ExceptionFilter {
                         case 'Unauthorized':
                             if (exception.response!.data.error.code == 'UNAUTHORIZED') {
                                 const accountId = exception.config!.headers['Account-Id'];
-                                // await this.accountRep.setBanMp(accountId);
+                                // await this.accountService.setBanMp(accountId);
                                 exception.message = ERROR_LOGOUT_MP;
                                 break;
                             }
@@ -29,7 +29,7 @@ export class TelegrafExceptionFilter implements ExceptionFilter {
                             if (exception.response!.data.error.code == 'WRONG_TOKEN') {
                                 exception.message = ERROR_LOGOUT_MP;
                                 const accountId = exception.config!.headers['Account-Id'];
-                                await this.accountRep.setBanMp(accountId);
+                                await this.accountService.setBanMp(accountId);
                             }
                             if (exception.response!.data.error.code == 'TOO_MANY_INCORRECT_CODE_INPUTS') {
                                 exception.message = exception.response!.data.error.message;

@@ -5,7 +5,7 @@ import { AccountEntity } from './entities/account.entity';
 import { IAccountWithProxy, IFindCitiesAccount, IRecipientOrder, IRefreshAccount } from './interfaces/account.interface';
 import { Order } from '@prisma/client';
 import { ProxyService } from '../proxy/proxy.service';
-import { ERROR_ACCESS_TOKEN_COURSE, ERROR_ACCOUNT_NOT_FOUND, ERROR_LOGOUT_MP } from './constants/error.constant';
+import { ERROR_ACCOUNT_NOT_FOUND, ERROR_GET_ACCESS_TOKEN_COURSE, ERROR_LOGOUT_MP } from './constants/error.constant';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '../http/http.service';
 import { SocksProxyAgent } from 'socks-proxy-agent';
@@ -29,7 +29,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { SportmasterHeadersService } from './entities/headers.entity';
 import { UserGateTokenInterface } from './interfaces/userGateToken.interface';
 import { CourseList } from './interfaces/course-list.interface';
-import { Cron } from '@nestjs/schedule';
+import { CourseService } from './course.service';
 
 @Injectable()
 export class AccountService {
@@ -43,6 +43,7 @@ export class AccountService {
         private accountRep: AccountRepository,
         private proxyService: ProxyService,
         private httpService: HttpService,
+        private courseService: CourseService,
         private sportmasterHeaders: SportmasterHeadersService,
     ) {}
 
@@ -55,12 +56,15 @@ export class AccountService {
             cookie,
             accessToken,
             refreshToken,
+            accessTokenCourse,
+            refreshTokenCourse,
             xUserId,
             deviceId,
             installationId,
             expiresIn,
             bonusCount,
             isOnlyAccessOrder,
+            statusCourse,
         } = accountDto;
 
         const refreshTokensEntity = new RefreshTokensEntity({ accessToken, refreshToken, expiresIn });
@@ -73,6 +77,10 @@ export class AccountService {
             cookie,
             accessToken: refreshTokensEntity.accessToken,
             refreshToken: refreshTokensEntity.refreshToken,
+            accessTokenCourse,
+            refreshTokenCourse,
+            isValidAccessTokenCourse: true,
+            statusCourse: statusCourse ? statusCourse : 'ACTIVE',
             xUserId,
             deviceId,
             installationId,
@@ -83,13 +91,28 @@ export class AccountService {
             ownerTelegramId: this.adminsId[0],
         });
         await this.accountRep.addingAccount(account);
+        await this.initializeAccountProgress(account.accountId);
         return account;
+    }
+
+    async initializeAccountProgress(accountId: string): Promise<void> {
+        const courses = await this.courseService.getCoursesWithLessons();
+
+        for (const course of courses) {
+            await this.courseService.createAccountCourse(accountId, course);
+            await this.courseService.createAccountLessonProgress(accountId, course);
+        }
     }
 
     async getAccount(accountId: string): Promise<AccountEntity> {
         const account = await this.getAccountFromDb(accountId);
         if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
         return new AccountEntity(account);
+    }
+
+    async getActiveCourseAccount(): Promise<any> {
+        const accounts = await this.accountRep.getActiveCourseAccount();
+        console.log(accounts);
     }
 
     private async getAccountFromDb(accountId: string) {
@@ -106,6 +129,10 @@ export class AccountService {
 
     async findOrderNumber(orderNumber: string) {
         return await this.accountRep.getOrder(orderNumber);
+    }
+
+    async setBanMp(accountId: string) {
+        return await this.accountRep.setBanMp(accountId);
     }
 
     async updateAccountBonusCount(accountId: string, data: UpdatingBonusCountRequestDto) {
@@ -228,6 +255,19 @@ export class AccountService {
     private async getHttpOptionsSiteCourse(accountWithProxy: AccountWithProxyEntity, accessTokenCourse: string): Promise<any> {
         const headers = this.sportmasterHeaders.getHeadersWithAccessToken(accessTokenCourse);
         const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
+
+        return { headers, httpsAgent };
+    }
+
+    private async getHttpOptionsSiteCourseVideo(
+        accessTokenCourse: string,
+        proxy: string,
+        videoId: string,
+        lessonId: string,
+        mnemocode: string,
+    ): Promise<any> {
+        const headers = this.sportmasterHeaders.getHeadersWithAccessToken(accessTokenCourse, videoId, lessonId, mnemocode);
+        const httpsAgent = new SocksProxyAgent(proxy);
 
         return { headers, httpsAgent };
     }
@@ -683,7 +723,7 @@ export class AccountService {
         if (match) {
             return match[0];
         }
-        throw new HttpException(ERROR_ACCESS_TOKEN_COURSE, HttpStatus.BAD_REQUEST);
+        throw new HttpException(ERROR_GET_ACCESS_TOKEN_COURSE, HttpStatus.BAD_REQUEST);
     }
 
     private async getCourses(accessTokenCourse: string, accountWithProxyEntity: AccountWithProxyEntity): Promise<CourseList> {
@@ -693,8 +733,25 @@ export class AccountService {
         return response.data;
     }
 
-    @Cron('15 * * * * *')
-    handleCron() {
-        console.log('вызов крон', new Date());
-    }
+    // private async watchingLesson(idLesson: string, accountWithProxyEntity: AccountWithProxyEntity): Promise<CourseList> {
+    //     const lesson = await this.courseService.getInfoLesson(idLesson);
+    //
+    //     if (!accountWithProxyEntity.accessTokenCourse) throw new HttpException(ERROR_ACCESS_TOKEN_COURSE, HttpStatus.BAD_REQUEST);
+    //
+    //     const url = this.urlSite + `courses/api/courses/lessons/${lesson.mnemocode}/${lesson.courseId}/watching`;
+    //     const httpOptions = await this.getHttpOptionsSiteCourseVideo(
+    //         accountWithProxyEntity.accessTokenCourse,
+    //         accountWithProxyEntity.proxy!.proxy,
+    //         lesson.videoId,
+    //         lesson.lessonId,
+    //         lesson.mnemocode,
+    //     );
+    //     const payload = {
+    //         startTime: 0,
+    //         endTime: lesson.duration,
+    //     };
+    //
+    //     const response = await this.httpService.post(url, payload, httpOptions);
+    //     return response.data;
+    // }
 }

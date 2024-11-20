@@ -4,6 +4,6 @@ import { ProxyRepository } from './proxy.repository';
 
 @Module({
     providers: [ProxyService, ProxyRepository],
-    exports: [ProxyService, ProxyRepository],
+    exports: [ProxyService],
 })
 export class ProxyModule {}

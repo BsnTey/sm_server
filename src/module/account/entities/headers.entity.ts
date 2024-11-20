@@ -65,7 +65,18 @@ export class SportmasterHeadersService {
         };
     }
 
-    getHeadersWithAccessToken(accessToken: string): IRequestHeadersCourse {
+    getHeadersWithAccessToken(accessToken: string, videoId?: string, lessonId?: string, mnemocode?: string): IRequestHeadersCourse {
+        const referer = videoId
+            ? this.onlineCourses
+            : 'https://' +
+              this.hostSite +
+              'courses/mobile-player/?videoId=' +
+              videoId +
+              '&type=video&lessonId=' +
+              lessonId +
+              '&mnemocode=' +
+              mnemocode;
+
         return {
             'User-Agent': this.userAgentMobileWeb,
             Host: this.hostSite,
@@ -77,7 +88,7 @@ export class SportmasterHeadersService {
             'Sec-Fetch-Dest': this.secFetchDest,
             'Accept-Encoding': this.acceptEncoding + ', br',
             'Accept-Language': this.acceptLanguage,
-            Referer: this.onlineCourses,
+            Referer: referer,
         };
     }
 
