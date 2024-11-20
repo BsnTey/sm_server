@@ -56,7 +56,7 @@ export class AccountController {
     }
 
     @HasZenno()
-    @Patch(':accountId/connectionCourse')
+    @Post(':accountId/connectionCourse')
     @HttpCode(200)
     async connectionCourseAccount(@Param() params: AccountIdParamsDto): Promise<void> {
         await this.accountService.connectionCourseAccount(params.accountId);
