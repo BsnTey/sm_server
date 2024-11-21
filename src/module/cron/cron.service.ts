@@ -24,6 +24,7 @@ export class CronService {
             if (accounts.length === 0) return;
 
             accountsLoop: for (const account of accounts) {
+                console.log('In accountsLoop by', account.accountId);
                 const accountCourses = account.AccountCourse;
                 const firstCourse = accountCourses.length == 0 ? null : accountCourses[0];
 
