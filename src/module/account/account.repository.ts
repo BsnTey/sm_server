@@ -328,6 +328,7 @@ export class AccountRepository {
             where: {
                 statusCourse: 'ACTIVE',
             },
+            take: 50,
             include: {
                 AccountCourse: {
                     include: {
@@ -344,6 +345,7 @@ export class AccountRepository {
                 },
             },
         });
+
         return foundAccounts.map(acc => {
             return {
                 ...acc,
@@ -353,14 +355,12 @@ export class AccountRepository {
                         course: {
                             ...accountCourse.course,
                             lessons: accountCourse.course.lessons
-                                .map(lesson => {
-                                    return {
-                                        ...lesson,
-                                        AccountLessonProgress: lesson.AccountLessonProgress.filter(
-                                            progress => progress.accountId === acc.accountId,
-                                        ),
-                                    };
-                                })
+                                .map(lesson => ({
+                                    ...lesson,
+                                    AccountLessonProgress: lesson.AccountLessonProgress.filter(
+                                        progress => progress.accountId === acc.accountId,
+                                    ),
+                                }))
                                 .sort((a, b) => a.position - b.position),
                         },
                     };
