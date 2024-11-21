@@ -393,4 +393,29 @@ export class AccountRepository {
             data,
         });
     }
+
+    async getAccountCoursesWithLessons(accountId: string) {
+        return this.prisma.account.findUnique({
+            where: { accountId },
+            include: {
+                AccountCourse: {
+                    include: {
+                        course: {
+                            include: {
+                                lessons: {
+                                    include: {
+                                        AccountLessonProgress: {
+                                            where: {
+                                                accountId,
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+    }
 }

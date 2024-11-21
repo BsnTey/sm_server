@@ -46,7 +46,7 @@ export class AccountController {
     }
 
     @HasZenno()
-    @Patch(':accountId/courseToken')
+    @Patch('/course/token/:accountId')
     @HttpCode(200)
     async updateCourseTokenAccount(
         @Body() dto: UpdatingCourseTokensAccountRequestDto,
@@ -57,7 +57,7 @@ export class AccountController {
     }
 
     @HasZenno()
-    @Patch(':accountId/courseStatus')
+    @Patch('course/status/:accountId')
     @HttpCode(200)
     async updateCourseStatusAccount(
         @Body() dto: UpdatingCourseStatusAccountRequestDto,
@@ -68,7 +68,14 @@ export class AccountController {
     }
 
     @HasZenno()
-    @Post(':accountId/connectionCourse')
+    @Get('courses/progress/:accountId')
+    @HttpCode(200)
+    async isCourseAddingAccount(@Param() params: AccountIdParamsDto): Promise<any> {
+        return await this.accountService.getAccountCoursesWithLessons(params.accountId);
+    }
+
+    @HasZenno()
+    @Post('courses/connection/:accountId')
     @HttpCode(200)
     async connectionCourseAccount(@Param() params: AccountIdParamsDto): Promise<void> {
         await this.accountService.connectionCourseAccount(params.accountId);

@@ -183,6 +183,12 @@ export class AccountService {
         return await this.accountRep.updateCourseStatusAccount(accountId, data);
     }
 
+    async getAccountCoursesWithLessons(accountId: string) {
+        const account = await this.accountRep.getAccountCoursesWithLessons(accountId);
+        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        return account;
+    }
+
     async connectionCourseAccount(accountId: string) {
         const account = await this.getAccountFromDb(accountId);
         if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
