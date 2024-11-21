@@ -130,6 +130,8 @@ export class CronService {
                     }
                 }
             }
+        } catch (err: any) {
+            console.error(err);
         } finally {
             this.isRunning = false;
         }
