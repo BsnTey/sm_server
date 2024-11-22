@@ -3,7 +3,6 @@ import { AccountService } from '../account/account.service';
 import { CourseStatus, Lesson, LessonStatus } from '@prisma/client';
 import { CourseService } from '../account/course.service';
 import { IWatchLesson } from '../account/interfaces/course.interface';
-import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class CronService {
@@ -13,7 +12,7 @@ export class CronService {
         private courseService: CourseService,
     ) {}
 
-    @Cron('*/2 * * * *')
+    // @Cron('*/2 * * * *')
     async processLessons(): Promise<void> {
         if (this.isRunning) {
             return;
