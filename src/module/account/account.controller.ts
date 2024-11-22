@@ -13,10 +13,16 @@ import { UpdateGoogleIdRequestDto, UpdateGoogleIdResponseDto } from './dto/updat
 import { AxiosError } from 'axios';
 import { UpdatingCourseTokensAccountRequestDto } from './dto/update-course-tokens-account.dto';
 import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
+import { CourseService } from './course.service';
+import { UpdateCourseStatusRequestDto } from './dto/updateCourseStatus-course';
+import { CourseData } from './interfaces/course-data.interface';
 
 @Controller('account')
 export class AccountController {
-    constructor(private accountService: AccountService) {}
+    constructor(
+        private accountService: AccountService,
+        private courseService: CourseService,
+    ) {}
 
     @HasZenno()
     @Post()
@@ -163,5 +169,19 @@ export class AccountController {
             errorMessage = err.message || 'Неизвестная ошибка';
         }
         return { error: errorMessage };
+    }
+
+    @HasZenno()
+    @Patch('courses/status/:accountId')
+    @HttpCode(200)
+    async courseUnblock(@Body() dto: UpdateCourseStatusRequestDto, @Param() params: AccountIdParamsDto): Promise<void> {
+        await this.courseService.changeStatusCourse(params.accountId, dto.courseId, dto.status);
+    }
+
+    @HasZenno()
+    @Post('courses/synchronization/:accountId')
+    @HttpCode(200)
+    async synchronizationCourse(@Body() data: CourseData, @Param() params: AccountIdParamsDto): Promise<string> {
+        return this.courseService.synchronizationCourse(params.accountId, data);
     }
 }

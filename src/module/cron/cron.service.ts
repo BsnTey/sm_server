@@ -22,50 +22,21 @@ export class CronService {
             const accounts = await this.accountService.getActiveCourseAccount();
             if (accounts.length === 0) return;
 
-            accountsLoop: for (const account of accounts) {
-                console.log('In accountsLoop by', account.accountId);
-                const accountCourses = account.AccountCourse;
-                const firstCourse = accountCourses.length == 0 ? null : accountCourses[0];
+            accountsLoop: for (const accountId of accounts) {
+                console.log('In accountsLoop by', accountId);
+                const accountWithCourses = await this.accountService.getAccountCoursesWithLessons(accountId);
 
-                if (!firstCourse) {
-                    await this.accountService.promblemCourses(account.accountId);
-                    continue;
-                }
+                for (let i = 0; i < accountWithCourses.length; i++) {
+                    const accountCourse = accountWithCourses[i];
 
-                if (firstCourse.status == CourseStatus.BLOCKED) {
-                    await this.courseService.unBlockCourse(accountCourses[0].accountCourseId);
-                    const accountId = accountCourses[0].accountId;
-                    const progressId = accountCourses[0].course.lessons[0].AccountLessonProgress[0].progressId;
-
-                    const mnemocode = accountCourses[0].course.mnemocode;
-                    const firstLesson = accountCourses[0].course.lessons[0];
-
-                    const lessonView = this.mapLesson(firstLesson, mnemocode);
-                    try {
-                        const isWatched = await this.viewLesson(lessonView, progressId, accountId);
-                        if (!isWatched) continue;
-                        console.log('просмотрел первое видео');
-                    } catch (err: any) {
-                        await this.accountService.promblemCourses(account.accountId);
-                        console.error('Проблема с курсом first isWatched', account.accountId);
-                    }
-                    const nextLesson = accountCourses[0].course.lessons[1];
-                    const timeUnblock = this.getTimeUnblock(nextLesson.duration);
-                    await this.courseService.updateUnblockLesson(nextLesson.AccountLessonProgress[0].progressId, timeUnblock);
-                    continue;
-                }
-
-                for (let i = 0; i < accountCourses.length; i++) {
-                    const accountCourse = accountCourses[i];
-
-                    if (accountCourse.status != CourseStatus.ACTIVE) continue;
+                    if (accountCourse.status == CourseStatus.FINISHED) continue;
 
                     const lessons = accountCourse.course.lessons;
 
                     for (let j = 0; j < lessons.length; j++) {
                         const lesson = lessons[j];
                         const accountLessonProgress = lesson.AccountLessonProgress.find(
-                            progress => progress.accountId === account.accountId,
+                            progress => progress.accountId === accountCourse.accountId,
                         );
 
                         if (!accountLessonProgress) throw Error('Не нашел курс');
@@ -85,44 +56,51 @@ export class CronService {
                             try {
                                 const isWatched = await this.viewLesson(lessonView, progressId, accountId);
                                 if (!isWatched) continue accountsLoop;
+                                console.log('просмотрел', lessonView.mnemocode, lesson.position);
                             } catch (err: any) {
-                                await this.accountService.promblemCourses(account.accountId);
-                                console.error('Проблема с курсом isWatched', account.accountId);
+                                await this.accountService.promblemCourses(accountCourse.accountId);
+                                console.error('Проблема с курсом isWatched', accountCourse.accountId);
                             }
 
                             // Если это последняя лекция в курсе
                             if (j === lessons.length - 1) {
                                 // Помечаем курс как завершённый
-                                await this.courseService.finishCourse(accountCourse.accountCourseId);
+                                await this.courseService.changeStatusCourse(
+                                    accountCourse.accountId,
+                                    accountCourse.courseId,
+                                    CourseStatus.FINISHED,
+                                );
 
                                 // Если есть следующий курс, разблокируем первую лекцию
-                                if (i < accountCourses.length - 1) {
-                                    const nextCourse = accountCourses[i + 1];
-                                    await this.courseService.unBlockCourse(nextCourse.accountCourseId);
+                                if (i < accountWithCourses.length - 1) {
+                                    const nextCourse = accountWithCourses[i + 1];
+                                    // await this.courseService.unBlockCourse(nextCourse.accountCourseId);
                                     const firstLesson = nextCourse.course.lessons[0];
                                     const firstLessonProgress = firstLesson.AccountLessonProgress.find(
-                                        progress => progress.accountId === account.accountId,
+                                        progress => progress.accountId === accountCourse.accountId,
                                     );
 
                                     if (firstLessonProgress) {
                                         const timeUnblock = this.getTimeUnblock(firstLesson.duration);
                                         await this.courseService.updateUnblockLesson(firstLessonProgress.progressId, timeUnblock);
-                                        await this.courseService.unBlockCourse(nextCourse.accountCourseId);
+                                        //переход к другому акку
                                     }
                                 } else {
-                                    await this.accountService.finishedCourses(accountLessonProgress.accountId);
+                                    //аккаунт FINISHED
+                                    await this.accountService.updateCourseStatus(accountLessonProgress.accountId, CourseStatus.FINISHED);
                                 }
+                                continue accountsLoop;
                             } else {
                                 // Если не последняя лекция, разблокируем следующую
                                 const nextLesson = lessons[j + 1];
                                 const nextLessonProgress = nextLesson.AccountLessonProgress.find(
-                                    progress => progress.accountId === account.accountId,
+                                    progress => progress.accountId === accountCourse.accountId,
                                 );
                                 if (!nextLessonProgress) continue;
 
                                 const timeUnblock = this.getTimeUnblock(nextLesson.duration);
                                 await this.courseService.updateUnblockLesson(nextLessonProgress.progressId, timeUnblock);
-                                nextLessonProgress.nextViewAt = timeUnblock;
+                                continue accountsLoop;
                             }
                         } else {
                             continue accountsLoop;
@@ -142,7 +120,7 @@ export class CronService {
         if (isWatching) {
             await this.courseService.updateViewedLesson(progressId);
         } else {
-            console.error('ОШИБКА В ПРОСМОТРЕ, ТАЙМЕР НЕ ПОДОШЕЛ');
+            console.error('ОШИБКА В ПРОСМОТРЕ', accountId);
             const plusTimeUnblock = this.getTimeUnblock(400);
             await this.courseService.updateUnblockLesson(progressId, plusTimeUnblock);
         }

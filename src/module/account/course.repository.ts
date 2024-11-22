@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@common/database/prisma.service';
 import { CourseWithLessons } from './interfaces/course.interface';
-import { CourseStatus, LessonStatus } from '@prisma/client';
+import { CourseStatus, Lesson, LessonStatus } from '@prisma/client';
 
 @Injectable()
 export class CourseRepository {
@@ -16,12 +16,21 @@ export class CourseRepository {
         });
     }
 
-    async createAccountLessonProgress(accountId: string, course: CourseWithLessons): Promise<void> {
-        const lessonProgressData = course.lessons.map(lesson => ({
-            accountId,
-            lessonId: lesson.lessonId,
-            nextViewAt: null,
-        }));
+    async getAllLesson(): Promise<Lesson[]> {
+        return this.prisma.lesson.findMany();
+    }
+
+    async createAccountLessonProgress(accountId: string, lessons: Lesson[]): Promise<void> {
+        const lessonProgressData = lessons.map(lesson => {
+            const isFirstLesson = ['1321', '621', '662', '681', '821', '842', '861', '961', '981'].includes(lesson.lessonId);
+            const courseStatus = isFirstLesson ? LessonStatus.NONE : LessonStatus.BLOCKED;
+            return {
+                status: courseStatus,
+                accountId,
+                lessonId: lesson.lessonId,
+                nextViewAt: null,
+            };
+        });
 
         await this.prisma.accountLessonProgress.createMany({
             data: lessonProgressData,
@@ -63,24 +72,30 @@ export class CourseRepository {
         });
     }
 
-    async unBlockCourse(accountCourseId: number) {
+    async changeStatusCourse(accountId: string, courseId: string, status: CourseStatus) {
         await this.prisma.accountCourse.update({
             where: {
-                accountCourseId,
+                accountId_courseId: {
+                    accountId,
+                    courseId,
+                },
             },
             data: {
-                status: CourseStatus.ACTIVE,
+                status,
             },
         });
     }
 
-    async finishCourse(accountCourseId: number) {
-        await this.prisma.accountCourse.update({
+    async changeStatusLesson(accountId: string, lessonId: string, status: LessonStatus) {
+        await this.prisma.accountLessonProgress.update({
             where: {
-                accountCourseId,
+                accountId_lessonId: {
+                    accountId,
+                    lessonId,
+                },
             },
             data: {
-                status: CourseStatus.FINISHED,
+                status,
             },
         });
     }

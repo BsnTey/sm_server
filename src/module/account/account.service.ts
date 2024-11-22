@@ -3,7 +3,7 @@ import { AccountRepository } from './account.repository';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
 import { AccountEntity } from './entities/account.entity';
 import { IAccountWithProxy, IFindCitiesAccount, IRecipientOrder, IRefreshAccount } from './interfaces/account.interface';
-import { Order } from '@prisma/client';
+import { CourseStatus, Order } from '@prisma/client';
 import { ProxyService } from '../proxy/proxy.service';
 import {
     ERROR_ACCESS_TOKEN_COURSE,
@@ -35,7 +35,7 @@ import { SportmasterHeadersService } from './entities/headers.entity';
 import { UserGateTokenInterface } from './interfaces/userGateToken.interface';
 import { CourseList } from './interfaces/course-list.interface';
 import { CourseService } from './course.service';
-import { IAccountCourse, IWatchLesson } from './interfaces/course.interface';
+import { IAccountCourseWLesson, IWatchLesson } from './interfaces/course.interface';
 import { CourseTokensEntity } from './entities/courseTokens.entity';
 import { UpdatingCourseTokensAccountRequestDto } from './dto/update-course-tokens-account.dto';
 import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
@@ -111,7 +111,7 @@ export class AccountService {
 
         for (const course of courses) {
             await this.courseService.createAccountCourse(accountId, course);
-            await this.courseService.createAccountLessonProgress(accountId, course);
+            await this.courseService.createAccountLessonProgress(accountId, course.lessons);
         }
     }
 
@@ -180,11 +180,15 @@ export class AccountService {
     async updateCourseStatusAccount(accountId: string, data: UpdatingCourseStatusAccountRequestDto) {
         const account = await this.getAccountFromDb(accountId);
         if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
-        return await this.accountRep.updateCourseStatusAccount(accountId, data);
+        return await this.accountRep.updateCourseStatusAccount(accountId, data.statusCourse);
     }
 
-    async getAccountCoursesWithLessons(accountId: string) {
-        const account = await this.accountRep.getAccountCoursesWithLessons(accountId);
+    async updateCourseStatus(accountId: string, status: CourseStatus) {
+        return await this.accountRep.updateCourseStatusAccount(accountId, status);
+    }
+
+    async getAccountCoursesWithLessons(accountId: string): Promise<IAccountCourseWLesson[]> {
+        const account = await this.accountRep.getAccountCoursesWithProgress(accountId);
         if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
         return account;
     }
@@ -194,7 +198,8 @@ export class AccountService {
         if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
 
         await this.accountRep.addAccountCourses(accountId);
-        await this.accountRep.addAccountLessonProgress(accountId);
+        const lessons = await this.courseService.getAllLesson();
+        await this.courseService.createAccountLessonProgress(account.accountId, lessons);
     }
 
     private async updateCourseTokensAccountPrivate(
@@ -777,15 +782,15 @@ export class AccountService {
         return response.data;
     }
 
-    async finishedCourses(accountId: string): Promise<void> {
-        await this.accountRep.finishedCourses(accountId);
-    }
+    // async finishedCourses(accountId: string): Promise<void> {
+    //     await this.accountRep.finishedCourses(accountId);
+    // }
 
     async promblemCourses(accountId: string): Promise<void> {
         await this.accountRep.promblemCourses(accountId);
     }
 
-    async getActiveCourseAccount(): Promise<IAccountCourse[]> {
+    async getActiveCourseAccount(): Promise<string[]> {
         return await this.accountRep.getActiveCourseAccount();
     }
 

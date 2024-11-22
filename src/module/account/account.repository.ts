@@ -2,16 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { Account, CourseStatus, Order, Prisma } from '@prisma/client';
 import { PrismaService } from '@common/database/prisma.service';
 import { AccountEntity } from './entities/account.entity';
-import {
-    IAccountWithProxy,
-    ICourseStatus,
-    ICourseTokens,
-    IEmailFromDb,
-    IRefreshDataAccount,
-    IUpdateAccount,
-} from './interfaces/account.interface';
+import { IAccountWithProxy, ICourseTokens, IEmailFromDb, IRefreshDataAccount, IUpdateAccount } from './interfaces/account.interface';
 import { CitySMEntity } from './entities/citySM.entity';
-import { IAccountCourse } from './interfaces/course.interface';
+import { IAccountCourseWLesson } from './interfaces/course.interface';
 
 @Injectable()
 export class AccountRepository {
@@ -209,7 +202,7 @@ export class AccountRepository {
         });
     }
 
-    async updateCourseStatusAccount(accountId: string, { statusCourse }: ICourseStatus): Promise<Account> {
+    async updateCourseStatusAccount(accountId: string, statusCourse: CourseStatus): Promise<Account> {
         return this.prisma.account.update({
             where: {
                 accountId,
@@ -286,16 +279,16 @@ export class AccountRepository {
         });
     }
 
-    async finishedCourses(accountId: string): Promise<Account> {
-        return this.prisma.account.update({
-            where: {
-                accountId,
-            },
-            data: {
-                statusCourse: 'FINISHED',
-            },
-        });
-    }
+    // async finishedCourses(accountId: string): Promise<Account> {
+    //     return this.prisma.account.update({
+    //         where: {
+    //             accountId,
+    //         },
+    //         data: {
+    //             statusCourse: 'FINISHED',
+    //         },
+    //     });
+    // }
 
     async setCityToAccount(accountId: string, cityId: string): Promise<Account> {
         return this.prisma.account.update({
@@ -323,50 +316,59 @@ export class AccountRepository {
         });
     }
 
-    async getActiveCourseAccount(): Promise<IAccountCourse[]> {
-        const foundAccounts = await this.prisma.account.findMany({
+    async getActiveCourseAccount() {
+        const accounts = await this.prisma.account.findMany({
             where: {
                 statusCourse: 'ACTIVE',
             },
-            // take: 50,
-            include: {
-                AccountCourse: {
-                    include: {
-                        course: {
-                            include: {
-                                lessons: {
-                                    include: {
-                                        AccountLessonProgress: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
+            select: {
+                accountId: true,
             },
         });
 
-        return foundAccounts.map(acc => {
-            return {
-                ...acc,
-                AccountCourse: acc.AccountCourse.map(accountCourse => {
-                    return {
-                        ...accountCourse,
-                        course: {
-                            ...accountCourse.course,
-                            lessons: accountCourse.course.lessons
-                                .map(lesson => ({
-                                    ...lesson,
-                                    AccountLessonProgress: lesson.AccountLessonProgress.filter(
-                                        progress => progress.accountId === acc.accountId,
-                                    ),
-                                }))
-                                .sort((a, b) => a.position - b.position),
-                        },
-                    };
-                }).sort((a, b) => a.course.courseId.localeCompare(b.course.courseId)),
-            };
-        });
+        return accounts.map(account => account.accountId);
+        // return this.prisma.account.findMany({
+        //     where: {
+        //         statusCourse: 'ACTIVE',
+        //     },
+        // take: 50,
+        //     include: {
+        //         AccountCourse: {
+        //             include: {
+        //                 course: {
+        //                     include: {
+        //                         lessons: {
+        //                             include: {
+        //                                 AccountLessonProgress: true,
+        //                             },
+        //                         },
+        //                     },
+        //                 },
+        //             },
+        //         },
+        //     },
+        // });
+        // return foundAccounts.map(acc => {
+        //     return {
+        //         ...acc,
+        //         AccountCourse: acc.AccountCourse.map(accountCourse => {
+        //             return {
+        //                 ...accountCourse,
+        //                 course: {
+        //                     ...accountCourse.course,
+        //                     lessons: accountCourse.course.lessons
+        //                         .map(lesson => ({
+        //                             ...lesson,
+        //                             AccountLessonProgress: lesson.AccountLessonProgress.filter(
+        //                                 progress => progress.accountId === acc.accountId,
+        //                             ),
+        //                         }))
+        //                         .sort((a, b) => a.position - b.position),
+        //                 },
+        //             };
+        //         }).sort((a, b) => a.course.courseId.localeCompare(b.course.courseId)),
+        //     };
+        // });
     }
 
     async addAccountCourses(accountId: string): Promise<void> {
@@ -381,34 +383,31 @@ export class AccountRepository {
         });
     }
 
-    async addAccountLessonProgress(accountId: string): Promise<void> {
-        const lessons = await this.prisma.lesson.findMany();
-        const data = lessons.map(lesson => ({
-            accountId,
-            lessonId: lesson.lessonId,
-            status: CourseStatus.BLOCKED,
-            nextViewAt: null,
-        }));
-        await this.prisma.accountLessonProgress.createMany({
-            data,
-        });
-    }
+    // async addAccountLessonProgress(accountId: string): Promise<void> {
+    //     const data = lessons.map(lesson => ({
+    //         accountId,
+    //         lessonId: lesson.lessonId,
+    //         status: CourseStatus.BLOCKED,
+    //         nextViewAt: null,
+    //     }));
+    //     await this.prisma.accountLessonProgress.createMany({
+    //         data,
+    //     });
+    // }
 
-    async getAccountCoursesWithLessons(accountId: string) {
-        return this.prisma.account.findUnique({
-            where: { accountId },
+    async getAccountCoursesWithProgress(accountId: string): Promise<IAccountCourseWLesson[]> {
+        return this.prisma.accountCourse.findMany({
+            where: {
+                accountId: accountId,
+            },
             include: {
-                AccountCourse: {
+                course: {
                     include: {
-                        course: {
+                        lessons: {
                             include: {
-                                lessons: {
-                                    include: {
-                                        AccountLessonProgress: {
-                                            where: {
-                                                accountId,
-                                            },
-                                        },
+                                AccountLessonProgress: {
+                                    where: {
+                                        accountId: accountId,
                                     },
                                 },
                             },
