@@ -328,7 +328,7 @@ export class AccountRepository {
             where: {
                 statusCourse: 'ACTIVE',
             },
-            take: 50,
+            // take: 50,
             include: {
                 AccountCourse: {
                     include: {
