@@ -40,7 +40,14 @@ export class CronService {
                         );
 
                         if (!accountLessonProgress) throw Error('Не нашел курс');
-                        if (accountLessonProgress.status == LessonStatus.VIEWED) continue;
+                        if (accountLessonProgress.status == LessonStatus.VIEWED) {
+                            //здесь проверяем, последний ли урок и курс. нужно на проверку после синхронизации
+                            if (i < accountWithCourses.length - 1 && j === lessons.length - 1) {
+                                await this.accountService.updateCourseStatus(accountLessonProgress.accountId, CourseStatus.FINISHED);
+                                continue accountsLoop;
+                            }
+                            continue;
+                        }
 
                         // Проверяем, наступило ли время для просмотра лекции
                         if (

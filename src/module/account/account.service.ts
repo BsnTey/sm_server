@@ -782,10 +782,6 @@ export class AccountService {
         return response.data;
     }
 
-    // async finishedCourses(accountId: string): Promise<void> {
-    //     await this.accountRep.finishedCourses(accountId);
-    // }
-
     async promblemCourses(accountId: string): Promise<void> {
         await this.accountRep.promblemCourses(accountId);
     }

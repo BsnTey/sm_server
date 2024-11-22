@@ -67,7 +67,7 @@ export class CourseService {
 
     private mapLessonStatus(status: string): LessonStatus {
         const statusMap: Record<string, LessonStatus> = {
-            finished: LessonStatus.VIEWED,
+            viewed: LessonStatus.VIEWED,
             blocked: LessonStatus.BLOCKED,
             none: LessonStatus.NONE,
         };

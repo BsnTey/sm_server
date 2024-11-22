@@ -327,48 +327,6 @@ export class AccountRepository {
         });
 
         return accounts.map(account => account.accountId);
-        // return this.prisma.account.findMany({
-        //     where: {
-        //         statusCourse: 'ACTIVE',
-        //     },
-        // take: 50,
-        //     include: {
-        //         AccountCourse: {
-        //             include: {
-        //                 course: {
-        //                     include: {
-        //                         lessons: {
-        //                             include: {
-        //                                 AccountLessonProgress: true,
-        //                             },
-        //                         },
-        //                     },
-        //                 },
-        //             },
-        //         },
-        //     },
-        // });
-        // return foundAccounts.map(acc => {
-        //     return {
-        //         ...acc,
-        //         AccountCourse: acc.AccountCourse.map(accountCourse => {
-        //             return {
-        //                 ...accountCourse,
-        //                 course: {
-        //                     ...accountCourse.course,
-        //                     lessons: accountCourse.course.lessons
-        //                         .map(lesson => ({
-        //                             ...lesson,
-        //                             AccountLessonProgress: lesson.AccountLessonProgress.filter(
-        //                                 progress => progress.accountId === acc.accountId,
-        //                             ),
-        //                         }))
-        //                         .sort((a, b) => a.position - b.position),
-        //                 },
-        //             };
-        //         }).sort((a, b) => a.course.courseId.localeCompare(b.course.courseId)),
-        //     };
-        // });
     }
 
     async addAccountCourses(accountId: string): Promise<void> {
@@ -383,20 +341,8 @@ export class AccountRepository {
         });
     }
 
-    // async addAccountLessonProgress(accountId: string): Promise<void> {
-    //     const data = lessons.map(lesson => ({
-    //         accountId,
-    //         lessonId: lesson.lessonId,
-    //         status: CourseStatus.BLOCKED,
-    //         nextViewAt: null,
-    //     }));
-    //     await this.prisma.accountLessonProgress.createMany({
-    //         data,
-    //     });
-    // }
-
     async getAccountCoursesWithProgress(accountId: string): Promise<IAccountCourseWLesson[]> {
-        return this.prisma.accountCourse.findMany({
+        const accountCourses = await this.prisma.accountCourse.findMany({
             where: {
                 accountId: accountId,
             },
@@ -416,5 +362,22 @@ export class AccountRepository {
                 },
             },
         });
+
+        return accountCourses
+            .map(accountCourse => {
+                return {
+                    ...accountCourse,
+                    course: {
+                        ...accountCourse.course,
+                        lessons: accountCourse.course.lessons
+                            .map(lesson => ({
+                                ...lesson,
+                                AccountLessonProgress: lesson.AccountLessonProgress.filter(progress => progress.accountId === accountId),
+                            }))
+                            .sort((a, b) => a.position - b.position),
+                    },
+                };
+            })
+            .sort((a, b) => a.course.courseId.localeCompare(b.course.courseId));
     }
 }
