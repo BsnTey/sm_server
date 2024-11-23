@@ -50,8 +50,18 @@ export class CronService {
                         if (accountLessonProgress.status == LessonStatus.VIEWED) {
                             //здесь проверяем, последний ли урок и курс. нужно на проверку после синхронизации
                             if (i < accountWithCourses.length - 1 && j === lessons.length - 1) {
-                                await this.accountService.updateCourseStatus(accountLessonProgress.accountId, CourseStatus.FINISHED);
-                                continue accountsLoop;
+                                const allCoursesFinished = accountWithCourses.every(
+                                    course =>
+                                        course.status === CourseStatus.FINISHED &&
+                                        course.course.lessons.every(lesson =>
+                                            lesson.AccountLessonProgress.some(progress => progress.status === LessonStatus.VIEWED),
+                                        ),
+                                );
+
+                                if (allCoursesFinished) {
+                                    await this.accountService.updateCourseStatus(accountLessonProgress.accountId, CourseStatus.FINISHED);
+                                    continue accountsLoop;
+                                }
                             }
                             continue;
                         }
@@ -79,11 +89,19 @@ export class CronService {
                             // Если это последняя лекция в курсе
                             if (j === lessons.length - 1) {
                                 // Помечаем курс как завершённый
-                                await this.courseService.changeStatusCourse(
-                                    accountCourse.accountId,
-                                    accountCourse.courseId,
-                                    CourseStatus.FINISHED,
+                                const allCoursesFinished = accountWithCourses.every(
+                                    course =>
+                                        course.status === CourseStatus.FINISHED &&
+                                        course.course.lessons.every(lesson =>
+                                            lesson.AccountLessonProgress.some(progress => progress.status === LessonStatus.VIEWED),
+                                        ),
                                 );
+                                if (i === accountWithCourses.length - 1 && allCoursesFinished) {
+                                    await this.accountService.updateCourseStatus(accountLessonProgress.accountId, CourseStatus.FINISHED);
+                                } else {
+                                    // Пропустите к следующему аккаунту
+                                    continue accountsLoop;
+                                }
 
                                 // Если есть следующий курс, разблокируем первую лекцию
                                 if (i < accountWithCourses.length - 1) {
@@ -110,7 +128,10 @@ export class CronService {
                                 const nextLessonProgress = nextLesson.AccountLessonProgress.find(
                                     progress => progress.accountId === accountCourse.accountId,
                                 );
-                                if (!nextLessonProgress) continue;
+                                if (!nextLessonProgress) {
+                                    console.warn(`Не удалось найти прогресс для следующего урока ${nextLesson.lessonId}`);
+                                    continue accountsLoop;
+                                }
 
                                 const timeUnblock = this.getTimeUnblock(nextLesson.duration);
                                 await this.courseService.updateUnblockLesson(nextLessonProgress.progressId, timeUnblock);
