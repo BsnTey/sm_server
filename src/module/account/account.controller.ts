@@ -74,10 +74,10 @@ export class AccountController {
     }
 
     @HasZenno()
-    @Get('courses/progress/:accountId')
+    @Get('courses/isconnection/:accountId')
     @HttpCode(200)
     async isCourseAddingAccount(@Param() params: AccountIdParamsDto): Promise<any> {
-        return await this.accountService.getAccountCoursesWithLessons(params.accountId);
+        return this.courseService.getIsAccountCourses(params.accountId);
     }
 
     @HasZenno()

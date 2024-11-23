@@ -99,4 +99,15 @@ export class CourseRepository {
             },
         });
     }
+
+    async getIsAccountCourses(accountId: string) {
+        return this.prisma.accountCourse.findMany({
+            where: {
+                accountId: accountId,
+            },
+            select: {
+                courseId: true,
+            },
+        });
+    }
 }
