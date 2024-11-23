@@ -38,6 +38,23 @@ export class CronService {
                         continue;
                     }
 
+                    //здесь проверка, когда курс Активен, все просмотрено, но нет статуса финиш курса
+                    if (accountCourse.status == CourseStatus.ACTIVE) {
+                        const allLessonsFinished = accountCourse.course.lessons.every(lesson =>
+                            lesson.AccountLessonProgress.some(progress => progress.status === LessonStatus.VIEWED),
+                        );
+
+                        if (allLessonsFinished) {
+                            // Помечаем курс как завершённый
+                            await this.courseService.changeStatusCourse(
+                                accountCourse.accountId,
+                                accountCourse.courseId,
+                                CourseStatus.FINISHED,
+                            );
+                        }
+                        continue;
+                    }
+
                     const lessons = accountCourse.course.lessons;
 
                     for (let j = 0; j < lessons.length; j++) {

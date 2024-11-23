@@ -60,6 +60,7 @@ export class CourseService {
             finished: CourseStatus.FINISHED,
             blocked: CourseStatus.BLOCKED,
             none: CourseStatus.ACTIVE,
+            active: CourseStatus.ACTIVE,
         };
 
         return statusMap[status.toLowerCase()] || CourseStatus.NONE;
