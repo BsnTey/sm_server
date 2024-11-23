@@ -89,18 +89,17 @@ export class CronService {
                             // Если это последняя лекция в курсе
                             if (j === lessons.length - 1) {
                                 // Помечаем курс как завершённый
-                                const allCoursesFinished = accountWithCourses.every(
-                                    course =>
-                                        course.status === CourseStatus.FINISHED &&
-                                        course.course.lessons.every(lesson =>
-                                            lesson.AccountLessonProgress.some(progress => progress.status === LessonStatus.VIEWED),
-                                        ),
+                                const allLessonsFinished = lessons.every(lesson =>
+                                    lesson.AccountLessonProgress.some(progress => progress.status === LessonStatus.VIEWED),
                                 );
-                                if (i === accountWithCourses.length - 1 && allCoursesFinished) {
-                                    await this.accountService.updateCourseStatus(accountLessonProgress.accountId, CourseStatus.FINISHED);
-                                } else {
-                                    // Пропустите к следующему аккаунту
-                                    continue accountsLoop;
+
+                                if (allLessonsFinished) {
+                                    // Помечаем курс как завершённый
+                                    await this.courseService.changeStatusCourse(
+                                        accountCourse.accountId,
+                                        accountCourse.courseId,
+                                        CourseStatus.FINISHED,
+                                    );
                                 }
 
                                 // Если есть следующий курс, разблокируем первую лекцию
