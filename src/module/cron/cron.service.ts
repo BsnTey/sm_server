@@ -51,8 +51,8 @@ export class CronService {
                                 accountCourse.courseId,
                                 CourseStatus.FINISHED,
                             );
+                            continue;
                         }
-                        continue;
                     }
 
                     const lessons = accountCourse.course.lessons;
