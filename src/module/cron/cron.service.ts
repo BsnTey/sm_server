@@ -30,7 +30,13 @@ export class CronService {
                 for (let i = 0; i < accountWithCourses.length; i++) {
                     const accountCourse = accountWithCourses[i];
 
-                    if (accountCourse.status == CourseStatus.FINISHED) continue;
+                    if (accountCourse.status == CourseStatus.FINISHED) {
+                        if (i < accountWithCourses.length - 1) {
+                            await this.accountService.updateCourseStatus(accountCourse.accountId, CourseStatus.FINISHED);
+                            continue accountsLoop;
+                        }
+                        continue;
+                    }
 
                     const lessons = accountCourse.course.lessons;
 
