@@ -16,6 +16,7 @@ import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-statu
 import { CourseService } from './course.service';
 import { UpdateCourseStatusRequestDto } from './dto/updateCourseStatus-course';
 import { CourseData } from './interfaces/course-data.interface';
+import { ERROR_ACCOUNT_NOT_FOUND } from './constants/error.constant';
 
 @Controller('account')
 export class AccountController {
@@ -77,7 +78,9 @@ export class AccountController {
     @Get('courses/isconnection/:accountId')
     @HttpCode(200)
     async isCourseAddingAccount(@Param() params: AccountIdParamsDto): Promise<any> {
-        return this.courseService.getIsAccountCourses(params.accountId);
+        const courses = await this.courseService.getIsAccountCourses(params.accountId);
+        if (courses.length != 0) return;
+        throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
     }
 
     @HasZenno()
