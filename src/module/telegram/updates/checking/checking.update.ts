@@ -28,7 +28,7 @@ export class CheckingUpdate {
             telegramId: String(telegramId),
         });
 
-        await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки', mainMenuKeyboard);
+        await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки. За раз не больше 20', mainMenuKeyboard);
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
