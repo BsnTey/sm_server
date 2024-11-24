@@ -17,9 +17,7 @@ export class CourseService {
     }
 
     async getIsAccountCourses(accountId: string) {
-        const accounts = await this.courseRepository.getIsAccountCourses(accountId);
-        console.log(accounts);
-        return accounts;
+        return this.courseRepository.getIsAccountCourses(accountId);
     }
 
     async createAccountCourse(accountId: string, course: CourseWithLessons): Promise<void> {
