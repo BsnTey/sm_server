@@ -84,11 +84,10 @@ export class PaymentService {
     }
 
     private calculateAmountWithBonus(amount: number, userTelegramId: string): number {
-        return Math.floor(amount * 1.2);
-        // if (this.tgIdVipCoef.includes(userTelegramId)) {
-        //     return Math.floor(amount * 1.25);
-        // }
-        // return amount < 2000 ? amount : Math.floor(amount * 1.1);
+        if (this.tgIdVipCoef.includes(userTelegramId)) {
+            return Math.floor(amount * 1.25);
+        }
+        return amount < 2000 ? amount : Math.floor(amount * 1.1);
     }
 
     async getPaymentOrder(id: string): Promise<PaymentOrderEntity | null> {
