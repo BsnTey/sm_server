@@ -116,15 +116,15 @@ export class AccountService {
     }
 
     async getAccountCoursesOrSynchronized(accountId: string): Promise<string[]> {
-        const courses = await this.courseService.getIsAccountCourses(accountId);
-        console.log('courses', courses);
-        if (courses.length == 0) return [];
-        const coursesId = this.courseService.coursesId;
-        console.log('coursesId', coursesId);
+        const coursesInAccount = await this.courseService.getIsAccountCourses(accountId);
+        console.log('courses', coursesInAccount);
+        if (coursesInAccount.length == 0) return [];
+        const allCoursesId = this.courseService.coursesId;
+        console.log('coursesId', allCoursesId);
         const notAvalibleCourses: string[] = [];
 
-        for (const courseId of courses) {
-            if (coursesId.includes(courseId)) continue;
+        for (const courseId of allCoursesId) {
+            if (coursesInAccount.includes(courseId)) continue;
             notAvalibleCourses.push(courseId);
         }
 
