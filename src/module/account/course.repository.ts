@@ -5,7 +5,20 @@ import { CourseStatus, Lesson, LessonStatus } from '@prisma/client';
 
 @Injectable()
 export class CourseRepository {
-    constructor(private prisma: PrismaService) {}
+    firstLessons: string[] = [];
+
+    constructor(private prisma: PrismaService) {
+        this.loadFirstLessons();
+    }
+
+    async loadFirstLessons() {
+        const firstLessons = await this.prisma.lesson.findMany({
+            where: {
+                position: 1,
+            },
+        });
+        this.firstLessons = firstLessons.map(lesson => lesson.lessonId);
+    }
 
     async createAccountCourse(accountId: string, course: CourseWithLessons): Promise<void> {
         await this.prisma.accountCourse.create({
@@ -22,7 +35,7 @@ export class CourseRepository {
 
     async createAccountLessonProgress(accountId: string, lessons: Lesson[]): Promise<void> {
         const lessonProgressData = lessons.map(lesson => {
-            const isFirstLesson = ['1321', '621', '662', '681', '821', '842', '861', '961', '981'].includes(lesson.lessonId);
+            const isFirstLesson = this.firstLessons.includes(lesson.lessonId);
             const courseStatus = isFirstLesson ? LessonStatus.NONE : LessonStatus.BLOCKED;
             return {
                 status: courseStatus,
@@ -96,6 +109,14 @@ export class CourseRepository {
             },
             data: {
                 status,
+            },
+        });
+    }
+
+    async getAllAvailableCoursesId() {
+        return this.prisma.originalCourse.findMany({
+            select: {
+                courseId: true,
             },
         });
     }

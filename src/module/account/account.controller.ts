@@ -78,7 +78,7 @@ export class AccountController {
     @Get('courses/isconnection/:accountId')
     @HttpCode(200)
     async isCourseAddingAccount(@Param() params: AccountIdParamsDto): Promise<any> {
-        const courses = await this.courseService.getIsAccountCourses(params.accountId);
+        const courses = await this.accountService.getAccountCoursesOrSynchronized(params.accountId);
         if (courses.length != 0) return;
         throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
     }

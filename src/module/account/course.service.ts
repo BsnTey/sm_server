@@ -6,7 +6,11 @@ import { CourseData } from './interfaces/course-data.interface';
 
 @Injectable()
 export class CourseService {
-    constructor(private courseRepository: CourseRepository) {}
+    coursesId: string[] = [];
+
+    constructor(private courseRepository: CourseRepository) {
+        this.loadAvailableCoursesId();
+    }
 
     async getCoursesWithLessons(): Promise<CourseWithLessons[]> {
         return this.courseRepository.getCoursesWithLessons();
@@ -16,8 +20,18 @@ export class CourseService {
         return this.courseRepository.getAllLesson();
     }
 
+    private async getAvailableCoursesIdFromDB() {
+        return this.courseRepository.getAllAvailableCoursesId();
+    }
+
+    private async loadAvailableCoursesId(): Promise<void> {
+        const coursesIdObj = await this.getAvailableCoursesIdFromDB();
+        this.coursesId = coursesIdObj.map(course => course.courseId);
+    }
+
     async getIsAccountCourses(accountId: string) {
-        return this.courseRepository.getIsAccountCourses(accountId);
+        const coursesObj = await this.courseRepository.getIsAccountCourses(accountId);
+        return coursesObj.map(course => course.courseId);
     }
 
     async createAccountCourse(accountId: string, course: CourseWithLessons): Promise<void> {

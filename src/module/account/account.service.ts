@@ -8,6 +8,7 @@ import { ProxyService } from '../proxy/proxy.service';
 import {
     ERROR_ACCESS_TOKEN_COURSE,
     ERROR_ACCOUNT_NOT_FOUND,
+    ERROR_COURSE_NOT_FOUND,
     ERROR_GET_ACCESS_TOKEN_COURSE,
     ERROR_LOGOUT_MP,
 } from './constants/error.constant';
@@ -35,7 +36,7 @@ import { SportmasterHeadersService } from './entities/headers.entity';
 import { UserGateTokenInterface } from './interfaces/userGateToken.interface';
 import { CourseList } from './interfaces/course-list.interface';
 import { CourseService } from './course.service';
-import { IAccountCourseWLesson, IWatchLesson } from './interfaces/course.interface';
+import { CourseWithLessons, IAccountCourseWLesson, IWatchLesson } from './interfaces/course.interface';
 import { CourseTokensEntity } from './entities/courseTokens.entity';
 import { UpdatingCourseTokensAccountRequestDto } from './dto/update-course-tokens-account.dto';
 import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
@@ -110,9 +111,35 @@ export class AccountService {
         const courses = await this.courseService.getCoursesWithLessons();
 
         for (const course of courses) {
-            await this.courseService.createAccountCourse(accountId, course);
-            await this.courseService.createAccountLessonProgress(accountId, course.lessons);
+            await this.createAccountCourseAndLessons(accountId, course);
         }
+    }
+
+    async getAccountCoursesOrSynchronized(accountId: string): Promise<string[]> {
+        const courses = await this.courseService.getIsAccountCourses(accountId);
+        if (courses.length == 0) return [];
+        const coursesId = this.courseService.coursesId;
+        const notAvalibleCourses: string[] = [];
+
+        for (const courseId of courses) {
+            if (coursesId.includes(courseId)) continue;
+            notAvalibleCourses.push(courseId);
+        }
+
+        if (notAvalibleCourses.length != 0) {
+            const courses = await this.courseService.getCoursesWithLessons();
+            for (const courseId of notAvalibleCourses) {
+                const course = courses.find(course => course.courseId == courseId);
+                if (!course) throw new NotFoundException(ERROR_COURSE_NOT_FOUND);
+                await this.createAccountCourseAndLessons(accountId, course);
+            }
+        }
+        return notAvalibleCourses;
+    }
+
+    async createAccountCourseAndLessons(accountId: string, course: CourseWithLessons) {
+        await this.courseService.createAccountCourse(accountId, course);
+        await this.courseService.createAccountLessonProgress(accountId, course.lessons);
     }
 
     async getAccount(accountId: string): Promise<AccountEntity> {
