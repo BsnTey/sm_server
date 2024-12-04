@@ -117,8 +117,10 @@ export class AccountService {
 
     async getAccountCoursesOrSynchronized(accountId: string): Promise<string[]> {
         const courses = await this.courseService.getIsAccountCourses(accountId);
+        console.log('courses', courses);
         if (courses.length == 0) return [];
         const coursesId = this.courseService.coursesId;
+        console.log('coursesId', coursesId);
         const notAvalibleCourses: string[] = [];
 
         for (const courseId of courses) {
@@ -127,6 +129,7 @@ export class AccountService {
         }
 
         if (notAvalibleCourses.length != 0) {
+            console.log('notAvalibleCourses', notAvalibleCourses);
             const courses = await this.courseService.getCoursesWithLessons();
             for (const courseId of notAvalibleCourses) {
                 const course = courses.find(course => course.courseId == courseId);
