@@ -167,14 +167,25 @@ export class CronService {
     }
 
     async viewLesson(lesson: IWatchLesson, progressId: number, accountId: string): Promise<boolean> {
-        const isWatching = await this.accountService.watchingLesson(lesson, accountId);
+        const timeout = new Promise<boolean>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000));
+
+        const isWatchingPromise = this.accountService.watchingLesson(lesson, accountId);
+
+        let isWatching: boolean;
+        try {
+            isWatching = await Promise.race([isWatchingPromise, timeout]);
+        } catch (error) {
+            console.error('ОШИБКА В ПРОСМОТРЕ', accountId);
+            isWatching = false;
+        }
+
         if (isWatching) {
             await this.courseService.updateViewedLesson(progressId);
         } else {
-            console.error('ОШИБКА В ПРОСМОТРЕ', accountId);
             const plusTimeUnblock = this.getTimeUnblock(400);
             await this.courseService.updateUnblockLesson(progressId, plusTimeUnblock);
         }
+
         return isWatching;
     }
 
