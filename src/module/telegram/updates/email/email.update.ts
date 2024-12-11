@@ -42,8 +42,10 @@ export class EmailUpdate {
             await ctx.reply('❌ Чеков не найдено');
         }
 
-        for (const receipt of cashReceipt) {
-            await ctx.reply(receipt);
+        for (const subject of cashReceipt) {
+            for (const receipt of subject.links) {
+                await ctx.reply(receipt);
+            }
         }
     }
 }

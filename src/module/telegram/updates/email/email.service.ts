@@ -1,52 +1,47 @@
 import { Injectable } from '@nestjs/common';
 import Imap from 'imap';
-import { ParsedMail, simpleParser } from 'mailparser';
-import { Readable } from 'stream';
+import { simpleParser } from 'mailparser';
 import { mimeWordDecode } from 'emailjs-mime-codec';
 import iconv from 'iconv-lite';
 
 @Injectable()
 export class EmailService {
-    private async searchRegex(bodys: Array<string | undefined>): Promise<Array<string>> {
-        const regex = /https:\/\/consumer\.1-ofd\.ru\/v1\?.*?t=\d+T\d+&s=\d+&fn=\d+&i=\d+&fp=\d+&n=1/g;
-        const cashReceipts: string[] = [];
+    private readonly receiptSubjectPatterns: RegExp[] = [/Электронный чек/, /Кассовый чек/];
 
-        for (const body of bodys) {
-            try {
-                if (body) {
-                    const receipts = body.match(regex);
-                    if (receipts) {
-                        cashReceipts.push(...receipts);
-                    }
-                }
-            } catch (error) {
-                console.error('Error parsing body:', error);
-            }
-        }
-        return cashReceipts;
-    }
+    private readonly receiptLinkPatterns: RegExp[] = [
+        /https:\/\/consumer\.1-ofd\.ru\/v1\?.*?t=\d+T\d+&s=\d+&fn=\d+&i=\d+&fp=\d+&n=1/g,
+        /https:\/\/ofd\.ru\/b\/[a-fA-F0-9]{32}/g,
+    ];
 
-    public async findEmailCashReceipt(email: string, passImap: string): Promise<Array<string>> {
-        const serverImap = email.split('@')[1];
-        const hostServer = 'imap.' + (serverImap == 'rambler.ru' ? 'rambler.ru' : 'mail.ru');
+    public async findEmailCashReceipt(email: string, password: string): Promise<{ subject: string; links: string[] }[]> {
+        const hostServer = email.includes('rambler.ru') ? 'imap.rambler.ru' : 'imap.mail.ru';
+
         return new Promise((resolve, reject) => {
             const imap = new Imap({
                 user: email,
-                password: passImap,
+                password,
                 host: hostServer,
                 port: 993,
                 tls: true,
+                tlsOptions: { rejectUnauthorized: false },
             });
 
-            const bodys: Array<string | undefined> = [];
+            const results: { subject: string; links: string[] }[] = [];
 
             imap.once('ready', async () => {
                 try {
-                    await this.processMail(imap, bodys);
-                    const cashReceipts = await this.searchRegex(bodys);
-                    resolve(cashReceipts);
+                    const mailboxes = await this.listMailboxes(imap);
+                    for (const mailbox of mailboxes) {
+                        await this.openMailbox(imap, mailbox);
+                        const messageIds = await this.searchMessages(imap);
+                        for (const id of messageIds) {
+                            await this.processMessage(imap, id, results);
+                        }
+                    }
+
+                    resolve(results.filter(result => result.links.length > 0));
                 } catch (error) {
-                    console.error('Error processing mail:', error);
+                    console.error('Error during IMAP operations:', error);
                     reject(error);
                 } finally {
                     imap.end();
@@ -54,7 +49,7 @@ export class EmailService {
             });
 
             imap.once('error', (error: any) => {
-                console.error('IMAP error:', error);
+                console.error('IMAP Error:', error);
                 reject(error);
             });
 
@@ -66,115 +61,43 @@ export class EmailService {
         });
     }
 
-    private async processMail(imap: Imap, bodys: Array<string | undefined>): Promise<void> {
-        try {
-            const boxes = await this.getBoxes(imap);
-            for (const box of boxes) {
-                await this.openBox(imap, box);
-                const messageNums = await this.searchMessages(imap);
-                for (const num of messageNums) {
-                    await this.fetchMessage(imap, num, bodys);
-                }
-            }
-        } catch (error) {
-            console.error('Error processing mailboxes:', error);
-            throw error;
-        }
-    }
+    private async processMessage(imap: Imap, messageId: number, results: { subject: string; links: string[] }[]): Promise<void> {
+        const fetch = imap.fetch(messageId, { bodies: '' });
 
-    private getBoxes(imap: Imap): Promise<string[]> {
         return new Promise((resolve, reject) => {
-            imap.getBoxes((err, boxes) => {
-                if (err) {
-                    return reject(err);
-                }
-                resolve(Object.keys(boxes));
-            });
-        });
-    }
-
-    private openBox(imap: Imap, box: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            imap.openBox(box, false, err => {
-                if (err) {
-                    return reject(err);
-                }
-                resolve();
-            });
-        });
-    }
-
-    private searchMessages(imap: Imap): Promise<number[]> {
-        return new Promise((resolve, reject) => {
-            imap.search(['ALL'], (err, results) => {
-                if (err) {
-                    return reject(err);
-                }
-                resolve(results);
-            });
-        });
-    }
-
-    private fetchMessage(imap: Imap, num: number, bodys: Array<string | undefined>): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const fetch = imap.fetch(num, { bodies: 'HEADER.FIELDS (SUBJECT)', struct: true });
-
             fetch.on('message', msg => {
-                msg.on('body', async stream => {
-                    let subject = '';
-                    stream.on('data', chunk => {
-                        subject += chunk.toString('utf8');
-                    });
+                let rawMessage = '';
 
-                    stream.on('end', async () => {
-                        const decodedSubject = this.decodeMimeWords(subject.trim());
-                        const cleanedSubject = decodedSubject.replace(/\s+/g, ' ');
-                        if (this.isTargetSubject(cleanedSubject)) {
-                            await this.fetchFullMessage(imap, num, bodys);
-                        }
-                        resolve();
+                msg.on('body', stream => {
+                    stream.on('data', chunk => {
+                        rawMessage += chunk.toString('utf8');
                     });
                 });
-            });
 
-            fetch.once('error', error => {
-                console.error('Fetch error:', error);
-                reject(error);
-            });
-
-            fetch.once('end', () => {
-                resolve();
-            });
-        });
-    }
-
-    private decodeMimeWords(encodedText: string): string {
-        return encodedText.replace(/=\?([^?]+)\?([BQ])\?([^?]+)\?=/gi, (match, charset, encoding, encodedText) => {
-            if (encoding.toUpperCase() === 'B') {
-                return iconv.decode(Buffer.from(encodedText, 'base64'), charset);
-            } else if (encoding.toUpperCase() === 'Q') {
-                return iconv.decode(Buffer.from(mimeWordDecode(encodedText), 'binary'), charset);
-            }
-            return match;
-        });
-    }
-
-    private isTargetSubject(subject: string): boolean {
-        const targetPattern = /СПОРТМАСТЕР/;
-        return targetPattern.test(subject);
-    }
-
-    private fetchFullMessage(imap: Imap, num: number, bodys: Array<string | undefined>): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const fetch = imap.fetch(num, { bodies: 'TEXT' });
-
-            fetch.on('message', msg => {
-                msg.on('body', async stream => {
+                msg.once('end', async () => {
                     try {
-                        const parsed: ParsedMail = await simpleParser(stream as unknown as Readable);
-                        bodys.push(parsed.text);
+                        const parsed = await simpleParser(rawMessage);
+                        if (parsed.subject && this.isReceiptSubject(parsed.subject)) {
+                            const content = [parsed.subject, parsed.text || '', parsed.html || ''].join('\n');
+                            const links = this.extractLinks(content);
+
+                            if (parsed.html) {
+                                links.push(...this.extractLinksFromHtml(parsed.html));
+                            }
+
+                            const filteredLinks = this.filterValidLinks(links);
+
+                            if (filteredLinks.length > 0) {
+                                results.push({
+                                    subject: parsed.subject,
+                                    links: [...new Set(filteredLinks)], // Remove duplicates
+                                });
+                            }
+                        }
                     } catch (error) {
                         console.error('Error parsing message:', error);
+                    } finally {
+                        resolve();
                     }
                 });
             });
@@ -187,6 +110,73 @@ export class EmailService {
             fetch.once('end', () => {
                 resolve();
             });
+        });
+    }
+
+    private isReceiptSubject(subject: string): boolean {
+        return this.receiptSubjectPatterns.some(pattern => pattern.test(subject));
+    }
+
+    private extractLinks(content: string): string[] {
+        const links: string[] = [];
+        for (const pattern of this.receiptLinkPatterns) {
+            links.push(...(content.match(pattern) || []));
+        }
+        return links;
+    }
+
+    private extractLinksFromHtml(html: string): string[] {
+        const hrefPattern = /href=["'](https?:\/\/[^"'>]+)["']/g;
+        const links: string[] = [];
+        let match;
+        while ((match = hrefPattern.exec(html)) !== null) {
+            links.push(match[1]);
+        }
+        return links;
+    }
+
+    private filterValidLinks(links: string[]): string[] {
+        return links.map(link => this.normalizeLink(link)).filter(link => this.receiptLinkPatterns.some(pattern => pattern.test(link)));
+    }
+
+    private normalizeLink(link: string): string {
+        return link.replace(/&amp;/g, '&');
+    }
+
+    private listMailboxes(imap: Imap): Promise<string[]> {
+        return new Promise((resolve, reject) => {
+            imap.getBoxes((err, boxes) => {
+                if (err) return reject(err);
+                resolve(Object.keys(boxes));
+            });
+        });
+    }
+
+    private openMailbox(imap: Imap, mailbox: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            imap.openBox(mailbox, false, err => {
+                if (err) return reject(err);
+                resolve();
+            });
+        });
+    }
+
+    private searchMessages(imap: Imap): Promise<number[]> {
+        return new Promise((resolve, reject) => {
+            imap.search(['ALL'], (err, results) => {
+                if (err) return reject(err);
+                resolve(results || []);
+            });
+        });
+    }
+
+    private decodeMime(encodedText: string): string {
+        return encodedText.replace(/=\?([^?]+)\?([BQ])\?([^?]+)\?=/gi, (match, charset, encoding, text) => {
+            const buffer = Buffer.from(
+                encoding.toUpperCase() === 'B' ? text : mimeWordDecode(text),
+                encoding.toUpperCase() === 'B' ? 'base64' : 'binary',
+            );
+            return iconv.decode(buffer, charset);
         });
     }
 }

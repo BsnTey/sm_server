@@ -60,26 +60,24 @@ export const extractUsersStatistics = (html: string, usersException: string[]): 
 };
 
 export const getPromoCodeDetailsFromHtml = (html: string, promoCodeName: string): USerPromocodeActivations | null => {
-    const regex = new RegExp(
-        `<tr>\\s*<td>${promoCodeName}<\\/td>\\s*<td>Не активирован<\\/td>\\s*<td>Скидка в процентах<\\/td>\\s*<td>-<\\/td>\\s*<td>(\\d+)<\\/td>\\s*<td>(\\d+\\s?%)<\\/td>\\s*<td>(\\d+|Одноразовый)<\\/td>`,
-        'i',
-    );
-    const regex2 = new RegExp(
-        `<tr[^>]*?>\\s*<td[^>]*?>${promoCodeName}<\\/td>\\s*<td[^>]*?aria-label=\\"Статус\\"[^>]*?>Не активирован<\\/td>\\s*<td[^>]*?aria-label=\\"Тип\\"[^>]*?>Скидка в процентах<\\/td>\\s*<td[^>]*?aria-label=\\"Ник пользователя\\"[^>]*?>-<\\/td>\\s*<td[^>]*?aria-label=\\"Минимальная сумма\\"[^>]*?>(\\d+)<\\/td>\\s*<td[^>]*?aria-label=\\"Размер скидки\\"[^>]*?><span[^>]*?>(\\d+\\s?%)<\\/span><\\/td>\\s*<td[^>]*?aria-label=\\"Кол-во активаций\\"[^>]*?>(\\d+|Одноразовый)<\\/td>`,
+    const unifiedRegex = new RegExp(
+        `<tr[^>]*?>\\s*` +
+            `<td[^>]*?>${promoCodeName}<\\/td>\\s*` +
+            `<td[^>]*?(?:aria-label=\\"?Статус\\"?[^>]*?)?>Не активирован<\\/td>\\s*` +
+            `<td[^>]*?(?:aria-label=\\"?Тип\\"?[^>]*?)?>Скидка в процентах<\\/td>\\s*` +
+            `<td[^>]*?(?:aria-label=\\"?Ник пользователя\\"?[^>]*?)?>-<\\/td>\\s*` +
+            `(?:<td[^>]*?(?:aria-label=\\"?Срок действия\\"?[^>]*?)?>Бессрочно<\\/td>\\s*)?` +
+            `<td[^>]*?(?:aria-label=\\"?Минимальная сумма\\"?[^>]*?)?>(\\d+)<\\/td>\\s*` +
+            `<td[^>]*?(?:aria-label=\\"?Размер скидки(?:\\/начисления)?\\"?[^>]*?)?>` +
+            `<span[^>]*?>(\\d+\\s?%)<\\/span><\\/td>\\s*` +
+            `<td[^>]*?(?:aria-label=\\"?Кол-во активаций\\"?[^>]*?)?>(\\d+|Одноразовый)<\\/td>`,
         'i',
     );
 
-    const regex3 = new RegExp(
-        `<tr[^>]*?>\\s*<td[^>]*?>${promoCodeName}<\\/td>\\s*<td[^>]*?aria-label=\\"Статус\\"[^>]*?>Не активирован<\\/td>\\s*<td[^>]*?aria-label=\\"Тип\\"[^>]*?>Скидка в процентах<\\/td>\\s*<td[^>]*?aria-label=\\"Ник пользователя\\"[^>]*?>-<\\/td>\\s*<td[^>]*?aria-label=\\"Минимальная сумма\\"[^>]*?>(\\d+)<\\/td>\\s*<td[^>]*?aria-label=\\"Размер скидки\\/начисления\\"[^>]*?><span[^>]*?>(\\d+\\s?%)<\\/span><\\/td>\\s*<td[^>]*?aria-label=\\"Кол-во активаций\\"[^>]*?>(\\d+|Одноразовый)<\\/td>`,
-        'i',
-    );
+    const match1 = unifiedRegex.exec(html);
 
-    const match1 = regex.exec(html);
-    const match2 = regex2.exec(html);
-    const match3 = regex3.exec(html);
-
-    if (match1 || match2 || match3) {
-        const match = match1 || match2 || match3;
+    if (match1) {
+        const match = match1;
         const activationsLeft = match![3] === 'Одноразовый' ? 1 : parseInt(match![3], 10);
         return {
             activationsLeft: activationsLeft,
