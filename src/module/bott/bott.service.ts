@@ -5,6 +5,9 @@ import { BotTHeadersService } from './entities/headers-bot-t.entity';
 import { Html, ISearchByTelegramId } from './interfaces/bot-t.interface';
 import { IReplenishmentUsersBotT } from './interfaces/replenishment-bot-t.interface';
 import qs from 'qs';
+import { SocksProxyAgent } from 'socks-proxy-agent';
+import { ProxyService } from '../proxy/proxy.service';
+import { ProxyEntity } from '../proxy/entities/proxy.entity';
 
 @Injectable()
 export class BottService {
@@ -13,12 +16,22 @@ export class BottService {
     private sellerTradeBotId: string = this.configService.getOrThrow('SELLER_TRADE_BOT_ID');
     private sellerTradeBotToken: string = this.configService.getOrThrow('SELLER_TRADE_TOKEN');
     private headers = this.botTHeaders.headers;
+    private httpsAgent: SocksProxyAgent;
 
     constructor(
         private configService: ConfigService,
         private httpService: HttpService,
+        private proxyService: ProxyService,
         private botTHeaders: BotTHeadersService,
-    ) {}
+    ) {
+        this.getRandomProxy().then(proxyEntity => {
+            this.httpsAgent = new SocksProxyAgent(proxyEntity.proxy);
+        });
+    }
+
+    private async getRandomProxy(): Promise<ProxyEntity> {
+        return await this.proxyService.getRandomProxy();
+    }
 
     async searchSearchIdByTelegramId(telegramId: string): Promise<ISearchByTelegramId> {
         const params = {
@@ -32,7 +45,7 @@ export class BottService {
 
         const url = `${this.apiUrlBotT}v2/ajax/bot/user/name`;
 
-        const response = await this.httpService.get<ISearchByTelegramId>(url, { params });
+        const response = await this.httpService.get<ISearchByTelegramId>(url, { params, httpsAgent: this.httpsAgent });
         return response.data;
     }
 
@@ -42,7 +55,7 @@ export class BottService {
             'BotUserSearch[user_id]': searchId,
         };
         const url = this.urlBotT + `lk/common/users/users/index`;
-        const response = await this.httpService.get(url, { headers: this.headers, params });
+        const response = await this.httpService.get(url, { headers: this.headers, params, httpsAgent: this.httpsAgent });
         return response.data;
     }
 
@@ -58,7 +71,7 @@ export class BottService {
         });
 
         const url = this.urlBotT + `lk/common/users/user/balance-edit`;
-        const response = await this.httpService.post(url, payload, { headers: this.headers, params });
+        const response = await this.httpService.post(url, payload, { headers: this.headers, params, httpsAgent: this.httpsAgent });
         return response.data;
     }
 
@@ -74,7 +87,7 @@ export class BottService {
         };
 
         const url = this.apiUrlBotT + `v1/bot/replenishment/user/index`;
-        const response = await this.httpService.post(url, payload, { params });
+        const response = await this.httpService.post(url, payload, { params, httpsAgent: this.httpsAgent });
         return response.data;
     }
 
@@ -84,7 +97,7 @@ export class BottService {
         };
 
         const url = this.urlBotT + `lk/common/replenishment/main/statistics`;
-        const response = await this.httpService.get(url, { headers: this.headers, params });
+        const response = await this.httpService.get(url, { headers: this.headers, params, httpsAgent: this.httpsAgent });
         return response.data;
     }
 
@@ -95,7 +108,7 @@ export class BottService {
         };
 
         const url = this.urlBotT + `lk/common/shop/coupon/index`;
-        const response = await this.httpService.get(url, { headers: this.headers, params });
+        const response = await this.httpService.get(url, { headers: this.headers, params, httpsAgent: this.httpsAgent });
         return response.data;
     }
 
@@ -115,7 +128,7 @@ export class BottService {
         });
 
         const url = this.urlBotT + `lk/common/shop/coupon/create`;
-        const response = await this.httpService.post(url, payload, { headers: this.headers, params });
+        const response = await this.httpService.post(url, payload, { headers: this.headers, params, httpsAgent: this.httpsAgent });
         return response.status;
     }
 }

@@ -34,20 +34,15 @@ export class PaymentService {
         let csrfToken;
         try {
             const response = await this.bottService.searchSearchIdByTelegramId(telegramId);
-            console.log('response', response);
             searchId = response.results[0].id;
-            console.log('searchId', searchId);
         } catch (err) {
             throw new NotFoundException(ERROR_GET_SEARCH_ID);
         }
         let userBotId;
         try {
             const response = await this.bottService.getUserBotId(searchId);
-            console.log('response', response);
             userBotId = extractUserBotId(response);
-            console.log('userBotId', userBotId);
             csrfToken = extractCsrf(response);
-            console.log('csrfToken', csrfToken);
         } catch (err) {
             throw new NotFoundException(ERROR_GET_BOT_ID);
         }
