@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import Imap from 'imap';
 import { simpleParser } from 'mailparser';
-import { mimeWordDecode } from 'emailjs-mime-codec';
-import iconv from 'iconv-lite';
 
 @Injectable()
 export class EmailService {
@@ -167,16 +165,6 @@ export class EmailService {
                 if (err) return reject(err);
                 resolve(results || []);
             });
-        });
-    }
-
-    private decodeMime(encodedText: string): string {
-        return encodedText.replace(/=\?([^?]+)\?([BQ])\?([^?]+)\?=/gi, (match, charset, encoding, text) => {
-            const buffer = Buffer.from(
-                encoding.toUpperCase() === 'B' ? text : mimeWordDecode(text),
-                encoding.toUpperCase() === 'B' ? 'base64' : 'binary',
-            );
-            return iconv.decode(buffer, charset);
         });
     }
 }
