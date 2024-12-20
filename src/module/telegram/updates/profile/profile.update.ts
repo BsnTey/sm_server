@@ -4,7 +4,7 @@ import { ALL_KEYS_MENU_BUTTON_NAME, PROFILE } from '../base-command/base-command
 import { TelegramService } from '../../telegram.service';
 import { AccountService } from '../../../account/account.service';
 import { CheckingService } from '../checking/checking.service';
-import { comebackProfile, createPromocodeScene } from '../../keyboards/profile.keyboard';
+import { comebackProfile, createPromocodeScene, profileKeyboard } from '../../keyboards/profile.keyboard';
 import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { MAKE_DEPOSIT_SCENE, PROFILE_GET_INFO_ORDER, PROMOCODE_BOT_SCENE } from '../../scenes/profile.scene-constant';
@@ -26,7 +26,7 @@ export class ProfileUpdate {
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         const user = await this.userService.getUserByTelegramId(String(telegramId));
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
-        await ctx.reply('Выберете действие', getMainMenuKeyboard(user.role));
+        await ctx.reply('Выберете действие', profileKeyboard(user.role));
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)

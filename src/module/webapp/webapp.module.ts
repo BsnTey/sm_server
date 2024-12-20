@@ -5,8 +5,9 @@ import { AccountModule } from '../account/account.module';
 import { TelegramService } from '../telegram/telegram.service';
 
 @Module({
+    controllers: [WebAppController],
     imports: [TelegramModule, AccountModule],
-    providers: [WebAppController, TelegramService],
+    providers: [TelegramService],
     exports: [],
 })
 export class WebappModule {}
