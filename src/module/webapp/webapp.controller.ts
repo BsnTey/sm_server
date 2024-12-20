@@ -1,10 +1,17 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
-import { Request } from 'express';
+import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { TelegramService } from '../telegram/telegram.service';
+import { join } from 'path';
 
 @Controller('webapp')
 export class WebAppController {
     constructor(private telegramService: TelegramService) {}
+
+    @Get('auth')
+    async serveAuthPage(@Res() res: Response) {
+        const filePath = join(process.cwd(), 'views', 'web-app.auth.html');
+        res.sendFile(filePath);
+    }
 
     @Post('auth')
     async handleAuth(@Body() body: any, @Req() request: Request) {
