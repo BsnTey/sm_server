@@ -11,8 +11,7 @@ import { ConfigService } from '@nestjs/config';
 @Scene(AUTH_MIRROR.scene)
 @UseFilters(TelegrafExceptionFilter)
 export class AuthMirrorUpdate {
-    // private DOMAIN = this.configService.getOrThrow('DOMAIN', 'http://localhost:3001');
-    private DOMAIN = 'http://127.0.0.1:3001/webapp/auth';
+    private DOMAIN = this.configService.getOrThrow('DOMAIN', 'http://localhost:3001');
 
     private userIpMap: Record<string, string> = {};
 
