@@ -30,7 +30,7 @@ export class AuthMirrorUpdate {
                         {
                             text: 'Авторизация',
                             web_app: {
-                                url: `${this.DOMAIN}/webapp/auth`,
+                                url: `${this.DOMAIN}/api/webapp/auth`,
                             },
                         },
                     ],
