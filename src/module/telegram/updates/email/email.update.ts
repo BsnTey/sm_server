@@ -1,27 +1,32 @@
-import { Ctx, Hears, Message, On, Scene, SceneEnter } from 'nestjs-telegraf';
+import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { ALL_KEYS_MENU_BUTTON_NAME, CASH_RECEIPT } from '../base-command/base-command.constants';
-import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { EmailService } from './email.service';
 import { AccountService } from '../../../account/account.service';
 import { TelegramService } from '../../telegram.service';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
 import { ERROR_ACCOUNT_NOT_FOUND } from '../../../account/constants/error.constant';
+import { ERROR_FOUND_USER } from '../../constants/error.constant';
+import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
+import { UserService } from '../../../user/user.service';
 
 @Scene(CASH_RECEIPT.scene)
 @UseFilters(TelegrafExceptionFilter)
 export class EmailUpdate {
     constructor(
         private accountService: AccountService,
+        private userService: UserService,
         private emailService: EmailService,
         private telegramService: TelegramService,
     ) {}
 
     @SceneEnter()
-    async onSceneEnter(@Ctx() ctx: WizardContext) {
-        await ctx.reply('🔑 Введите номер вашего аккаунта:', mainMenuKeyboard);
+    async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
+        await ctx.reply('🔑 Введите номер вашего аккаунта:', getMainMenuKeyboard(user.role));
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)

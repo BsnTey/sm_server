@@ -20,7 +20,6 @@ import { Context } from '../../interfaces/telegram.context';
 import { AdminGuard } from '../admin/admin.guard';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { TelegramService } from '../../telegram.service';
-import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { ConfigService } from '@nestjs/config';
 
 @Update()
@@ -100,7 +99,7 @@ export class HelpUpdate {
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
-        await ctx.reply(`Обратиться в поддержку можно по ссылке ${this.tgAdmin}. Бот для покупки ${this.shopTg}`, mainMenuKeyboard);
+        await ctx.reply(`Обратиться в поддержку можно по ссылке ${this.tgAdmin}. Бот для покупки ${this.shopTg}`);
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)

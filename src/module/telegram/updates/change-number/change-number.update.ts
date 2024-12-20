@@ -1,9 +1,8 @@
 import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { ALL_KEYS_MENU_BUTTON_NAME, CHANGE_NUMBER } from '../base-command/base-command.constants';
-import { UseFilters } from '@nestjs/common';
+import { NotFoundException, UseFilters } from '@nestjs/common';
 import { AccountService } from '../../../account/account.service';
-import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
 import { CHANGE_NUMBER_CODE_SCENE, CHANGE_NUMBER_INPUT_NUMBER_SCENE } from '../../scenes/change-number.scene-constants';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
@@ -12,6 +11,8 @@ import { isPhonePipe } from '../../pipes/isPhone.pipe';
 import { isCodePipe } from '../../pipes/isCode.pipe';
 import { Context } from '../../interfaces/telegram.context';
 import { UserService } from '../../../user/user.service';
+import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
+import { ERROR_FOUND_USER } from '../../constants/error.constant';
 
 @Scene(CHANGE_NUMBER.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -25,13 +26,15 @@ export class ChangeNumberUpdate {
     async onSceneEnter(@Ctx() ctx: Context, @Sender() telegramUser: any) {
         // в будующем удалить регу или обновление юзера
         const { first_name: telegramName, id: telegramId } = telegramUser;
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
 
         await this.userService.createOrUpdateUserByTelegram({
             telegramName,
             telegramId: String(telegramId),
         });
 
-        await ctx.reply('🔑 Введите номер вашего аккаунта:', mainMenuKeyboard);
+        await ctx.reply('🔑 Введите номер вашего аккаунта:', getMainMenuKeyboard(user.role));
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
@@ -90,6 +93,7 @@ export class ChangeNumberInputCode {
     constructor(
         private accountService: AccountService,
         private telegramService: TelegramService,
+        private userService: UserService,
     ) {}
 
     @SceneEnter()
@@ -112,7 +116,9 @@ export class ChangeNumberInputCode {
     ) {
         const account = await this.telegramService.getFromCache(String(telegramId));
         await this.accountService.phoneChange(account.accountId, account.requestId, code);
-        await ctx.reply('✅ Номер успешно изменен. Можете авторизоваться в аккаунт', mainMenuKeyboard);
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
+        await ctx.reply('✅ Номер успешно изменен. Можете авторизоваться в аккаунт', getMainMenuKeyboard(user.role));
         await ctx.scene.leave();
     }
 }

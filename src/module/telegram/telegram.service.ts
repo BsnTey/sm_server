@@ -1,11 +1,12 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Ctx } from 'nestjs-telegraf';
+import { Ctx, InjectBot } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { getValueKeysMenu } from './updates/base-command/base-command.constants';
 import { IAccountCashing } from '../account/interfaces/account.interface';
 import { ERROR_TIMEOUT_TTL_CASH } from './constants/error.constant';
 import { ConfigService } from '@nestjs/config';
+import { Telegraf } from 'telegraf';
 
 @Injectable()
 export class TelegramService {
@@ -14,6 +15,7 @@ export class TelegramService {
     constructor(
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
         private configService: ConfigService,
+        @InjectBot() private readonly bot: Telegraf,
     ) {}
 
     async exitScene(menuBtn: string, @Ctx() ctx: WizardContext) {
@@ -51,5 +53,13 @@ export class TelegramService {
         const data = await this.cacheManager.get<T>(String(telegramId));
         if (!data) throw new HttpException(ERROR_TIMEOUT_TTL_CASH, HttpStatus.FORBIDDEN);
         return data;
+    }
+
+    async sendMessage(chatId: number, text: string) {
+        try {
+            await this.bot.telegram.sendMessage(chatId, text);
+        } catch (error) {
+            console.error('Ошибка при отправке сообщения:', error);
+        }
     }
 }

@@ -1,10 +1,9 @@
 import { Action, Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { ALL_KEYS_MENU_BUTTON_NAME, MAKE_ORDER } from '../base-command/base-command.constants';
-import { UseFilters } from '@nestjs/common';
+import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { TelegramService } from '../../telegram.service';
 import { WizardContext } from 'telegraf/typings/scenes';
-import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
 import {
     ORDER_CHANGE_RECIPIENT_SCENE,
@@ -38,7 +37,7 @@ import {
 } from '../../keyboards/make-order.keyboard';
 import { UserService } from '../../../user/user.service';
 import { isCityPipe } from '../../pipes/isCity.pipe';
-import { ERROR_FIND_CITY } from '../../constants/error.constant';
+import { ERROR_FIND_CITY, ERROR_FOUND_USER } from '../../constants/error.constant';
 import { getTextCart } from '../../utils/cart.utils';
 import { isUrlPipe } from '../../pipes/isUrl.pipe';
 import { prepareForInternalPickupAvailability } from '../../utils/order.utils';
@@ -47,6 +46,7 @@ import { isFioPipe } from '../../pipes/isFio.pipe';
 import { IRecipient, IRecipientOrder } from '../../../account/interfaces/account.interface';
 import { ConfigService } from '@nestjs/config';
 import { Context } from '../../interfaces/telegram.context';
+import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 
 @Scene(MAKE_ORDER.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -60,13 +60,15 @@ export class MakeOrderUpdate {
     async onSceneEnter(@Ctx() ctx: Context, @Sender() telegramUser: any) {
         // в будующем удалить регу или обновление юзера
         const { first_name: telegramName, id: telegramId } = telegramUser;
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
 
         await this.userService.createOrUpdateUserByTelegram({
             telegramName,
             telegramId: String(telegramId),
         });
 
-        await ctx.reply('🔑 Введите номер вашего аккаунта:', mainMenuKeyboard);
+        await ctx.reply('🔑 Введите номер вашего аккаунта:', getMainMenuKeyboard(user.role));
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)

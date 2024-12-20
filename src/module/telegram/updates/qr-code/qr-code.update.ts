@@ -1,14 +1,16 @@
 import { Action, Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { ALL_KEYS_MENU_BUTTON_NAME, QR_CODE } from '../base-command/base-command.constants';
-import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { AccountService } from '../../../account/account.service';
-import { UseFilters } from '@nestjs/common';
+import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { QrCodeService } from './qr-code.service';
 import { TelegramService } from '../../telegram.service';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
 import { qrCodeUpdateKeyboard } from '../../keyboards/qr-code.keyboard';
+import { ERROR_FOUND_USER } from '../../constants/error.constant';
+import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
+import { UserService } from '../../../user/user.service';
 
 @Scene(QR_CODE.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -16,12 +18,15 @@ export class QrCodeUpdate {
     constructor(
         private qrCodeService: QrCodeService,
         private accountService: AccountService,
+        private userService: UserService,
         private telegramService: TelegramService,
     ) {}
 
     @SceneEnter()
-    async onSceneEnter(@Ctx() ctx: WizardContext) {
-        await ctx.reply('🔑 Введите номер вашего аккаунта:', mainMenuKeyboard);
+    async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
+        await ctx.reply('🔑 Введите номер вашего аккаунта:', getMainMenuKeyboard(user.role));
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)

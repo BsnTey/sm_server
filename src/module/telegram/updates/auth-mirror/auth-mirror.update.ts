@@ -1,8 +1,7 @@
 import { ALL_KEYS_MENU_BUTTON_NAME, AUTH_MIRROR } from '../base-command/base-command.constants';
-import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
+import { Ctx, Hears, Message, On, Scene, SceneEnter } from 'nestjs-telegraf';
 import { AccountService } from '../../../account/account.service';
 import { WizardContext } from 'telegraf/typings/scenes';
-import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { TelegramService } from '../../telegram.service';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
 import { UseFilters } from '@nestjs/common';
@@ -12,7 +11,10 @@ import { ConfigService } from '@nestjs/config';
 @Scene(AUTH_MIRROR.scene)
 @UseFilters(TelegrafExceptionFilter)
 export class AuthMirrorUpdate {
-    private DOMAIN = this.configService.getOrThrow('DOMAIN', 'http://localhost:3001');
+    // private DOMAIN = this.configService.getOrThrow('DOMAIN', 'http://localhost:3001');
+    private DOMAIN = 'http://127.0.0.1:3001/webapp/auth';
+
+    private userIpMap: Record<string, string> = {};
 
     constructor(
         private accountService: AccountService,
@@ -22,7 +24,24 @@ export class AuthMirrorUpdate {
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
-        await ctx.reply('🔑 Введите номер вашего аккаунта:', mainMenuKeyboard);
+        await ctx.reply('Пройдите авторизацию', {
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        {
+                            text: 'Авторизация',
+                            web_app: {
+                                url: `${this.DOMAIN}/webapp/auth`,
+                            },
+                        },
+                    ],
+                ],
+            },
+        });
+    }
+
+    getUserIp(telegramId: string): string | null {
+        return this.userIpMap[telegramId] || null;
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
@@ -31,9 +50,7 @@ export class AuthMirrorUpdate {
     }
 
     @On('text')
-    async findAccount(@Message('text', new isAccountIdPipe()) accountId: string, @Ctx() ctx: WizardContext, @Sender() telegramUser: any) {
-        const { first_name: telegramName } = telegramUser;
-        console.log('Запрос зеркала', telegramName, '   Аккаунт: ', accountId);
+    async findAccount(@Message('text', new isAccountIdPipe()) accountId: string, @Ctx() ctx: WizardContext) {
         await this.accountService.getAccount(accountId);
         const url = `${this.DOMAIN}/api/mirror/${accountId}`;
 

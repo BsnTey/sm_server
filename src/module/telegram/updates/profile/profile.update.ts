@@ -3,15 +3,15 @@ import { WizardContext } from 'telegraf/typings/scenes';
 import { ALL_KEYS_MENU_BUTTON_NAME, PROFILE } from '../base-command/base-command.constants';
 import { TelegramService } from '../../telegram.service';
 import { AccountService } from '../../../account/account.service';
-import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { CheckingService } from '../checking/checking.service';
-import { comebackProfile, createPromocodeScene, profileKeyboard } from '../../keyboards/profile.keyboard';
+import { comebackProfile, createPromocodeScene } from '../../keyboards/profile.keyboard';
 import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { MAKE_DEPOSIT_SCENE, PROFILE_GET_INFO_ORDER, PROMOCODE_BOT_SCENE } from '../../scenes/profile.scene-constant';
 import { UserService } from '../../../user/user.service';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { PaymentService } from '../../../payment/payment.service';
+import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 
 @Scene(PROFILE.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -26,7 +26,7 @@ export class ProfileUpdate {
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         const user = await this.userService.getUserByTelegramId(String(telegramId));
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
-        await ctx.reply('Выберете действие', profileKeyboard(user?.role));
+        await ctx.reply('Выберете действие', getMainMenuKeyboard(user.role));
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
@@ -35,16 +35,18 @@ export class ProfileUpdate {
     }
 
     @On('text')
-    async inputAccounts(@Message('text') inputAccounts: string, @Ctx() ctx: WizardContext) {
+    async inputAccounts(@Message('text') inputAccounts: string, @Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
         const accounts = inputAccounts.split('\n');
         await ctx.reply('Началась проверка');
         const checkedAccounts = await this.checkingService.checkingAccountsOnPromocodes(accounts);
-        await ctx.reply(checkedAccounts.join(''), mainMenuKeyboard);
+        await ctx.reply(checkedAccounts.join(''), getMainMenuKeyboard(user.role));
     }
 
     @Action('check_promo')
     async goToCheckerPromo(@Ctx() ctx: WizardContext) {
-        await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки', mainMenuKeyboard);
+        await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки');
     }
 
     @Action('get_info_order')
@@ -68,12 +70,13 @@ export class ProfileUpdate {
 export class GetInfoOrderUpdate {
     constructor(
         private accountService: AccountService,
+        private userService: UserService,
         private telegramService: TelegramService,
     ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
-        await ctx.reply('Введите номер вашего заказа для поиска аккаунта, с которого был выполнен заказ:', mainMenuKeyboard);
+        await ctx.reply('Введите номер вашего заказа для поиска аккаунта, с которого был выполнен заказ:');
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
@@ -82,12 +85,14 @@ export class GetInfoOrderUpdate {
     }
 
     @On('text')
-    async inputAccounts(@Message('text') numberOrder: string, @Ctx() ctx: WizardContext) {
+    async inputAccounts(@Message('text') numberOrder: string, @Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
         const order = await this.accountService.findOrderNumber(numberOrder);
         if (order) {
-            await ctx.reply(order.accountId, mainMenuKeyboard);
+            await ctx.reply(order.accountId, getMainMenuKeyboard(user.role));
         } else {
-            await ctx.reply('Нет данных о заказе', mainMenuKeyboard);
+            await ctx.reply('Нет данных о заказе', getMainMenuKeyboard(user.role));
         }
     }
 }
@@ -98,6 +103,7 @@ export class PromocodeBotUpdate {
     constructor(
         private telegramService: TelegramService,
         private paymentService: PaymentService,
+        private userService: UserService,
     ) {}
 
     @SceneEnter()
@@ -124,9 +130,11 @@ export class PromocodeBotUpdate {
     @Action('create_promocode')
     async createPromocode(@Ctx() ctx: WizardContext, @Sender() { id: telegramId, username }: any) {
         const { promoName, discountPercent } = await this.paymentService.createPromocode(String(telegramId), username);
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
         await ctx.reply(
             `Ваш промокод <b><code>${promoName}</code></b> на ${discountPercent}% скидку создан. Всего активаций: 5 для перевыпуска`,
-            { parse_mode: 'HTML', ...mainMenuKeyboard },
+            { parse_mode: 'HTML', ...getMainMenuKeyboard(user.role) },
         );
         await ctx.scene.leave();
     }

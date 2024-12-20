@@ -1,15 +1,17 @@
-import { Ctx, Hears, Message, On, Scene, SceneEnter } from 'nestjs-telegraf';
+import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { ADMIN, ALL_KEYS_MENU_BUTTON_NAME } from '../base-command/base-command.constants';
 import { TelegramService } from '../../telegram.service';
-import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
-import { UseFilters, UseGuards } from '@nestjs/common';
+import { NotFoundException, UseFilters, UseGuards } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { createWriteStream, promises as fsPromises } from 'fs';
 import { join } from 'path';
 import axios from 'axios';
 import { AccountService } from '../../../account/account.service';
 import { AdminGuard } from './admin.guard';
+import { ERROR_FOUND_USER } from '../../constants/error.constant';
+import { UserService } from '../../../user/user.service';
+import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 
 @Scene(ADMIN.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -17,12 +19,15 @@ export class AdminUpdate {
     constructor(
         private telegramService: TelegramService,
         private accountService: AccountService,
+        private userService: UserService,
     ) {}
 
     @SceneEnter()
     @UseGuards(AdminGuard)
-    async onSceneEnter(@Ctx() ctx: WizardContext) {
-        await ctx.reply('Пришли текстовый файл', mainMenuKeyboard);
+    async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
+        await ctx.reply('Пришли текстовый файл', getMainMenuKeyboard(user.role));
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
@@ -42,7 +47,7 @@ export class AdminUpdate {
 
         const accounts = this.parseFileContent(fileContent);
         await this.addAccounts(accounts);
-        await ctx.reply('Аккаунты добавлены', mainMenuKeyboard);
+        await ctx.reply('Аккаунты добавлены');
     }
 
     private async downloadFile(fileUrl: string, filePath: string): Promise<void> {

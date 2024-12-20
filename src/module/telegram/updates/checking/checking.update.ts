@@ -1,13 +1,14 @@
 import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
-import { UseFilters } from '@nestjs/common';
+import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { TelegramService } from '../../telegram.service';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { ALL_KEYS_MENU_BUTTON_NAME, CHECK } from '../base-command/base-command.constants';
 import { CheckingService } from './checking.service';
-import { mainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { UserService } from '../../../user/user.service';
 import { Context } from '../../interfaces/telegram.context';
+import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
+import { ERROR_FOUND_USER } from '../../constants/error.constant';
 
 @Scene(CHECK.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -22,13 +23,15 @@ export class CheckingUpdate {
     async onSceneEnter(@Ctx() ctx: Context, @Sender() telegramUser: any) {
         // в будующем удалить регу или обновление юзера
         const { first_name: telegramName, id: telegramId } = telegramUser;
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
 
         await this.userService.createOrUpdateUserByTelegram({
             telegramName,
             telegramId: String(telegramId),
         });
 
-        await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки. За раз не больше 20', mainMenuKeyboard);
+        await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки. За раз не больше 20', getMainMenuKeyboard(user.role));
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
@@ -37,10 +40,12 @@ export class CheckingUpdate {
     }
 
     @On('text')
-    async inputAccounts(@Message('text') inputAccounts: string, @Ctx() ctx: WizardContext) {
+    async inputAccounts(@Message('text') inputAccounts: string, @Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
         const accounts = inputAccounts.split('\n');
         await ctx.reply('Началась проверка');
         const checkedAccounts = await this.checkingService.checkingAccounts(accounts);
-        await ctx.reply(checkedAccounts.join(''), mainMenuKeyboard);
+        await ctx.reply(checkedAccounts.join(''), getMainMenuKeyboard(user.role));
     }
 }

@@ -71,5 +71,6 @@ import { PaymentModule } from '../payment/payment.module';
         AuthMirrorUpdate,
         PaymentUpdate,
     ],
+    exports: [TelegramService, AuthMirrorUpdate],
 })
 export class TelegramModule {}

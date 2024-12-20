@@ -17,6 +17,7 @@ import { BottModule } from './module/bott/bott.module';
 import { PaymentModule } from './module/payment/payment.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CronModule } from './module/cron/cron.module';
+import { WebappModule } from './module/webapp/webapp.module';
 
 @Module({
     imports: [
@@ -43,8 +44,8 @@ import { CronModule } from './module/cron/cron.module';
         SharedModule,
         PaymentModule,
         CronModule,
+        WebappModule,
     ],
-    controllers: [],
     providers: [],
 })
 export class AppModule {}
