@@ -15,8 +15,14 @@ export class WebAppController {
 
     @Post('auth')
     async handleAuth(@Body() body: any, @Req() request: Request) {
-        const telegramId = body.telegramId;
         const ipAddress = request.ip;
+
+        console.log('IP:', request.ip); // Логирует IP, который сервер видит
+        console.log('Headers:', request.headers); // Показывает все заголовки
+
+        const telegramId = body.telegramId;
+        const ipAddress1 = request.headers['x-forwarded-for'] || request.ip;
+        console.log('ipAddress1:', ipAddress1);
 
         if (!telegramId || !ipAddress) {
             return { success: false, message: 'Не удалось получить данные.' };
