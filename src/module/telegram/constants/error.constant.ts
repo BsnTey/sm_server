@@ -17,3 +17,4 @@ export const ERROR_LOW_MONEY_COUNT = 'Сумма должна быть боль�
 export const ERROR_NOT_MULTIPLE_OF_50 = 'Сумма должна быть кратной 50р (1000, 1050 и т.д.)';
 export const ERROR_SCRINSHOT = 'Пришлите скриншот перевода или Pdf';
 export const ERROR_FOUND_USER = 'Пользователь не найден';
+export const ERROR_ACCESS = 'Доступ запрещен';

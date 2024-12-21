@@ -34,7 +34,7 @@ export class WebAppController {
 
         await this.mirrorService.updateAccountMirror(id, { accountId, userIp: ipAddress });
         const mirrorToken = await this.mirrorService.generateMirrorToken(id);
-        const mirrorUrl = `${this.DOMAIN}/mirror/auth?token=${mirrorToken.mirrorToken}`;
+        const mirrorUrl = `${this.DOMAIN}/api/mirror/auth?token=${mirrorToken.mirrorToken}`;
         await this.telegramService.sendMessage(Number(telegramId), `Ваша ссылка на зеркало: ${mirrorUrl}`);
         return { success: true, link: mirrorUrl };
     }
