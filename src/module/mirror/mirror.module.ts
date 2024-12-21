@@ -1,13 +1,15 @@
 import { Module } from '@nestjs/common';
 import { MirrorController } from './mirror.controller';
 import { AccountModule } from '../account/account.module';
-import { ProxyModule } from '../proxy/proxy.module';
-import { MirrorLinkService } from './mirror.service';
 import { JwtService } from '@nestjs/jwt';
+import { MirrorService } from './mirror.service';
+import { MirrorRepository } from './mirror.repository';
+import { ConfigService } from '@nestjs/config';
 
 @Module({
     controllers: [MirrorController],
-    providers: [MirrorLinkService, JwtService],
-    imports: [AccountModule, ProxyModule],
+    providers: [JwtService, MirrorService, MirrorRepository, ConfigService],
+    imports: [AccountModule],
+    exports: [MirrorService, JwtService, ConfigService, MirrorRepository],
 })
 export class MirrorModule {}

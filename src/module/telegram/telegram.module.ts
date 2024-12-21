@@ -34,9 +34,10 @@ import { SharedModule } from '../shared/shared.module';
 import { HttpModule } from '../http/http.module';
 import { UserModule } from '../user/user.module';
 import { PaymentModule } from '../payment/payment.module';
+import { MirrorModule } from '../mirror/mirror.module';
 
 @Module({
-    imports: [AccountModule, ProxyModule, SharedModule, HttpModule, UserModule, PaymentModule],
+    imports: [AccountModule, ProxyModule, SharedModule, HttpModule, UserModule, PaymentModule, MirrorModule],
     providers: [
         TelegramService,
         MakeOrderService,
@@ -71,6 +72,6 @@ import { PaymentModule } from '../payment/payment.module';
         AuthMirrorUpdate,
         PaymentUpdate,
     ],
-    exports: [TelegramService, AuthMirrorUpdate],
+    exports: [TelegramService],
 })
 export class TelegramModule {}

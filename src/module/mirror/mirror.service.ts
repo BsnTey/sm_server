@@ -14,7 +14,7 @@ interface JwtPayload {
 
 @Injectable()
 export class MirrorService {
-    private botToken = this.configService.getOrThrow('TELEGRAM_BOT_TOKEN');
+    private botToken = this.configService.getOrThrow('TELEGRAM_TOKEN');
     private domain = this.configService.getOrThrow('DOMAIN').split('://')[1];
     constructor(
         private readonly mirrorRepository: MirrorRepository,
