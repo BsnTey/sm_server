@@ -1,8 +1,9 @@
 import { ALL_KEYS_MENU_BUTTON_NAME, AUTH_MIRROR } from '../base-command/base-command.constants';
-import { Ctx, Hears, Message, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
+import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { AccountService } from '../../../account/account.service';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { TelegramService } from '../../telegram.service';
+import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
 import { NotFoundException, UseFilters, UseGuards } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { ConfigService } from '@nestjs/config';
@@ -50,5 +51,11 @@ export class AuthMirrorUpdate {
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
         await this.telegramService.exitScene(menuBtn, ctx);
+    }
+
+    @On('text')
+    async findAccount(@Message('text', new isAccountIdPipe()) accountId: string, @Ctx() ctx: WizardContext) {
+        await ctx.reply('Используйте авторизацию по кнопке ⬆️');
+        await ctx.scene.leave();
     }
 }
