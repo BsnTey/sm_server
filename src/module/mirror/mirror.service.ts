@@ -14,7 +14,7 @@ interface JwtPayload {
 
 @Injectable()
 export class MirrorService {
-    private botToken = this.configService.getOrThrow('TELEGRAM_TOKEN');
+    private hash = this.configService.getOrThrow('ZENNO_HASH');
     private domain = this.configService.getOrThrow('DOMAIN').split('://')[1];
     constructor(
         private readonly mirrorRepository: MirrorRepository,
@@ -79,7 +79,7 @@ export class MirrorService {
             ip: mirrorEntry.userIp,
             exp: Math.floor(mirrorEntry.mirrorTokenExpiry.getTime() / 1000),
         };
-        const jwtToken = await this.jwtService.signAsync(payload, { secret: this.botToken });
+        const jwtToken = await this.jwtService.signAsync(payload, { secret: this.hash });
         return { jwtToken, smid: smid, domain: this.domain, expiry: mirrorEntry.mirrorTokenExpiry };
     }
 }
