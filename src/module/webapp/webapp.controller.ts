@@ -1,11 +1,17 @@
-import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { TelegramService } from '../telegram/telegram.service';
 import { join } from 'path';
+import { ConfigService } from '@nestjs/config';
+import { MirrorService } from '../mirror/mirror.service';
 
 @Controller('webapp')
 export class WebAppController {
-    constructor(private telegramService: TelegramService) {}
+    constructor(
+        private telegramService: TelegramService,
+        private configService: ConfigService,
+        private mirrorService: MirrorService,
+    ) {}
 
     @Get('auth')
     async serveAuthPage(@Res() res: Response) {
@@ -15,26 +21,19 @@ export class WebAppController {
 
     @Post('auth')
     async handleAuth(@Body() body: any, @Req() request: Request) {
-        const ipAddress = request.ip;
+        const ipAddress = Array.isArray(request.headers['x-forwarded-for'])
+            ? request.headers['x-forwarded-for'][0]
+            : request.headers['x-forwarded-for'] || request.ip;
 
-        console.log('IP:', request.ip); // Логирует IP, который сервер видит
-        console.log('Headers:', request.headers); // Показывает все заголовки
-
-        const telegramId = body.telegramId;
-        const ipAddress1 = request.headers['x-forwarded-for'] || request.ip;
-        console.log('ipAddress1:', ipAddress1);
-
-        if (!telegramId || !ipAddress) {
-            return { success: false, message: 'Не удалось получить данные.' };
+        const { telegramId, accountId, id } = body;
+        if (!telegramId || !ipAddress || !accountId || !id) {
+            throw new BadRequestException('Не удалось получить данные.');
         }
 
-        await this.saveUserIpAndNotify(telegramId, ipAddress);
-
-        return { success: true, message: 'Авторизация успешна.' };
-    }
-
-    async saveUserIpAndNotify(telegramId: string, ipAddress: string) {
-        // this.userIpMap[telegramId] = ipAddress;
-        await this.telegramService.sendMessage(Number(telegramId), ipAddress);
+        await this.mirrorService.updateAccountMirror(id, { accountId, userIp: ipAddress });
+        const mirrorToken = await this.mirrorService.generateMirrorToken(id);
+        const mirrorUrl = `${this.configService.getOrThrow('DOMAIN')}/mirror/auth?token=${mirrorToken.mirrorToken}`;
+        await this.telegramService.sendMessage(Number(telegramId), `Ваша ссылка на зеркало: ${mirrorUrl}`);
+        return { success: true, link: mirrorUrl };
     }
 }

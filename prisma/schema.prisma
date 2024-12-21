@@ -230,6 +230,20 @@ model AccountLessonProgress {
   @@map("account_lesson_progress")
 }
 
+model AccountMirror {
+  id                String    @id @default(uuid()) @db.Uuid
+  telegramId        String    @map("telegram_id")
+  telegramName      String    @map("telegram_name")
+  accountId         String?   @map("account_id")
+  userIp            String?   @map("user_ip")
+  mirrorToken       String?   @unique @map("mirror_token")
+  mirrorTokenExpiry DateTime? @map("mirror_token_expiry")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@map("account_mirror")
+}
+
 enum UserRole {
   User
   Admin

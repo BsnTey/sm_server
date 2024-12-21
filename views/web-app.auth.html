@@ -5,15 +5,30 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-<button id="authButton">Авторизоваться</button>
+<form id="authForm">
+    <input type="text" id="accountId" placeholder="Введите номер аккаунта" required>
+    <button type="submit" >Авторизоваться</button>
+</form>
+<div id="link-container" style="display: none">
+
+    <a id="mirrorLink" href="" target="_blank">Перейти</a>
+</div>
 
 <script>
-    const authButton = document.getElementById('authButton');
+    const authForm = document.getElementById('authForm');
     const tg = window.Telegram.WebApp;
+    const linkContainer = document.getElementById('link-container');
+    const mirrorLink = document.getElementById('mirrorLink');
+    const urlParams = new URLSearchParams(window.location.search);
+    const id = urlParams.get('id');
 
-    authButton.addEventListener('click', () => {
+    authForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const accountId = document.getElementById('accountId').value;
         const data = {
             telegramId: tg.initDataUnsafe.user.id,
+            accountId: accountId,
+            id: id
         };
 
         fetch('/api/webapp/auth', {
@@ -26,7 +41,8 @@
             .then((response) => response.json())
             .then((result) => {
                 if (result.success) {
-                    tg.close();
+                    mirrorLink.href = result.link;
+                    linkContainer.style.display = 'block';
                 } else {
                     alert('Ошибка авторизации: ' + result.message);
                 }

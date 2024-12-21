@@ -1,28 +1,36 @@
+// src/module/mirror/auth-mirror-update.scene.ts
 import { ALL_KEYS_MENU_BUTTON_NAME, AUTH_MIRROR } from '../base-command/base-command.constants';
-import { Ctx, Hears, Message, On, Scene, SceneEnter } from 'nestjs-telegraf';
+import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { AccountService } from '../../../account/account.service';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { TelegramService } from '../../telegram.service';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
-import { UseFilters } from '@nestjs/common';
+import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { ConfigService } from '@nestjs/config';
+import { UserService } from '../../../user/user.service';
+import { ERROR_FOUND_USER } from '../../constants/error.constant';
+import { MirrorService } from '../../../mirror/mirror.service';
 
 @Scene(AUTH_MIRROR.scene)
 @UseFilters(TelegrafExceptionFilter)
 export class AuthMirrorUpdate {
     private DOMAIN = this.configService.getOrThrow('DOMAIN', 'http://localhost:3001');
 
-    private userIpMap: Record<string, string> = {};
-
     constructor(
         private accountService: AccountService,
+        private userService: UserService,
         private telegramService: TelegramService,
         private configService: ConfigService,
+        private mirrorService: MirrorService,
     ) {}
 
     @SceneEnter()
-    async onSceneEnter(@Ctx() ctx: WizardContext) {
+    async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId, username }: any) {
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
+
+        const createdMirror = await this.mirrorService.createAccountMirror(String(telegramId), String(username));
         await ctx.reply('Пройдите авторизацию', {
             reply_markup: {
                 inline_keyboard: [
@@ -30,17 +38,13 @@ export class AuthMirrorUpdate {
                         {
                             text: 'Авторизация',
                             web_app: {
-                                url: `${this.DOMAIN}/api/webapp/auth`,
+                                url: `${this.DOMAIN}/api/webapp/auth?id=${createdMirror.id}`,
                             },
                         },
                     ],
                 ],
             },
         });
-    }
-
-    getUserIp(telegramId: string): string | null {
-        return this.userIpMap[telegramId] || null;
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
