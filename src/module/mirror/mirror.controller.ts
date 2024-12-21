@@ -16,11 +16,11 @@ export class MirrorController {
             ? request.headers['x-forwarded-for'][0]
             : request.headers['x-forwarded-for'] || request.ip;
 
-        if (!ipAddress) {
+        if (!ipAddress || mirrorEntry.userIp !== ipAddress) {
             throw new BadRequestException('Неверный запрос');
         }
 
-        const { jwtToken, smid, domain, expiry } = await this.mirrorService.createJwt(mirrorEntry, ipAddress);
+        const { jwtToken, smid, domain, expiry } = await this.mirrorService.createJwt(mirrorEntry);
 
         res.cookie('SMID', smid, {
             domain,

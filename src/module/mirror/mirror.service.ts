@@ -53,16 +53,17 @@ export class MirrorService {
         return mirrorEntry;
     }
 
-    async createJwt(
-        mirrorEntry: AccountMirror,
-        ipAddress: string,
-    ): Promise<{ jwtToken: string; smid: string; domain: string; expiry: Date }> {
+    async createJwt(mirrorEntry: AccountMirror): Promise<{ jwtToken: string; smid: string; domain: string; expiry: Date }> {
         if (!mirrorEntry.accountId) {
             throw new BadRequestException('Нет id');
         }
 
         if (!mirrorEntry.mirrorTokenExpiry) {
             throw new BadRequestException('Нет токена');
+        }
+
+        if (!mirrorEntry.userIp) {
+            throw new BadRequestException('Не верный запрос');
         }
 
         const accountEntity = await this.accountService.getAccount(mirrorEntry.accountId);
@@ -75,7 +76,7 @@ export class MirrorService {
 
         const payload: JwtPayload = {
             smid: smidCookie.value,
-            ip: ipAddress,
+            ip: mirrorEntry.userIp,
             exp: Math.floor(mirrorEntry.mirrorTokenExpiry.getTime() / 1000),
         };
         const jwtToken = await this.jwtService.signAsync(payload, { secret: this.botToken });

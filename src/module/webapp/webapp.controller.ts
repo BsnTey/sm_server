@@ -7,6 +7,8 @@ import { MirrorService } from '../mirror/mirror.service';
 
 @Controller('webapp')
 export class WebAppController {
+    private DOMAIN = this.configService.getOrThrow('DOMAIN', 'http://localhost:3001');
+
     constructor(
         private telegramService: TelegramService,
         private configService: ConfigService,
@@ -32,7 +34,7 @@ export class WebAppController {
 
         await this.mirrorService.updateAccountMirror(id, { accountId, userIp: ipAddress });
         const mirrorToken = await this.mirrorService.generateMirrorToken(id);
-        const mirrorUrl = `${this.configService.getOrThrow('DOMAIN')}/mirror/auth?token=${mirrorToken.mirrorToken}`;
+        const mirrorUrl = `${this.DOMAIN}/mirror/auth?token=${mirrorToken.mirrorToken}`;
         await this.telegramService.sendMessage(Number(telegramId), `Ваша ссылка на зеркало: ${mirrorUrl}`);
         return { success: true, link: mirrorUrl };
     }

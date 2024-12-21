@@ -1,4 +1,3 @@
-// src/module/mirror/auth-mirror-update.scene.ts
 import { ALL_KEYS_MENU_BUTTON_NAME, AUTH_MIRROR } from '../base-command/base-command.constants';
 import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { AccountService } from '../../../account/account.service';
@@ -26,11 +25,11 @@ export class AuthMirrorUpdate {
     ) {}
 
     @SceneEnter()
-    async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId, username }: any) {
+    async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId, first_name: telegramName }: any) {
         const user = await this.userService.getUserByTelegramId(String(telegramId));
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
 
-        const createdMirror = await this.mirrorService.createAccountMirror(String(telegramId), String(username));
+        const createdMirror = await this.mirrorService.createAccountMirror(String(telegramId), String(telegramName));
         await ctx.reply('Пройдите авторизацию', {
             reply_markup: {
                 inline_keyboard: [
