@@ -61,9 +61,8 @@ export class MirrorService {
         if (!mirrorEntry.mirrorTokenExpiry) {
             throw new BadRequestException('Нет токена');
         }
-
         if (!mirrorEntry.userIp) {
-            throw new BadRequestException('Не верный запрос');
+            throw new BadRequestException('Неверный запрос');
         }
 
         const accountEntity = await this.accountService.getAccount(mirrorEntry.accountId);
@@ -73,13 +72,14 @@ export class MirrorService {
         if (!smidCookie) {
             throw new BadRequestException('Cookie SMID не найден.');
         }
-
+        const smid = smidCookie.value;
+        const shortSmid = smid.slice(-50);
         const payload: JwtPayload = {
-            smid: smidCookie.value,
+            smid: shortSmid,
             ip: mirrorEntry.userIp,
             exp: Math.floor(mirrorEntry.mirrorTokenExpiry.getTime() / 1000),
         };
         const jwtToken = await this.jwtService.signAsync(payload, { secret: this.botToken });
-        return { jwtToken, smid: smidCookie.value, domain: this.domain, expiry: mirrorEntry.mirrorTokenExpiry };
+        return { jwtToken, smid: smid, domain: this.domain, expiry: mirrorEntry.mirrorTokenExpiry };
     }
 }
