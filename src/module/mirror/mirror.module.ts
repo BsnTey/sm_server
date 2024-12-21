@@ -7,9 +7,9 @@ import { MirrorRepository } from './mirror.repository';
 import { ConfigService } from '@nestjs/config';
 
 @Module({
+    imports: [AccountModule],
     controllers: [MirrorController],
     providers: [JwtService, MirrorService, MirrorRepository, ConfigService],
-    imports: [AccountModule],
-    exports: [MirrorService, JwtService, ConfigService, MirrorRepository],
+    exports: [MirrorService, JwtService, ConfigService],
 })
 export class MirrorModule {}

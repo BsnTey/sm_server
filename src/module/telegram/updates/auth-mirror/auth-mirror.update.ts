@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { UserService } from '../../../user/user.service';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { MirrorService } from '../../../mirror/mirror.service';
+import { UserRole } from '@prisma/client';
 
 @Scene(AUTH_MIRROR.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -28,6 +29,8 @@ export class AuthMirrorUpdate {
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId, first_name: telegramName }: any) {
         const user = await this.userService.getUserByTelegramId(String(telegramId));
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
+
+        if (user.role != UserRole.Admin) return ctx.reply('🚫 Доступ запрещен');
 
         const createdMirror = await this.mirrorService.createAccountMirror(String(telegramId), String(telegramName));
         await ctx.reply('Пройдите авторизацию', {
