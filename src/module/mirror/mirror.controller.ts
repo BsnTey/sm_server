@@ -21,11 +21,11 @@ export class MirrorController {
         }
 
         const { jwtToken, smid, domain, expiry } = await this.mirrorService.createJwt(mirrorEntry);
-        console.log('до удаления', res.cookie);
+        console.log('Куки из запроса:', request.cookies);
         res.clearCookie('SMID');
         res.clearCookie('jwt');
 
-        console.log('после удаления', res.cookie);
+        console.log('Куки после удаления (заголовки ответа):', res.getHeaders());
 
         // res.cookie('SMID', smid, {
         //     domain,
@@ -56,7 +56,7 @@ export class MirrorController {
             secure: true,
             expires: expiry,
         });
-        console.log('итог', res.cookie);
+        console.log('Заголовки ответа после установки куков:', res.getHeaders());
         return res.redirect('/');
     }
 }
