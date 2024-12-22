@@ -1,14 +1,10 @@
 import { BadRequestException, Controller, Get, Query, Req, Res } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { MirrorService } from './mirror.service';
-import { ConfigService } from '@nestjs/config';
 
 @Controller('mirror')
 export class MirrorController {
-    constructor(
-        private mirrorService: MirrorService,
-        private configService: ConfigService,
-    ) {}
+    constructor(private mirrorService: MirrorService) {}
 
     @Get('auth')
     async accessMirror(@Query('token') mirrorToken: string, @Res({ passthrough: true }) res: Response, @Req() request: Request) {
@@ -28,13 +24,6 @@ export class MirrorController {
         res.clearCookie('SMID');
         res.clearCookie('jwt');
 
-        // if (request.cookies) {
-        //     const cookies = Object.keys(request.cookies);
-        //     for (const cookieName of cookies) {
-        //         res.clearCookie(cookieName, { domain: domain, path: '/' });
-        //     }
-        // }
-
         console.log(request.cookies);
 
         // res.cookie('SMID', smid, {
@@ -50,7 +39,7 @@ export class MirrorController {
             domain,
             httpOnly: true,
             path: '/',
-            sameSite: 'lax',
+            sameSite: 'none',
             secure: true,
             expires: expiry,
         });
