@@ -37,6 +37,8 @@ export class MirrorController {
             }
         }
 
+        console.log(request.cookies);
+
         let newDomain = this.DOMAIN.split('://')[1];
         newDomain = `www.${newDomain}`;
 
