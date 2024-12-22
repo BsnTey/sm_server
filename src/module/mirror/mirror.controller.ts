@@ -1,10 +1,16 @@
 import { BadRequestException, Controller, Get, Query, Req, Res } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { MirrorService } from './mirror.service';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('mirror')
 export class MirrorController {
-    constructor(private mirrorService: MirrorService) {}
+    private DOMAIN = this.configService.getOrThrow('DOMAIN', 'http://localhost:3001');
+
+    constructor(
+        private mirrorService: MirrorService,
+        private configService: ConfigService,
+    ) {}
 
     @Get('auth')
     async accessMirror(@Query('token') mirrorToken: string, @Res({ passthrough: true }) res: Response, @Req() request: Request) {
@@ -31,14 +37,26 @@ export class MirrorController {
             }
         }
 
+        let newDomain = this.DOMAIN.split('://')[1];
+        newDomain = `www.${newDomain}`;
+
         res.cookie('SMID', smid, {
-            domain,
+            domain: newDomain,
             httpOnly: true,
             path: '/',
             sameSite: 'lax',
             secure: true,
             expires: expiry,
         });
+
+        // res.cookie('SMID', smid, {
+        //     domain,
+        //     httpOnly: true,
+        //     path: '/',
+        //     sameSite: 'lax',
+        //     secure: true,
+        //     expires: expiry,
+        // });
         res.cookie('jwt', jwtToken, {
             domain,
             httpOnly: true,
