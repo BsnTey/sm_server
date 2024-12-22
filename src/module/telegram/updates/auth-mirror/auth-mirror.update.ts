@@ -1,6 +1,5 @@
 import { ALL_KEYS_MENU_BUTTON_NAME, AUTH_MIRROR } from '../base-command/base-command.constants';
 import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
-import { AccountService } from '../../../account/account.service';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { TelegramService } from '../../telegram.service';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
@@ -18,7 +17,6 @@ export class AuthMirrorUpdate {
     private DOMAIN = this.configService.getOrThrow('DOMAIN', 'http://localhost:3001');
 
     constructor(
-        private accountService: AccountService,
         private userService: UserService,
         private telegramService: TelegramService,
         private configService: ConfigService,
