@@ -25,11 +25,6 @@ export class MirrorController {
         res.clearCookie('SMID');
         res.clearCookie('jwt');
 
-        const cookies = Object.keys(request.cookies);
-        for (const cookieName of cookies) {
-            res.clearCookie(cookieName);
-        }
-
         console.log('после удаления', res.cookie);
 
         // res.cookie('SMID', smid, {
