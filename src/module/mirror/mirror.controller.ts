@@ -35,13 +35,16 @@ export class MirrorController {
         //     expires: expiry,
         // });
 
+        const twoYearsFromNow = new Date();
+        twoYearsFromNow.setFullYear(twoYearsFromNow.getFullYear() + 2);
+
         res.cookie('SMID', smid, {
             domain,
             httpOnly: true,
             path: '/',
             sameSite: 'none',
             secure: true,
-            expires: expiry,
+            expires: twoYearsFromNow,
         });
         res.cookie('jwt', jwtToken, {
             domain,
