@@ -16,6 +16,7 @@ interface JwtPayload {
 export class MirrorService {
     private hash = this.configService.getOrThrow('ZENNO_HASH');
     private domain = this.configService.getOrThrow('DOMAIN').split('://')[1];
+
     constructor(
         private readonly mirrorRepository: MirrorRepository,
         private readonly accountService: AccountService,

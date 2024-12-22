@@ -5,8 +5,6 @@ import { ConfigService } from '@nestjs/config';
 
 @Controller('mirror')
 export class MirrorController {
-    private DOMAIN = this.configService.getOrThrow('DOMAIN', 'http://localhost:3001');
-
     constructor(
         private mirrorService: MirrorService,
         private configService: ConfigService,
@@ -30,26 +28,14 @@ export class MirrorController {
         res.clearCookie('SMID');
         res.clearCookie('jwt');
 
-        if (request.cookies) {
-            const cookies = Object.keys(request.cookies);
-            for (const cookieName of cookies) {
-                res.clearCookie(cookieName, { domain: domain, path: '/' });
-            }
-        }
+        // if (request.cookies) {
+        //     const cookies = Object.keys(request.cookies);
+        //     for (const cookieName of cookies) {
+        //         res.clearCookie(cookieName, { domain: domain, path: '/' });
+        //     }
+        // }
 
         console.log(request.cookies);
-
-        let newDomain = this.DOMAIN.split('://')[1];
-        newDomain = `www.${newDomain}`;
-
-        res.cookie('SMID', smid, {
-            domain: newDomain,
-            httpOnly: true,
-            path: '/',
-            sameSite: 'lax',
-            secure: true,
-            expires: expiry,
-        });
 
         // res.cookie('SMID', smid, {
         //     domain,
@@ -59,6 +45,15 @@ export class MirrorController {
         //     secure: true,
         //     expires: expiry,
         // });
+
+        res.cookie('SMID', smid, {
+            domain,
+            httpOnly: true,
+            path: '/',
+            sameSite: 'lax',
+            secure: true,
+            expires: expiry,
+        });
         res.cookie('jwt', jwtToken, {
             domain,
             httpOnly: true,
