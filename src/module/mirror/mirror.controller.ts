@@ -42,10 +42,11 @@ export class MirrorController {
             domain,
             httpOnly: true,
             path: '/',
-            sameSite: 'none',
+            sameSite: 'lax',
             secure: true,
             expires: twoYearsFromNow,
         });
+
         res.cookie('jwt', jwtToken, {
             domain,
             httpOnly: true,
@@ -54,6 +55,7 @@ export class MirrorController {
             secure: true,
             expires: expiry,
         });
+        console.log(request.cookies);
         return res.redirect('/');
     }
 }
