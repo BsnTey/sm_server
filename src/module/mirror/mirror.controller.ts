@@ -22,8 +22,10 @@ export class MirrorController {
 
         const { jwtToken, smid, domain, expiry } = await this.mirrorService.createJwt(mirrorEntry);
 
-        res.clearCookie('SMID');
-        res.clearCookie('jwt');
+        const cookies = Object.keys(request.cookies);
+        for (const cookieName of cookies) {
+            res.clearCookie(cookieName, { domain: domain, path: '/' });
+        }
 
         res.cookie('SMID', smid, {
             domain,
