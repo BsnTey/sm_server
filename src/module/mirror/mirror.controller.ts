@@ -21,10 +21,16 @@ export class MirrorController {
         }
 
         const { jwtToken, smid, domain, expiry } = await this.mirrorService.createJwt(mirrorEntry);
+        console.log('до удаления', res.cookie);
         res.clearCookie('SMID');
         res.clearCookie('jwt');
 
-        console.log(request.cookies);
+        const cookies = Object.keys(request.cookies);
+        for (const cookieName of cookies) {
+            res.clearCookie(cookieName);
+        }
+
+        console.log('после удаления', res.cookie);
 
         // res.cookie('SMID', smid, {
         //     domain,
@@ -55,7 +61,7 @@ export class MirrorController {
             secure: true,
             expires: expiry,
         });
-        console.log(request.cookies);
+        console.log('итог', res.cookie);
         return res.redirect('/');
     }
 }
