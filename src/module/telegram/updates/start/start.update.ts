@@ -13,13 +13,12 @@ export class StartUpdate {
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: Context, @Sender() telegramUser: any) {
         const { first_name: telegramName, id: telegramId } = telegramUser;
-        const user = await this.userService.getUserByTelegramId(String(telegramId));
-        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
         await this.userService.createOrUpdateUserByTelegram({
             telegramName,
             telegramId: String(telegramId),
         });
-
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
         await ctx.replyWithPhoto('https://cstor.nn2.ru/forum/data/forum/images/2018-04/203019686-3f3b88013d6894fa103d7e79121a346a.jpg', {
             caption: `Добро пожаловать в меню, ${telegramName}!\n\nЧто вас интересует?`,
             ...getMainMenuKeyboard(user.role),
