@@ -41,7 +41,7 @@ export class ProfileUpdate {
         const accounts = inputAccounts.split('\n');
         await ctx.reply('Началась проверка');
         const checkedAccounts = await this.checkingService.checkingAccountsOnPromocodes(accounts);
-        await ctx.reply(checkedAccounts.join(''), getMainMenuKeyboard(user.role));
+        await ctx.reply(checkedAccounts.join(''), { parse_mode: 'HTML', ...getMainMenuKeyboard(user.role) });
     }
 
     @Action('check_promo')

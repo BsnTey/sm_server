@@ -46,6 +46,6 @@ export class CheckingUpdate {
         const accounts = inputAccounts.split('\n');
         await ctx.reply('Началась проверка');
         const checkedAccounts = await this.checkingService.checkingAccounts(accounts);
-        await ctx.reply(checkedAccounts.join(''), { parse_mode: 'HTML', ...getMainMenuKeyboard(user.role) });
+        await ctx.reply(checkedAccounts.join(''), getMainMenuKeyboard(user.role));
     }
 }
