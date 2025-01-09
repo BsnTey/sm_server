@@ -210,7 +210,7 @@ export class CheckingService {
                 }
                 const couponId = promo.couponId;
                 const endDate = promo.endDate;
-                promocodes += `${actionName} ${couponId} ${endDate} `;
+                promocodes += `${actionName} <b><code>${couponId}</code></b> ${endDate} `;
             }
 
             resultChecking[trimmedAccountId] = accountInfo + (promocodes || 'Нет промо') + '\n';

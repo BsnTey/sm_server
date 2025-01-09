@@ -4,7 +4,7 @@ import { BadRequestException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { ALL_KEYS_MENU_BUTTON_NAME } from '../base-command/base-command.constants';
 import { TelegramService } from '../../telegram.service';
-import { MAKE_DEPOSIT_SCENE } from '../../scenes/profile.scene-constant';
+import { MAKE_DEPOSIT_SCENE, PROMOCODE_BOT_SCENE } from '../../scenes/profile.scene-constant';
 import { isMoneyAmountPipe } from '../../pipes/isMoneyAmount.pipe';
 import { cancelPaymentKeyboard, createdPaymentKeyboard } from '../../keyboards/profile.keyboard';
 import { StatusPayment } from '@prisma/client';
@@ -13,6 +13,7 @@ import { FileService } from '../../../shared/file.service';
 import { getFileNameForReceipt } from '../../utils/receipt.utils';
 import { extractAmountFTransferedPay } from '../../utils/payment.utils';
 import { PaymentService } from '../../../payment/payment.service';
+import { gotoCoupon } from '../../keyboards/payment.keyboard';
 
 @Scene(MAKE_DEPOSIT_SCENE)
 @UseFilters(TelegrafExceptionFilter)
@@ -32,7 +33,8 @@ export class PaymentUpdate {
         let text = extractAmountFTransferedPay(transferedPayments);
 
         if (createdPayments.length == 0) {
-            text += 'Для пополнения введите сумму (кратную 50р), на которую хотите пополнить.\nМинимум 500р, от 2000р пополнение +10%';
+            text +=
+                'Для пополнения введите сумму (кратную 50р), на которую хотите пополнить.\nМинимум 500р, от 2000р пополнение +10%, от 5000р +20%';
             await ctx.editMessageText(text);
         } else {
             const keyboard = createdPaymentKeyboard(createdPayments);
@@ -108,8 +110,10 @@ export class PaymentUpdate {
             await this.fileService.saveFileFromTg(fileName, fileLink);
 
             const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
-            await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
-            await ctx.scene.leave();
+            await ctx.reply(
+                `Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.\nНе забывайте о своем промокоде`,
+                gotoCoupon,
+            );
         } catch (error) {
             console.error('Error processing receipt:', error);
             await ctx.reply('Произошла ошибка при обработке квитанции.');
@@ -133,9 +137,10 @@ export class PaymentUpdate {
 
                 const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
                 const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
-                await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
-
-                await ctx.scene.leave();
+                await ctx.reply(
+                    `Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.\nНе забывайте о своем промокоде`,
+                    gotoCoupon,
+                );
             } else {
                 await ctx.reply('Пожалуйста, отправьте файл в формате PDF.');
             }
@@ -147,5 +152,10 @@ export class PaymentUpdate {
     @On('text')
     async ErrorText() {
         throw new BadRequestException(ERROR_SCRINSHOT);
+    }
+
+    @Action('goto_coupon')
+    async gotoCoupon(@Ctx() ctx: WizardContext) {
+        await ctx.scene.enter(PROMOCODE_BOT_SCENE);
     }
 }
