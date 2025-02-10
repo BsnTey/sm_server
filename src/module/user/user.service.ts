@@ -24,6 +24,9 @@ export class UserService {
         if (!existUser) {
             return null;
         }
+        if (existUser.isBan) {
+            throw new Error('Доступ запрещен');
+        }
         return new UserTelegramEntity(existUser);
     }
 

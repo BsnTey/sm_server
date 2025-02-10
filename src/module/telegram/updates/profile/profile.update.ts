@@ -7,7 +7,7 @@ import { CheckingService } from '../checking/checking.service';
 import { comebackProfile, createPromocodeScene, profileKeyboard } from '../../keyboards/profile.keyboard';
 import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
-import { MAKE_DEPOSIT_SCENE, PROFILE_GET_INFO_ORDER, PROMOCODE_BOT_SCENE } from '../../scenes/profile.scene-constant';
+import { FORTUNE_BOT_SCENE, MAKE_DEPOSIT_SCENE, PROFILE_GET_INFO_ORDER, PROMOCODE_BOT_SCENE } from '../../scenes/profile.scene-constant';
 import { UserService } from '../../../user/user.service';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { PaymentService } from '../../../payment/payment.service';
@@ -62,6 +62,11 @@ export class ProfileUpdate {
     @Action('get_promocode')
     async getPromocode(@Ctx() ctx: WizardContext) {
         await ctx.scene.enter(PROMOCODE_BOT_SCENE);
+    }
+
+    @Action('fortune')
+    async goToFortune(@Ctx() ctx: WizardContext) {
+        await ctx.scene.enter(FORTUNE_BOT_SCENE);
     }
 }
 

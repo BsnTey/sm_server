@@ -9,7 +9,6 @@ import {
     ERROR_CREATE_PROMOCODE,
     ERROR_GET_BOT_ID,
     ERROR_GET_SEARCH_ID,
-    ERROR_GET_STATISTICS,
     ERROR_GET_TRANSACTIONS,
     ERROR_NOT_FOUND_TRANSACTION,
 } from './constants/error.constants';
@@ -141,14 +140,6 @@ export class PaymentService {
         };
     }
 
-    async getUsersStatistic() {
-        try {
-            return await this.bottService.getStatistics();
-        } catch (err) {
-            throw new BadRequestException(ERROR_GET_STATISTICS);
-        }
-    }
-
     async findRemainingActivations(telegramId: string, userName: string) {
         let promoCodeDetails = null;
 
@@ -169,7 +160,7 @@ export class PaymentService {
     }
 
     async createPromocode(telegramId: string, userName: string) {
-        const responseStatistics = await this.getUsersStatistic();
+        const responseStatistics = await this.bottService.getStatistics();
         const csrfToken = extractCsrf(responseStatistics);
         const usersStatistic = extractUsersStatistics(responseStatistics, this.tgNamesExceptionStatistic);
         const promoName = userName || telegramId;
@@ -180,7 +171,7 @@ export class PaymentService {
     }
 
     async getInfoAboutPromocode(telegramId: string, userName: string) {
-        const responseStatistics = await this.getUsersStatistic();
+        const responseStatistics = await this.bottService.getStatistics();
         const usersStatistic = extractUsersStatistics(responseStatistics, this.tgNamesExceptionStatistic);
         return this.getDiscountFromStatistic(telegramId, userName, usersStatistic);
     }

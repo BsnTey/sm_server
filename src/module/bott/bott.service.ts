@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '../http/http.service';
 import { BotTHeadersService } from './entities/headers-bot-t.entity';
@@ -8,6 +8,8 @@ import qs from 'qs';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { ProxyService } from '../proxy/proxy.service';
 import { ProxyEntity } from '../proxy/entities/proxy.entity';
+import { ERROR_GET_STATISTICS } from '../payment/constants/error.constants';
+import dayjs from 'dayjs';
 
 @Injectable()
 export class BottService {
@@ -97,8 +99,12 @@ export class BottService {
         };
 
         const url = this.urlBotT + `lk/common/replenishment/main/statistics`;
-        const response = await this.httpService.get(url, { headers: this.headers, params, httpsAgent: this.httpsAgent });
-        return response.data;
+        try {
+            const response = await this.httpService.get(url, { headers: this.headers, params, httpsAgent: this.httpsAgent });
+            return response.data;
+        } catch (err) {
+            throw new BadRequestException(ERROR_GET_STATISTICS);
+        }
     }
 
     async getCouponPage(page = 1): Promise<Html> {
@@ -112,11 +118,16 @@ export class BottService {
         return response.data;
     }
 
-    async createPromocode(csrfToken: string, promoName: string, discountPercent: number, countActivation = 5) {
+    async createPromocode(csrfToken: string, promoName: string, discountPercent: number, countActivation = 5, activateAt?: string) {
         const params = {
             bot_id: this.sellerTradeBotId,
             type: '0',
         };
+
+        if (!activateAt) {
+            activateAt = dayjs().add(1, 'month').format('YYYY-MM-DDTHH:mm');
+        }
+
         const payload = qs.stringify({
             '_csrf-frontend': csrfToken,
             'ShopCouponCreateForm[code]': promoName,
@@ -124,6 +135,7 @@ export class BottService {
             'ShopCouponCreateForm[min_price]': 50,
             'ShopCouponCreateForm[only_first]': 0,
             'ShopCouponCreateForm[only_one_user_one_coupon]': 0,
+            'ShopCouponCreateForm[activate_at]': activateAt,
             'ShopCouponCreateForm[discount]': discountPercent,
         });
 
