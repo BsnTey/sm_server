@@ -18,6 +18,7 @@ import { PaymentModule } from './module/payment/payment.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CronModule } from './module/cron/cron.module';
 import { WebappModule } from './module/webapp/webapp.module';
+import { CouponModule } from './module/coupon/coupon.module';
 
 @Module({
     imports: [
@@ -45,7 +46,7 @@ import { WebappModule } from './module/webapp/webapp.module';
         PaymentModule,
         CronModule,
         WebappModule,
+        CouponModule,
     ],
-    providers: [],
 })
 export class AppModule {}

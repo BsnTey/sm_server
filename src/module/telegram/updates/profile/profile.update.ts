@@ -38,7 +38,14 @@ export class ProfileUpdate {
     async inputAccounts(@Message('text') inputAccounts: string, @Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         const user = await this.userService.getUserByTelegramId(String(telegramId));
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
-        const accounts = inputAccounts.split('\n');
+
+        const allAccounts = inputAccounts.split('\n');
+        const accounts = allAccounts.slice(0, 22);
+        const extraAccounts = allAccounts.slice(22);
+
+        if (extraAccounts.length > 0) {
+            await ctx.reply(`Не вместилось, отправьте еще раз:\n${extraAccounts.join('\n')}`);
+        }
         await ctx.reply('Началась проверка');
         const checkedAccounts = await this.checkingService.checkingAccountsOnPromocodes(accounts);
         await ctx.reply(checkedAccounts.join(''), { parse_mode: 'HTML', ...getMainMenuKeyboard(user.role) });
@@ -46,7 +53,7 @@ export class ProfileUpdate {
 
     @Action('check_promo')
     async goToCheckerPromo(@Ctx() ctx: WizardContext) {
-        await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки');
+        await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки. За раз не больше 20');
     }
 
     @Action('get_info_order')

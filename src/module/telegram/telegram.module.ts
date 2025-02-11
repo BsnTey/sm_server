@@ -27,7 +27,7 @@ import { QrCodeService } from './updates/qr-code/qr-code.service';
 import { GetInfoOrderUpdate, ProfileUpdate, PromocodeBotUpdate } from './updates/profile/profile.update';
 import { AdminUpdate } from './updates/admin/admin.update';
 import { AuthMirrorUpdate } from './updates/auth-mirror/auth-mirror.update';
-import { PaymentUpdate } from './updates/payment/payment.update';
+import { PaymentPromocodeUpdate, PaymentUpdate } from './updates/payment/payment.update';
 import { AccountModule } from '../account/account.module';
 import { ProxyModule } from '../proxy/proxy.module';
 import { SharedModule } from '../shared/shared.module';
@@ -35,9 +35,11 @@ import { HttpModule } from '../http/http.module';
 import { UserModule } from '../user/user.module';
 import { PaymentModule } from '../payment/payment.module';
 import { MirrorModule } from '../mirror/mirror.module';
+import { CouponModule } from '../coupon/coupon.module';
+import { FortuneUpdate } from './updates/fortune/fortune.update';
 
 @Module({
-    imports: [AccountModule, ProxyModule, SharedModule, HttpModule, UserModule, PaymentModule, MirrorModule],
+    imports: [AccountModule, ProxyModule, SharedModule, HttpModule, UserModule, PaymentModule, MirrorModule, CouponModule],
     providers: [
         TelegramService,
         MakeOrderService,
@@ -71,6 +73,8 @@ import { MirrorModule } from '../mirror/mirror.module';
         PromocodeBotUpdate,
         AuthMirrorUpdate,
         PaymentUpdate,
+        PaymentPromocodeUpdate,
+        FortuneUpdate,
     ],
     exports: [TelegramService],
 })

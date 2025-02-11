@@ -9,6 +9,8 @@ export class PaymentOrderEntity implements PaymentOrderModel {
     receiptUrl: string | null;
     isPositive: boolean | null;
     completedAt: Date | null;
+    couponId: string | null;
+    couponApplied: boolean;
     userTelegramId: string;
     createdAt: Date;
     updatedAt: Date;

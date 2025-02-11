@@ -13,7 +13,7 @@ import {
 } from '../updates/base-command/base-command.constants';
 import { UserRole } from '@prisma/client';
 
-export function getMainMenuKeyboard(role: UserRole) {
+export function getMainMenuKeyboard(role?: UserRole) {
     const firstRow = [CHANGE_NUMBER.name, MAKE_ORDER.name];
     if (role != 'User') firstRow.unshift(AUTH_MIRROR.name);
     const keyboard = [

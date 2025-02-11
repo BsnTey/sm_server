@@ -43,7 +43,15 @@ export class CheckingUpdate {
     async inputAccounts(@Message('text') inputAccounts: string, @Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         const user = await this.userService.getUserByTelegramId(String(telegramId));
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
-        const accounts = inputAccounts.split('\n');
+
+        const allAccounts = inputAccounts.split('\n');
+        const accounts = allAccounts.slice(0, 22);
+        const extraAccounts = allAccounts.slice(22);
+
+        if (extraAccounts.length > 0) {
+            await ctx.reply(`Следующие аккаунты не вместились, отправьте их ещё раз:\n${extraAccounts.join('\n')}`);
+        }
+
         await ctx.reply('Началась проверка');
         const checkedAccounts = await this.checkingService.checkingAccounts(accounts);
         await ctx.reply(checkedAccounts.join(''), getMainMenuKeyboard(user.role));

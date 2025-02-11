@@ -21,17 +21,18 @@ model User {
 }
 
 model UserTelegram {
-  telegramId    String         @id @unique @map("telegram_id")
-  telegramName  String         @map("telegram_name")
-  countBonuses  Int            @default(0) @map("count_bonuses")
-  isBan         Boolean        @default(false) @map("is_ban")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  role          UserRole       @default(User)
-  accounts      Account[]
-  paymentOrders PaymentOrder[]
-  user          User?
-  userCities    UserCitySM[]
+  telegramId     String          @id @unique @map("telegram_id")
+  telegramName   String          @map("telegram_name")
+  countBonuses   Int             @default(0) @map("count_bonuses")
+  isBan          Boolean         @default(false) @map("is_ban")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  role           UserRole        @default(User)
+  accounts       Account[]
+  paymentOrders  PaymentOrder[]
+  user           User?
+  fortuneCoupons FortuneCoupon[]
+  userCities     UserCitySM[]
 
   @@map("user_telegram")
 }
@@ -145,19 +146,23 @@ model Course {
 }
 
 model PaymentOrder {
-  id             String                      @id @default(uuid()) @db.Uuid
+  id             String        @id @default(uuid()) @db.Uuid
   amount         Int
-  status         StatusPayment               @default(Created) @map("status")
-  receiptUrl     String?                     @map("receipt_url")
-  completedAt    DateTime?                   @map("completed_at")
-  userTelegramId String                      @map("user_telegram_id")
-  createdAt      DateTime                    @default(now()) @map("created_at")
-  updatedAt      DateTime                    @updatedAt @map("updated_at")
-  isPositive     Boolean?                    @map("is_positive")
-  amountCredited Int                         @map("amount_credited")
-  transactionId  Int?                        @unique @map("transaction_id")
-  userTelegram   UserTelegram                @relation(fields: [userTelegramId], references: [telegramId])
-  statusHistory  PaymentOrderStatusHistory[]
+  status         StatusPayment @default(Created) @map("status")
+  receiptUrl     String?       @map("receipt_url")
+  completedAt    DateTime?     @map("completed_at")
+  userTelegramId String        @map("user_telegram_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  isPositive     Boolean?      @map("is_positive")
+  amountCredited Int           @map("amount_credited")
+  transactionId  Int?          @unique @map("transaction_id")
+  couponId       String?       @db.Uuid
+  couponApplied  Boolean       @default(false)
+
+  userTelegram  UserTelegram                @relation(fields: [userTelegramId], references: [telegramId])
+  statusHistory PaymentOrderStatusHistory[]
+  coupon        FortuneCoupon?              @relation(fields: [couponId], references: [id])
 
   @@index([userTelegramId])
   @@index([status])
@@ -242,6 +247,35 @@ model AccountMirror {
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
   @@map("account_mirror")
+}
+
+model FortuneCoupon {
+  id          String              @id @default(uuid()) @db.Uuid
+  coupon      String              @unique
+  type        FortuneSurpriseType
+  value       Int
+  isActive    Boolean             @default(true) @map("is_active")
+  expiresAt   DateTime            @map("expires_at")
+  usageCount  Int                 @default(0) @map("usage_count")
+  maxUsage    Int                 @default(1) @map("max_usage")
+  description String?
+
+  redeemedAt DateTime? @map("redeemed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner        String
+  userTelegram UserTelegram?  @relation(fields: [owner], references: [telegramId])
+  payments     PaymentOrder[]
+
+  @@map("fortune_surprise")
+}
+
+enum FortuneSurpriseType {
+  Replenish
+  Discount
+  Payment
 }
 
 enum UserRole {

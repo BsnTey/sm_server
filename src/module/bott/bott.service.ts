@@ -143,4 +143,28 @@ export class BottService {
         const response = await this.httpService.post(url, payload, { headers: this.headers, params, httpsAgent: this.httpsAgent });
         return response.status;
     }
+
+    async createReplenishPromocode(csrfToken: string, promoName: string, discount: number, countActivation = 1, activateAt?: string) {
+        const params = {
+            bot_id: this.sellerTradeBotId,
+            type: '2',
+        };
+
+        if (!activateAt) {
+            activateAt = dayjs().add(1, 'month').format('YYYY-MM-DDTHH:mm');
+        }
+
+        const payload = qs.stringify({
+            '_csrf-frontend': csrfToken,
+            'ShopCouponReplenishmentCreate[code]': promoName,
+            'ShopCouponReplenishmentCreate[discount]': discount,
+            'ShopCouponReplenishmentCreate[count]': countActivation,
+            'ShopCouponReplenishmentCreate[only_one_user_one_coupon]': 0,
+            'ShopCouponReplenishmentCreate[activate_at]': activateAt,
+        });
+
+        const url = this.urlBotT + `lk/common/shop/coupon/replenish`;
+        const response = await this.httpService.post(url, payload, { headers: this.headers, params, httpsAgent: this.httpsAgent });
+        return response.status;
+    }
 }

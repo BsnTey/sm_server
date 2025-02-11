@@ -6,16 +6,26 @@ import { TelegramService } from '../../telegram.service';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { ALL_KEYS_MENU_BUTTON_NAME } from '../base-command/base-command.constants';
 import { getSurprise } from '../../keyboards/profile.keyboard';
+import { FortuneCouponService } from '../../../coupon/fortune-coupon.service';
+import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 
 @Scene(FORTUNE_BOT_SCENE)
 @UseFilters(TelegrafExceptionFilter)
 export class FortuneUpdate {
-    constructor(private telegramService: TelegramService) {}
+    constructor(
+        private telegramService: TelegramService,
+        private fortuneCouponService: FortuneCouponService,
+    ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const text = 'Жмите на кнопку, забирайте приз!';
-        await ctx.editMessageText(text, getSurprise);
+        const prizeToday = await this.fortuneCouponService.getPrizeForToday(String(telegramId));
+        if (prizeToday) {
+            await ctx.editMessageText('😦 Вы уже получили приз сегодня, приходите за ним завтра.');
+        } else {
+            const text = 'Жмите на кнопку, забирайте приз! 🥳';
+            await ctx.editMessageText(text, getSurprise);
+        }
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
@@ -24,5 +34,15 @@ export class FortuneUpdate {
     }
 
     @Action('get_surprise')
-    async getSurprise(@Ctx() ctx: WizardContext) {}
+    async getSurprise(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
+        const prize = this.fortuneCouponService.getRandomPrize();
+        const newCoupon = await this.fortuneCouponService.awardPrizeToUser(prize, String(telegramId));
+        await ctx.reply(
+            `🔥 Поздравляем! Вы выиграли: ${prize.name}.\nДЕЙСТВУЕТ ДО КОНЦА ДНЯ\n(код: <b><code>${newCoupon.coupon}</code></b>)`,
+            {
+                parse_mode: 'HTML',
+                ...getMainMenuKeyboard(),
+            },
+        );
+    }
 }

@@ -193,4 +193,9 @@ export class PaymentService {
                 return 5;
         }
     }
+
+    async applyCouponToPaymentOrder(paymentId: string, newAmountCredited: number, couponId: string): Promise<PaymentOrderEntity> {
+        const paymentOrderModel = await this.paymentRepository.applyCouponToPaymentOrder(paymentId, newAmountCredited, couponId);
+        return new PaymentOrderEntity(paymentOrderModel);
+    }
 }

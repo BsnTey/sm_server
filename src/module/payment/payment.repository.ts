@@ -107,4 +107,16 @@ export class PaymentRepository {
             })),
         }));
     }
+
+    async applyCouponToPaymentOrder(paymentId: string, newAmountCredited: number, couponId: string): Promise<PaymentOrder> {
+        return this.prisma.paymentOrder.update({
+            where: { id: paymentId },
+            data: {
+                amountCredited: newAmountCredited,
+                couponId: couponId,
+                couponApplied: true,
+                updatedAt: new Date(),
+            },
+        });
+    }
 }
