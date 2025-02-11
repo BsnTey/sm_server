@@ -79,7 +79,7 @@ export class FortuneCouponService {
             const csrfToken = extractCsrf(responseStatistics);
             const activateAt = dayjs(expiresAt).format('YYYY-MM-DDTHH:mm');
             const promoStatus = await this.bottService.createReplenishPromocode(csrfToken, generatedCode, value, 1, activateAt);
-            if (promoStatus !== 302) {
+            if (promoStatus !== 302 && promoStatus !== 200) {
                 throw new BadRequestException('Не удалось создать промокод для начисления');
             }
             return this.couponRepository.createCoupon({
