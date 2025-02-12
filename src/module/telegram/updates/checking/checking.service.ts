@@ -80,7 +80,7 @@ export class CheckingService {
 
         try {
             const { bonusCount, bonusDetails } = await this.accountService.shortInfo(trimmedAccountId);
-            await this.accountService.orderHistory(trimmedAccountId);
+            // await this.accountService.orderHistory(trimmedAccountId);
             let result = `${trimmedAccountId}: ${bonusCount}`;
             const uniqueBonuses = new Set<string>();
 
