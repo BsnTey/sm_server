@@ -35,6 +35,11 @@ export class FortuneUpdate {
 
     @Action('get_surprise')
     async getSurprise(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
+        const prizeToday = await this.fortuneCouponService.getPrizeForToday(String(telegramId));
+        if (prizeToday) {
+            await ctx.reply('😦 Вы уже получили приз сегодня, приходите за ним завтра.');
+            return;
+        }
         const prize = this.fortuneCouponService.getRandomPrize();
         const newCoupon = await this.fortuneCouponService.awardPrizeToUser(prize, String(telegramId));
         await ctx.reply(
