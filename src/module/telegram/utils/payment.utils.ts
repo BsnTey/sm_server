@@ -60,29 +60,30 @@ export const extractUsersStatistics = (html: string, usersException: string[]): 
 };
 
 export const getPromoCodeDetailsFromHtml = (html: string, promoCodeName: string): USerPromocodeActivations | null => {
-    const unifiedRegex = new RegExp(
+    const regex = new RegExp(
         `<tr[^>]*?>\\s*` +
             `<td[^>]*?>${promoCodeName}<\\/td>\\s*` +
-            `<td[^>]*?(?:aria-label=\\"?Статус\\"?[^>]*?)?>Не активирован<\\/td>\\s*` +
-            `<td[^>]*?(?:aria-label=\\"?Тип\\"?[^>]*?)?>Скидка в процентах<\\/td>\\s*` +
-            `<td[^>]*?(?:aria-label=\\"?Ник пользователя\\"?[^>]*?)?>-<\\/td>\\s*` +
-            `(?:<td[^>]*?(?:aria-label=\\"?Срок действия\\"?[^>]*?)?>Бессрочно<\\/td>\\s*)?` +
-            `<td[^>]*?(?:aria-label=\\"?Минимальная сумма\\"?[^>]*?)?>(\\d+)<\\/td>\\s*` +
-            `<td[^>]*?(?:aria-label=\\"?Размер скидки(?:\\/начисления)?\\"?[^>]*?)?>` +
-            `<span[^>]*?>(\\d+\\s?%)<\\/span><\\/td>\\s*` +
-            `<td[^>]*?(?:aria-label=\\"?Кол-во активаций\\"?[^>]*?)?>(\\d+|Одноразовый)<\\/td>`,
+            `<td[^>]*?(?:aria-label="Статус"[^>]*?)?>Не активирован<\\/td>\\s*` +
+            `<td[^>]*?(?:aria-label="Тип"[^>]*?)?>Скидка в процентах<\\/td>\\s*` +
+            `<td[^>]*?(?:aria-label="Ник пользователя"[^>]*?)?>-<\\/td>\\s*` +
+            `<td[^>]*?(?:aria-label="Срок действия"[^>]*?)?>(?:Бессрочно|[^<]+)<\\/td>\\s*` +
+            `<td[^>]*?(?:aria-label="Минимальная сумма"[^>]*?)?>\\d+<\\/td>\\s*` +
+            `<td[^>]*?(?:aria-label="Размер скидки(?:\\/начисления)?"[^>]*?)?>\\s*<span[^>]*?>(\\d+\\s?%)<\\/span>\\s*<\\/td>\\s*` +
+            `<td[^>]*?(?:aria-label="Кол-во активаций"[^>]*?)?>(\\d+|Одноразовый)<\\/td>`,
         'i',
     );
 
-    const match1 = unifiedRegex.exec(html);
+    const match = regex.exec(html);
 
-    if (match1) {
-        const match = match1;
-        const activationsLeft = match![3] === 'Одноразовый' ? 1 : parseInt(match![3], 10);
-        return {
-            activationsLeft: activationsLeft,
-            discount: parseInt(match![2], 10),
-        };
+    if (match) {
+        const discountStr = match[1];
+        const activationsStr = match[2];
+
+        const discount = parseInt(discountStr, 10);
+        const activationsLeft = activationsStr === 'Одноразовый' ? 1 : parseInt(activationsStr, 10);
+
+        return { discount, activationsLeft };
     }
+
     return null;
 };
