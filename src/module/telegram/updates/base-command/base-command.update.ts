@@ -99,7 +99,7 @@ export class HelpUpdate {
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
-        await ctx.reply(`Обратиться в поддержку можно по ссылке ${this.tgAdmin}. Бот для покупки ${this.shopTg}`);
+        await ctx.reply(`Бот для покупки ${this.shopTg}`);
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
