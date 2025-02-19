@@ -17,6 +17,7 @@ import { CourseService } from './course.service';
 import { UpdateCourseStatusRequestDto } from './dto/updateCourseStatus-course';
 import { CourseData } from './interfaces/course-data.interface';
 import { ERROR_ACCOUNT_NOT_FOUND } from './constants/error.constant';
+import { UpdatingCookieRequestDto, UpdatingCookieResponseDto } from './dto/updateCookie-account.dto';
 
 @Controller('account')
 export class AccountController {
@@ -135,6 +136,16 @@ export class AccountController {
         @Param() params: AccountIdParamsDto,
     ): Promise<UpdateGoogleIdResponseDto> {
         return await this.accountService.updateGoogleId(params.accountId, dto);
+    }
+
+    @HasZenno()
+    @Patch(':accountId/cookie')
+    @HttpCode(200)
+    async updateCookieAccount(
+        @Body() dto: UpdatingCookieRequestDto,
+        @Param() params: AccountIdParamsDto,
+    ): Promise<UpdatingCookieResponseDto> {
+        return await this.accountService.updateCookie(params.accountId, dto);
     }
 
     // @HasZenno()

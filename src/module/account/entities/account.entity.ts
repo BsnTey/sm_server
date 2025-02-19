@@ -55,25 +55,44 @@ export class AccountEntity implements Account {
     }
 
     private formatedCookie(cookieString: string) {
-        const cookieInJson: any[] = JSON.parse(cookieString);
+        return cookieString;
+
+        // const cookieInJson: any[] = JSON.parse(cookieString);
+        // const smid = cookieInJson.find(cookie => {
+        //     if (cookie.name == 'SMID') return true;
+        // });
+        //
+        // const cookieObject: Cookie[] = [
+        //     {
+        //         domain: 'www.sportmaster.ru',
+        //         hostOnly: true,
+        //         httpOnly: true,
+        //         name: 'SMID',
+        //         path: '/',
+        //         sameSite: 'lax',
+        //         secure: false,
+        //         session: false,
+        //         storeId: null,
+        //         value: smid.value,
+        //     },
+        // ];
+        //
+        // return JSON.stringify(cookieObject);
+    }
+
+    get3BaseCookie(): string {
+        const cookieInJson: any[] = JSON.parse(this.cookie);
         const smid = cookieInJson.find(cookie => {
             if (cookie.name == 'SMID') return true;
         });
+        const smauth = cookieInJson.find(cookie => {
+            if (cookie.name == 'SMAUTH') return true;
+        });
+        const smaid = cookieInJson.find(cookie => {
+            if (cookie.name == 'SMAID') return true;
+        });
 
-        const cookieObject: Cookie[] = [
-            {
-                domain: 'www.sportmaster.ru',
-                hostOnly: true,
-                httpOnly: true,
-                name: 'SMID',
-                path: '/',
-                sameSite: 'lax',
-                secure: false,
-                session: false,
-                storeId: null,
-                value: smid.value,
-            },
-        ];
+        const cookieObject: Cookie[] = [...smid, ...smauth, ...smaid];
 
         return JSON.stringify(cookieObject);
     }

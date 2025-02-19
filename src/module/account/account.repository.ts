@@ -268,6 +268,17 @@ export class AccountRepository {
         });
     }
 
+    async updateCookie(accountId: string, cookie: string): Promise<Account> {
+        return this.prisma.account.update({
+            where: {
+                accountId,
+            },
+            data: {
+                cookie,
+            },
+        });
+    }
+
     async promblemCourses(accountId: string): Promise<Account> {
         return this.prisma.account.update({
             where: {

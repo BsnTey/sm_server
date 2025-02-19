@@ -16,13 +16,13 @@ export class FortuneCouponService {
     private readonly prizes: Prize[] = [
         { name: 'Купон на счет 200р. Активация в Спортивном боте', chance: 7, code: 'Replenish_200' },
         { name: 'Купон на счет 500р. Активация в Спортивном боте', chance: 5, code: 'Replenish_500' },
-        { name: 'Купон на счет 50р. Активация в Спортивном боте', chance: 25, code: 'Replenish_50' },
-        { name: 'Купон на счет 100р. Активация в Спортивном боте', chance: 21, code: 'Replenish_100' },
+        { name: 'Купон на счет 50р. Активация в Спортивном боте', chance: 27, code: 'Replenish_50' },
+        { name: 'Купон на счет 100р. Активация в Спортивном боте', chance: 23, code: 'Replenish_100' },
         { name: 'Пополнение 25%. Активация в профиле при пополнении', chance: 3, code: 'Payment_25' },
         { name: 'Пополнение 30%. Активация в профиле при пополнении', chance: 3, code: 'Payment_30' },
         { name: 'Скидка 25%. Активация в Спортивном боте', chance: 13, code: 'Discount_25' },
-        { name: 'Скидка 30%. Активация в Спортивном боте', chance: 13, code: 'Discount_30' },
-        { name: 'Скидка 50%. Активация в Спортивном боте', chance: 10, code: 'Discount_50' },
+        { name: 'Скидка 30%. Активация в Спортивном боте', chance: 11, code: 'Discount_30' },
+        { name: 'Скидка 50%. Активация в Спортивном боте', chance: 8, code: 'Discount_50' },
     ];
 
     constructor(

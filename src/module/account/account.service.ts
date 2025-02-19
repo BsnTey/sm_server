@@ -40,6 +40,7 @@ import { CourseWithLessons, IAccountCourseWLesson, IWatchLesson } from './interf
 import { CourseTokensEntity } from './entities/courseTokens.entity';
 import { UpdatingCourseTokensAccountRequestDto } from './dto/update-course-tokens-account.dto';
 import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
+import { UpdatingCookieRequestDto } from './dto/updateCookie-account.dto';
 
 @Injectable()
 export class AccountService {
@@ -143,13 +144,9 @@ export class AccountService {
     }
 
     async getAccount(accountId: string): Promise<AccountEntity> {
-        const account = await this.getAccountFromDb(accountId);
+        const account = await this.accountRep.getAccount(accountId);
         if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
         return new AccountEntity(account);
-    }
-
-    private async getAccountFromDb(accountId: string) {
-        return await this.accountRep.getAccount(accountId);
     }
 
     async findAccountEmail(accountId: string) {
@@ -169,8 +166,7 @@ export class AccountService {
     }
 
     async updateAccountBonusCount(accountId: string, data: UpdatingBonusCountRequestDto) {
-        const account = await this.getAccountFromDb(accountId);
-        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        await this.getAccount(accountId);
         return await this.updateAccountBonusCountPrivate(accountId, data.bonusCount);
     }
 
@@ -179,16 +175,14 @@ export class AccountService {
     }
 
     async updateAccount(accountId: string, dto: UpdateAccountRequestDto) {
-        const account = await this.getAccountFromDb(accountId);
-        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        await this.getAccount(accountId);
 
         const updateAccountEntity = new AccountUpdateEntity(dto);
         return await this.accountRep.updateAccount(accountId, updateAccountEntity);
     }
 
     async updateTokensAccount(accountId: string, dataAccount: IRefreshAccount) {
-        const account = await this.getAccountFromDb(accountId);
-        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        await this.getAccount(accountId);
         return await this.updateTokensAccountPrivate(accountId, dataAccount);
     }
 
@@ -199,14 +193,12 @@ export class AccountService {
     }
 
     async updateCourseTokensAccount(accountId: string, data: UpdatingCourseTokensAccountRequestDto) {
-        const account = await this.getAccountFromDb(accountId);
-        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        await this.getAccount(accountId);
         return await this.updateCourseTokensAccountPrivate(accountId, data);
     }
 
     async updateCourseStatusAccount(accountId: string, data: UpdatingCourseStatusAccountRequestDto) {
-        const account = await this.getAccountFromDb(accountId);
-        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        await this.getAccount(accountId);
         return await this.accountRep.updateCourseStatusAccount(accountId, data.statusCourse);
     }
 
@@ -221,8 +213,7 @@ export class AccountService {
     }
 
     async connectionCourseAccount(accountId: string) {
-        const account = await this.getAccountFromDb(accountId);
-        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        const account = await this.getAccount(accountId);
 
         await this.accountRep.addAccountCourses(accountId);
         const lessons = await this.courseService.getAllLesson();
@@ -242,17 +233,21 @@ export class AccountService {
     }
 
     async updateGoogleId(accountId: string, data: UpdateGoogleIdRequestDto): Promise<{ googleId: string }> {
-        const account = await this.getAccountFromDb(accountId);
-        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        await this.getAccount(accountId);
 
         const googleId = data.googleId || uuidv4();
         await this.accountRep.updateGoogleId(accountId, googleId);
         return { googleId };
     }
 
+    async updateCookie(accountId: string, data: UpdatingCookieRequestDto): Promise<{ cookie: string }> {
+        await this.getAccount(accountId);
+
+        return await this.accountRep.updateCookie(accountId, data.cookie);
+    }
+
     async updatePushToken(accountId: string, data: UpdatePushTokenRequestDto): Promise<{ pushToken: string }> {
-        const account = await this.getAccountFromDb(accountId);
-        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        await this.getAccount(accountId);
 
         const pushToken = data.pushToken || this.generateFCMLikeToken();
         await this.accountRep.updatePushToken(accountId, pushToken);
