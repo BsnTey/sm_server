@@ -92,7 +92,7 @@ export class AccountEntity implements Account {
             if (cookie.name == 'SMAID') return true;
         });
 
-        const cookieObject: Cookie[] = [...smid, ...smauth, ...smaid];
+        const cookieObject: Cookie[] = [smid, smauth, smaid];
 
         return JSON.stringify(cookieObject);
     }
