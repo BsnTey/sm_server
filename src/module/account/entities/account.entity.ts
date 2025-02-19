@@ -80,7 +80,7 @@ export class AccountEntity implements Account {
         // return JSON.stringify(cookieObject);
     }
 
-    get3BaseCookie(): string {
+    getBaseCookie(): string {
         const cookieInJson: any[] = JSON.parse(this.cookie);
         const smid = cookieInJson.find(cookie => {
             if (cookie.name == 'SMID') return true;
@@ -91,8 +91,11 @@ export class AccountEntity implements Account {
         const smaid = cookieInJson.find(cookie => {
             if (cookie.name == 'SMAID') return true;
         });
+        const smafauth = cookieInJson.find(cookie => {
+            if (cookie.name == 'smafauth') return true;
+        });
 
-        const cookieObject: Cookie[] = [smid, smauth, smaid];
+        const cookieObject: Cookie[] = [smid, smauth, smaid, smafauth];
 
         return JSON.stringify(cookieObject);
     }

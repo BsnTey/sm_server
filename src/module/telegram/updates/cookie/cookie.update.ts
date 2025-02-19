@@ -34,6 +34,6 @@ export class CookieUpdate {
     @On('text')
     async findAccount(@Message('text', new isAccountIdPipe()) accountId: string, @Ctx() ctx: WizardContext) {
         const account = await this.accountService.getAccount(accountId);
-        await ctx.reply(account.get3BaseCookie());
+        await ctx.reply(account.getBaseCookie());
     }
 }

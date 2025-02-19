@@ -243,7 +243,7 @@ export class AccountService {
     async updateCookie(accountId: string, data: UpdatingCookieRequestDto): Promise<{ cookie: string }> {
         await this.getAccount(accountId);
 
-        return await this.accountRep.updateCookie(accountId, data.cookie);
+        return this.accountRep.updateCookie(accountId, data.cookie);
     }
 
     async updatePushToken(accountId: string, data: UpdatePushTokenRequestDto): Promise<{ pushToken: string }> {
