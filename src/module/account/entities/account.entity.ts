@@ -1,5 +1,4 @@
 import { Account, CourseStatus } from '@prisma/client';
-import { Cookie } from '../interfaces/cookie.interface';
 
 export class AccountEntity implements Account {
     accountId: string;
@@ -82,20 +81,11 @@ export class AccountEntity implements Account {
 
     getBaseCookie(): string {
         const cookieInJson: any[] = JSON.parse(this.cookie);
-        const smid = cookieInJson.find(cookie => {
-            if (cookie.name == 'SMID') return true;
-        });
-        const smauth = cookieInJson.find(cookie => {
-            if (cookie.name == 'SMAUTH') return true;
-        });
-        const smaid = cookieInJson.find(cookie => {
-            if (cookie.name == 'SMAID') return true;
-        });
-        const smafauth = cookieInJson.find(cookie => {
-            if (cookie.name == 'smafauth') return true;
-        });
+        const cookieNames = ['SMID', 'SMAUTH', 'SMAID', 'smafauth', 'UDID'];
 
-        const cookieObject: Cookie[] = [smid, smauth, smaid, smafauth];
+        const cookieObject = cookieNames
+            .map(name => cookieInJson.find(cookie => cookie.name === name))
+            .filter(cookie => cookie !== undefined);
 
         return JSON.stringify(cookieObject);
     }
