@@ -1,5 +1,5 @@
 import axios, { AxiosResponse } from 'axios';
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { IHttpInterface } from './interfaces/http.interface';
 
 @Injectable()
@@ -13,7 +13,7 @@ export class HttpService implements IHttpInterface {
             return await axios.get<T>(url, { timeout: this.timeout, ...options });
         } catch (error: any) {
             console.error(`HTTP GET error on url ${url}:`, error.message);
-            throw new InternalServerErrorException(`Ошибка HTTP GET запроса: ${error}`);
+            throw error;
         }
     }
 
@@ -22,7 +22,7 @@ export class HttpService implements IHttpInterface {
             return await axios.post<T>(url, payload, { timeout: this.timeout, ...options });
         } catch (error: any) {
             console.error(`HTTP POST error on url ${url}:`, error.message);
-            throw new InternalServerErrorException(`Ошибка HTTP POST запроса: ${error}`);
+            throw error;
         }
     }
 
@@ -31,7 +31,7 @@ export class HttpService implements IHttpInterface {
             return await axios.delete<T>(url, { timeout: this.timeout, ...options });
         } catch (error: any) {
             console.error(`HTTP DELETE error on url ${url}:`, error.message);
-            throw new InternalServerErrorException(`Ошибка HTTP DELETE запроса: ${error}`);
+            throw error;
         }
     }
 }
