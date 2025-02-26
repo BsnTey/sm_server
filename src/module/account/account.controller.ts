@@ -213,7 +213,10 @@ export class AccountController {
     @Post('accounts/device')
     @HttpCode(200)
     async getTmpInfo(@Body() deviceInfoDto: DeviceInfoRequestDto) {
-        return this.deviceInfoService.getTmpDeviceInfo(deviceInfoDto);
+        console.log('getTmpInfo');
+        const deviceInfo = await this.deviceInfoService.getTmpDeviceInfo(deviceInfoDto);
+        console.log(deviceInfo);
+        return deviceInfo;
     }
 
     @HasZenno()
