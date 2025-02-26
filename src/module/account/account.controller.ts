@@ -203,24 +203,21 @@ export class AccountController {
     }
 
     @HasZenno()
-    @Post('accounts/:accountId/device')
+    @Post(':accountId/device')
     @HttpCode(200)
     async addDeviceInfo(@Param() params: AccountIdParamsDto, @Body() deviceInfoDto: DeviceInfoRequestDto): Promise<DeviceInfoResponseDto> {
         return this.accountService.addDeviceInfo(params.accountId, deviceInfoDto);
     }
 
     @HasZenno()
-    @Post('accounts/device')
+    @Post('device')
     @HttpCode(200)
     async getTmpInfo(@Body() deviceInfoDto: DeviceInfoRequestDto) {
-        console.log('getTmpInfo');
-        const deviceInfo = await this.deviceInfoService.getTmpDeviceInfo(deviceInfoDto);
-        console.log(deviceInfo);
-        return deviceInfo;
+        return this.deviceInfoService.getTmpDeviceInfo(deviceInfoDto);
     }
 
     @HasZenno()
-    @Put('accounts/:accountId/device')
+    @Put(':accountId/device')
     @HttpCode(200)
     async updateDeviceInfo(
         @Param() params: AccountIdParamsDto,
