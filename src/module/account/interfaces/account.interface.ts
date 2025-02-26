@@ -3,6 +3,7 @@ import { SearchProductInterface } from './search-product.interface';
 import { CartInterface } from './cart.interface';
 import { PickupAvabilityInterface, Shop } from './pickup-avability.interface';
 import { IItemsCart } from '../../telegram/utils/cart.utils';
+import { IDeviceInfo } from './deviceInfo.interface';
 
 export interface IRefreshAccount {
     accessToken: string;
@@ -42,6 +43,10 @@ export interface IUpdateAccount {
     accessTokenCourse: string;
     refreshTokenCourse: string;
     isValidAccessTokenCourse: boolean;
+}
+
+export interface AccountWDevice extends Account {
+    deviceInfo: IDeviceInfo | null;
 }
 
 export interface IEmailFromDb {

@@ -2,7 +2,7 @@ import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestj
 import { AccountRepository } from './account.repository';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
 import { AccountEntity } from './entities/account.entity';
-import { IAccountWithProxy, IFindCitiesAccount, IRecipientOrder, IRefreshAccount } from './interfaces/account.interface';
+import { AccountWDevice, IAccountWithProxy, IFindCitiesAccount, IRecipientOrder, IRefreshAccount } from './interfaces/account.interface';
 import { CourseStatus, Order } from '@prisma/client';
 import { ProxyService } from '../proxy/proxy.service';
 import {
@@ -41,6 +41,9 @@ import { CourseTokensEntity } from './entities/courseTokens.entity';
 import { UpdatingCourseTokensAccountRequestDto } from './dto/update-course-tokens-account.dto';
 import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
 import { UpdatingCookieRequestDto } from './dto/updateCookie-account.dto';
+import { DeviceInfoService } from './deviceInfo.service';
+import { IDeviceInfo } from './interfaces/deviceInfo.interface';
+import { DeviceInfoRequestDto } from './dto/create-deviceInfo.dto';
 
 @Injectable()
 export class AccountService {
@@ -55,6 +58,7 @@ export class AccountService {
         private proxyService: ProxyService,
         private httpService: HttpService,
         private courseService: CourseService,
+        private deviceInfoService: DeviceInfoService,
         private sportmasterHeaders: SportmasterHeadersService,
     ) {}
 
@@ -146,7 +150,24 @@ export class AccountService {
     async getAccount(accountId: string): Promise<AccountEntity> {
         const account = await this.accountRep.getAccount(accountId);
         if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+
         return new AccountEntity(account);
+    }
+
+    async getFullAccount(accountId: string): Promise<AccountWDevice> {
+        const account = await this.getAccount(accountId);
+
+        let deviceInfo: IDeviceInfo | null = null;
+        try {
+            deviceInfo = await this.deviceInfoService.getDeviceInfo(accountId);
+        } catch (error) {
+            //null
+        }
+
+        return {
+            ...account,
+            deviceInfo,
+        };
     }
 
     async findAccountEmail(accountId: string) {
@@ -232,6 +253,11 @@ export class AccountService {
         return courseTokensEntity;
     }
 
+    async addDeviceInfo(accountId: string, deviceInfoDto: DeviceInfoRequestDto) {
+        await this.getAccount(accountId);
+        return this.deviceInfoService.addDeviceInfo(accountId, deviceInfoDto);
+    }
+
     async updateGoogleId(accountId: string, data: UpdateGoogleIdRequestDto): Promise<{ googleId: string }> {
         await this.getAccount(accountId);
 
@@ -259,7 +285,9 @@ export class AccountService {
         return this.createAccessTokenCourse(accountWithProxyEntity);
     }
 
-    async createAccessTokenCourse(accountWithProxyEntity: AccountWithProxyEntity): Promise<{ accessTokenCourse: string }> {
+    async createAccessTokenCourse(accountWithProxyEntity: AccountWithProxyEntity): Promise<{
+        accessTokenCourse: string;
+    }> {
         if (!accountWithProxyEntity.userGateToken) {
             const respUserGateToken = await this.getUserGateToken(accountWithProxyEntity);
             const userGateToken = respUserGateToken.data.userGateToken;

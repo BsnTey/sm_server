@@ -18,12 +18,15 @@ import { UpdateCourseStatusRequestDto } from './dto/updateCourseStatus-course';
 import { CourseData } from './interfaces/course-data.interface';
 import { ERROR_ACCOUNT_NOT_FOUND } from './constants/error.constant';
 import { UpdatingCookieRequestDto, UpdatingCookieResponseDto } from './dto/updateCookie-account.dto';
+import { DeviceInfoRequestDto, DeviceInfoResponseDto } from './dto/create-deviceInfo.dto';
+import { DeviceInfoService } from './deviceInfo.service';
 
 @Controller('account')
 export class AccountController {
     constructor(
         private accountService: AccountService,
         private courseService: CourseService,
+        private deviceInfoService: DeviceInfoService,
     ) {}
 
     @HasZenno()
@@ -38,7 +41,7 @@ export class AccountController {
     @Get(':accountId')
     @HttpCode(200)
     async getAccount(@Param() params: AccountIdParamsDto): Promise<Account> {
-        const accountEntity = await this.accountService.getAccount(params.accountId);
+        const accountEntity = await this.accountService.getFullAccount(params.accountId);
         return {
             ...accountEntity,
             cookie: JSON.parse(accountEntity.cookie),
@@ -197,5 +200,22 @@ export class AccountController {
     @HttpCode(200)
     async synchronizationCourse(@Body() data: CourseData, @Param() params: AccountIdParamsDto): Promise<string> {
         return this.courseService.synchronizationCourse(params.accountId, data);
+    }
+
+    @HasZenno()
+    @Post('accounts/:accountId/device')
+    @HttpCode(200)
+    async addDeviceInfo(@Param() params: AccountIdParamsDto, @Body() deviceInfoDto: DeviceInfoRequestDto): Promise<DeviceInfoResponseDto> {
+        return this.accountService.addDeviceInfo(params.accountId, deviceInfoDto);
+    }
+
+    @HasZenno()
+    @Put('accounts/:accountId/device')
+    @HttpCode(200)
+    async updateDeviceInfo(
+        @Param() params: AccountIdParamsDto,
+        @Body() deviceInfoDto: DeviceInfoRequestDto,
+    ): Promise<DeviceInfoResponseDto> {
+        return this.deviceInfoService.updateDeviceInfo(params.accountId, deviceInfoDto);
     }
 }
