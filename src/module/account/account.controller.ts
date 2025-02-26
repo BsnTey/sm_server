@@ -210,7 +210,7 @@ export class AccountController {
     }
 
     @HasZenno()
-    @Get('accounts/device')
+    @Post('accounts/device')
     @HttpCode(200)
     async getTmpInfo(@Body() deviceInfoDto: DeviceInfoRequestDto) {
         return this.deviceInfoService.getTmpDeviceInfo(deviceInfoDto);
