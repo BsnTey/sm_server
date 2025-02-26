@@ -74,8 +74,26 @@ model Account {
   AccountLessonProgress    AccountLessonProgress[]
   orders                   Order[]
   courses                  OriginalCourse[]
+  deviceInfo               DeviceInfo?
 
   @@map("account")
+}
+
+model DeviceInfo {
+  id               String   @id @default(uuid()) @db.Uuid
+  osVersion        String   @map("os_version")
+  buildVersion     String   @map("build_version")
+  brand            String
+  model            String
+  screenResolution String   @map("screen_resolution")
+  browserVersion   String   @map("browser_version")
+  IP               String
+  accountId        String   @unique @map("account_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  account          Account  @relation(fields: [accountId], references: [accountId])
+
+  @@map("device_info")
 }
 
 model CitySM {
@@ -146,23 +164,22 @@ model Course {
 }
 
 model PaymentOrder {
-  id             String        @id @default(uuid()) @db.Uuid
+  id             String                      @id @default(uuid()) @db.Uuid
   amount         Int
-  status         StatusPayment @default(Created) @map("status")
-  receiptUrl     String?       @map("receipt_url")
-  completedAt    DateTime?     @map("completed_at")
-  userTelegramId String        @map("user_telegram_id")
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
-  isPositive     Boolean?      @map("is_positive")
-  amountCredited Int           @map("amount_credited")
-  transactionId  Int?          @unique @map("transaction_id")
-  couponId       String?       @db.Uuid
-  couponApplied  Boolean       @default(false)
-
-  userTelegram  UserTelegram                @relation(fields: [userTelegramId], references: [telegramId])
-  statusHistory PaymentOrderStatusHistory[]
-  coupon        FortuneCoupon?              @relation(fields: [couponId], references: [id])
+  status         StatusPayment               @default(Created) @map("status")
+  receiptUrl     String?                     @map("receipt_url")
+  completedAt    DateTime?                   @map("completed_at")
+  userTelegramId String                      @map("user_telegram_id")
+  createdAt      DateTime                    @default(now()) @map("created_at")
+  updatedAt      DateTime                    @updatedAt @map("updated_at")
+  isPositive     Boolean?                    @map("is_positive")
+  amountCredited Int                         @map("amount_credited")
+  transactionId  Int?                        @unique @map("transaction_id")
+  couponId       String?                     @db.Uuid
+  couponApplied  Boolean                     @default(false)
+  userTelegram   UserTelegram                @relation(fields: [userTelegramId], references: [telegramId])
+  statusHistory  PaymentOrderStatusHistory[]
+  coupon         FortuneCoupon?              @relation(fields: [couponId], references: [id])
 
   @@index([userTelegramId])
   @@index([status])
@@ -250,23 +267,20 @@ model AccountMirror {
 }
 
 model FortuneCoupon {
-  id          String              @id @default(uuid()) @db.Uuid
-  coupon      String              @unique
-  type        FortuneSurpriseType
-  value       Int
-  isActive    Boolean             @default(true) @map("is_active")
-  expiresAt   DateTime            @map("expires_at")
-  usageCount  Int                 @default(0) @map("usage_count")
-  maxUsage    Int                 @default(1) @map("max_usage")
-  description String?
-
-  redeemedAt DateTime? @map("redeemed_at")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
+  id           String              @id @default(uuid()) @db.Uuid
+  coupon       String              @unique
+  type         FortuneSurpriseType
+  value        Int
+  isActive     Boolean             @default(true) @map("is_active")
+  expiresAt    DateTime            @map("expires_at")
+  usageCount   Int                 @default(0) @map("usage_count")
+  maxUsage     Int                 @default(1) @map("max_usage")
+  description  String?
+  redeemedAt   DateTime?           @map("redeemed_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
   owner        String
-  userTelegram UserTelegram?  @relation(fields: [owner], references: [telegramId])
+  userTelegram UserTelegram?       @relation(fields: [owner], references: [telegramId])
   payments     PaymentOrder[]
 
   @@map("fortune_surprise")
