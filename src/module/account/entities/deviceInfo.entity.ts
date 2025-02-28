@@ -28,7 +28,7 @@ export class DeviceInfoEntity {
 
     getDeviceParams(): IDeviceInfo {
         return {
-            id: `${this.brand} ${this.model}`,
+            id: this.id,
             osVersion: this.osVersion,
             deviceModel: `${this.brand} ${this.model}`,
             buildNumber: this.buildVersion,

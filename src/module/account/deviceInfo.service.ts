@@ -2,7 +2,6 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { DeviceInfoRequestDto, DeviceInfoResponseDto } from './dto/create-deviceInfo.dto';
 import { DeviceInfoRepository } from './deviceInfo.repository';
 import { IDeviceInfo } from './interfaces/deviceInfo.interface';
-import { DeviceInfoEntity } from './entities/deviceInfo.entity';
 
 @Injectable()
 export class DeviceInfoService {
@@ -35,20 +34,6 @@ export class DeviceInfoService {
         }
 
         const deviceInfo = await this.deviceInfoRepository.update(accountId, {
-            osVersion: dto.osVersion,
-            buildVersion: dto.buildVersion,
-            brand: dto.brand,
-            model: dto.model,
-            screenResolution: dto.screenResolution,
-            browserVersion: dto.browserVersion,
-            IP: dto.IP,
-        });
-
-        return deviceInfo.getDeviceParams();
-    }
-
-    async getTmpDeviceInfo(dto: DeviceInfoRequestDto): Promise<IDeviceInfo> {
-        const deviceInfo = new DeviceInfoEntity({
             osVersion: dto.osVersion,
             buildVersion: dto.buildVersion,
             brand: dto.brand,
