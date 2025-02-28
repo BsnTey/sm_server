@@ -12,7 +12,7 @@ const AddingAccountRequestSchema = z.object({
     cookie: z.preprocess(val => (typeof val === 'string' ? decodeURIComponent(val.replace(/\+/g, ' ')) : val), z.string()),
     accessToken: z.string(),
     refreshToken: z.string(),
-    googleId: z.string(),
+    googleId: z.string().optional(),
     accessTokenCourse: z.string().optional(),
     refreshTokenCourse: z.string().optional(),
     statusCourse: CourseStatusEnum.optional(),
