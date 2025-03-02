@@ -17,7 +17,7 @@ export type IUpdateDeviceInfo = Omit<ICreateDeviceInfo, 'accountId'>;
 export interface IDeviceInfo extends IBaseDeviceInfo {
     id: string;
     deviceModel: string;
-    buildNumber: string;
+    buildVersion: string;
     uaDalvik: string;
     uaBrowser: string;
 }

@@ -31,7 +31,7 @@ export class DeviceInfoEntity {
             id: this.id,
             osVersion: this.osVersion,
             deviceModel: `${this.brand} ${this.model}`,
-            buildNumber: this.buildVersion,
+            buildVersion: this.buildVersion,
             screenResolution: this.screenResolution,
             browserVersion: this.browserVersion,
             IP: this.IP,
