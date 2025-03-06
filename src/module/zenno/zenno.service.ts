@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ZennoRepository } from './zenno.repository';
 import { ZennoConfigDto } from './dto/config.dto';
+import { ZennoConfigDtoV2 } from './dto/configV2.dto';
 
 @Injectable()
 export class ZennoService {
@@ -23,6 +24,23 @@ export class ZennoService {
         }
 
         return await this.getZennoConfig();
+    }
+
+    async updateZennoConfigV2({ config }: ZennoConfigDtoV2) {
+        const configFromDB = await this.getZennoConfigV2();
+        const currentTodo = configFromDB.data.features.find(todo => todo.active);
+        if (currentTodo?.id !== config.activeId) {
+            for (const feature of configFromDB.data.features) {
+                const active = feature.id === config.activeId;
+                await this.zennoRepository.updateTodoActive(feature.id, active);
+            }
+        }
+
+        for (const course of config.courses) {
+            await this.zennoRepository.updateCourseActive(course.name, course.active);
+        }
+
+        return await this.getZennoConfigV2();
     }
 
     async getZennoConfig(): Promise<ZennoConfigDto> {
@@ -63,6 +81,35 @@ export class ZennoService {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
                 heavy,
+            },
+        };
+    }
+
+    async getZennoConfigV2() {
+        const todos = await this.zennoRepository.getTodos();
+        const coursesDB = await this.zennoRepository.getCourses();
+
+        const todosMap = todos.map(todo => ({
+            id: todo.todo,
+            name: todo.name,
+            active: todo.active,
+        }));
+
+        const courses = coursesDB.map(todo => {
+            return {
+                id: todo.id,
+                name: todo.name,
+                active: todo.active,
+                count: todo.count,
+            };
+        });
+
+        return {
+            data: {
+                features: todosMap,
+                configs: {
+                    courses,
+                },
             },
         };
     }
