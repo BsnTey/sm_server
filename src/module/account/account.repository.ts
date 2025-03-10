@@ -202,7 +202,7 @@ export class AccountRepository {
         });
     }
 
-    async updateCourseStatusAccount(accountId: string, statusCourse: CourseStatus): Promise<Account> {
+    async updateStatusAccountCourse(accountId: string, statusCourse: CourseStatus): Promise<Account> {
         return this.prisma.account.update({
             where: {
                 accountId,

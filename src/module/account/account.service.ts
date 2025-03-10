@@ -45,6 +45,7 @@ import { DeviceInfoService } from './deviceInfo.service';
 import { IDeviceInfo } from './interfaces/deviceInfo.interface';
 import { DeviceInfoRequestDto } from './dto/create-deviceInfo.dto';
 import { CourseIdAccountRequestDto } from './dto/course-account.dto';
+import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
 
 @Injectable()
 export class AccountService {
@@ -99,7 +100,7 @@ export class AccountService {
             refreshTokenCourse,
             userGateToken,
             isValidAccessTokenCourse: true,
-            statusCourse: statusCourse ? statusCourse : 'ACTIVE',
+            statusCourse: statusCourse ? statusCourse : 'NONE',
             xUserId,
             deviceId,
             installationId,
@@ -224,7 +225,7 @@ export class AccountService {
     async activateCourseAccount(accountId: string, { courseId }: CourseIdAccountRequestDto) {
         await this.getAccount(accountId);
         //активировать курс
-        await this.updateCourseStatus(accountId, CourseStatus.ACTIVE);
+        await this.courseService.changeStatusCourse(accountId, courseId, CourseStatus.ACTIVE);
 
         const progressIdFirstLesson = await this.courseService.getFirstLessonProgressId(accountId, courseId);
         if (!progressIdFirstLesson) throw new NotFoundException(ERROR_PROGRESS_ID);
@@ -232,8 +233,8 @@ export class AccountService {
         return this.courseService.updateViewLesson(progressIdFirstLesson, LessonStatus.NONE);
     }
 
-    async updateCourseStatus(accountId: string, status: CourseStatus) {
-        return await this.accountRep.updateCourseStatusAccount(accountId, status);
+    async updateStatusAccountCourse(accountId: string, { statusCourse }: UpdatingCourseStatusAccountRequestDto) {
+        return await this.accountRep.updateStatusAccountCourse(accountId, statusCourse);
     }
 
     async getAccountCoursesWithLessons(accountId: string): Promise<IAccountCourseWLesson[]> {
