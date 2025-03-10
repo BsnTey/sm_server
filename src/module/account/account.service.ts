@@ -3,7 +3,7 @@ import { AccountRepository } from './account.repository';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
 import { AccountEntity } from './entities/account.entity';
 import { AccountWDevice, IAccountWithProxy, IFindCitiesAccount, IRecipientOrder, IRefreshAccount } from './interfaces/account.interface';
-import { CourseStatus, Order } from '@prisma/client';
+import { CourseStatus, LessonStatus, Order } from '@prisma/client';
 import { ProxyService } from '../proxy/proxy.service';
 import {
     ERROR_ACCESS_TOKEN_COURSE,
@@ -11,6 +11,7 @@ import {
     ERROR_COURSE_NOT_FOUND,
     ERROR_GET_ACCESS_TOKEN_COURSE,
     ERROR_LOGOUT_MP,
+    ERROR_PROGRESS_ID,
 } from './constants/error.constant';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '../http/http.service';
@@ -39,11 +40,11 @@ import { CourseService } from './course.service';
 import { CourseWithLessons, IAccountCourseWLesson, IWatchLesson } from './interfaces/course.interface';
 import { CourseTokensEntity } from './entities/courseTokens.entity';
 import { UpdatingCourseTokensAccountRequestDto } from './dto/update-course-tokens-account.dto';
-import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
 import { UpdatingCookieRequestDto } from './dto/updateCookie-account.dto';
 import { DeviceInfoService } from './deviceInfo.service';
 import { IDeviceInfo } from './interfaces/deviceInfo.interface';
 import { DeviceInfoRequestDto } from './dto/create-deviceInfo.dto';
+import { CourseIdAccountRequestDto } from './dto/course-account.dto';
 
 @Injectable()
 export class AccountService {
@@ -220,9 +221,15 @@ export class AccountService {
         return await this.updateCourseTokensAccountPrivate(accountId, data);
     }
 
-    async updateCourseStatusAccount(accountId: string, data: UpdatingCourseStatusAccountRequestDto) {
+    async activateCourseAccount(accountId: string, { courseId }: CourseIdAccountRequestDto) {
         await this.getAccount(accountId);
-        return await this.accountRep.updateCourseStatusAccount(accountId, data.statusCourse);
+        //активировать курс
+        await this.updateCourseStatus(accountId, CourseStatus.ACTIVE);
+
+        const progressIdFirstLesson = await this.courseService.getFirstLessonProgressId(accountId, courseId);
+        if (!progressIdFirstLesson) throw new NotFoundException(ERROR_PROGRESS_ID);
+        //активировать первый урок
+        return this.courseService.updateViewLesson(progressIdFirstLesson, LessonStatus.NONE);
     }
 
     async updateCourseStatus(accountId: string, status: CourseStatus) {

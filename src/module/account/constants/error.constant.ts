@@ -6,3 +6,4 @@ export const ERROR_GET_ACCESS_TOKEN_COURSE = 'Ошибка в получении
 export const ERROR_UNKNOWN = 'Необработанная ошибка';
 export const ERROR_PROXY = 'Ошибка с прокси. Обратитесь в поддержку';
 export const ERROR_ACCESS_TOKEN_COURSE = 'Нет accessToken курса';
+export const ERROR_PROGRESS_ID = 'Не найден progress id у аккаунта с курсом';

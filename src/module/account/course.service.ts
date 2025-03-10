@@ -7,9 +7,14 @@ import { CourseData } from './interfaces/course-data.interface';
 @Injectable()
 export class CourseService {
     coursesId: string[] = [];
+    coursesMnemocode: Record<string, string> = {};
 
     constructor(private courseRepository: CourseRepository) {
         this.loadAvailableCoursesId();
+    }
+
+    async onModuleInit() {
+        await this.initializeCache();
     }
 
     async getCoursesWithLessons(): Promise<CourseWithLessons[]> {
@@ -18,6 +23,10 @@ export class CourseService {
 
     async getAllLesson(): Promise<Lesson[]> {
         return this.courseRepository.getAllLesson();
+    }
+
+    async getCoursesByAccountAndStatus(accountId: string, status: CourseStatus) {
+        return this.courseRepository.getCoursesByAccountAndStatus(accountId, status);
     }
 
     private async getAvailableCoursesIdFromDB() {
@@ -42,8 +51,16 @@ export class CourseService {
         return await this.courseRepository.createAccountLessonProgress(accountId, lessons);
     }
 
-    async updateViewedLesson(progressId: number): Promise<void> {
-        await this.courseRepository.updateViewedLesson(progressId);
+    async getFirstLessonProgressId(accountId: string, courseId: string) {
+        return this.courseRepository.getFirstLessonProgressId(accountId, courseId);
+    }
+
+    async getLessonsWithProgressByAccountAndCourse(accountId: string, courseId: string) {
+        return this.courseRepository.getLessonsWithProgressByAccountAndCourse(accountId, courseId);
+    }
+
+    async updateViewLesson(progressId: number, status: LessonStatus) {
+        return this.courseRepository.updateViewLesson(progressId, status);
     }
 
     async updateUnblockLesson(progressId: number, timeUnblock: Date): Promise<void> {
@@ -92,5 +109,21 @@ export class CourseService {
         };
 
         return statusMap[status.toLowerCase()] || LessonStatus.NONE;
+    }
+
+    async initializeCache(): Promise<void> {
+        const courses = await this.courseRepository.getAllCoursesIdAndMnemocode();
+
+        this.coursesMnemocode = courses.reduce(
+            (acc, course) => {
+                acc[course.courseId] = course.mnemocode;
+                return acc;
+            },
+            {} as Record<string, string>,
+        );
+    }
+
+    getMnemocode(courseId: string): string | undefined {
+        return this.coursesMnemocode[courseId];
     }
 }

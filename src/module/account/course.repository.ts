@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@common/database/prisma.service';
 import { CourseWithLessons } from './interfaces/course.interface';
-import { CourseStatus, Lesson, LessonStatus } from '@prisma/client';
+import { AccountCourse, CourseStatus, Lesson, LessonStatus } from '@prisma/client';
 
 @Injectable()
 export class CourseRepository {
@@ -35,11 +35,9 @@ export class CourseRepository {
 
     async createAccountLessonProgress(accountId: string, lessons: Lesson[]): Promise<void> {
         const lessonProgressData = lessons.map(lesson => {
-            const isFirstLesson = this.firstLessons.includes(lesson.lessonId);
-            const courseStatus = isFirstLesson ? LessonStatus.NONE : LessonStatus.BLOCKED;
             return {
-                status: courseStatus,
                 accountId,
+                accountCourseAccountCourseId: +lesson.courseId,
                 lessonId: lesson.lessonId,
                 nextViewAt: null,
             };
@@ -62,13 +60,74 @@ export class CourseRepository {
         });
     }
 
-    async updateViewedLesson(progressId: number) {
+    async getLessonsWithProgressByAccountAndCourse(accountId: string, courseId: string) {
+        const lessons = await this.prisma.lesson.findMany({
+            where: {
+                courseId: courseId,
+            },
+            include: {
+                AccountLessonProgress: {
+                    where: {
+                        accountId: accountId,
+                    },
+                },
+            },
+            orderBy: {
+                position: 'asc',
+            },
+        });
+
+        return lessons.map(lesson => {
+            const progress = lesson.AccountLessonProgress[0];
+
+            return {
+                ...lesson,
+                progress,
+            };
+        });
+    }
+
+    async getFirstLessonProgressId(accountId: string, courseId: string): Promise<number | null> {
+        const firstLesson = await this.prisma.lesson.findFirst({
+            where: {
+                courseId,
+                position: 1,
+            },
+            include: {
+                AccountLessonProgress: {
+                    where: {
+                        accountId,
+                    },
+                },
+            },
+        });
+
+        if (!firstLesson || firstLesson.AccountLessonProgress.length === 0) {
+            return null;
+        }
+
+        return firstLesson.AccountLessonProgress[0].progressId;
+    }
+
+    async getCoursesByAccountAndStatus(accountId: string, status: CourseStatus): Promise<AccountCourse[]> {
+        return this.prisma.accountCourse.findMany({
+            where: {
+                accountId,
+                status,
+            },
+            orderBy: {
+                courseId: 'asc',
+            },
+        });
+    }
+
+    async updateViewLesson(progressId: number, status: LessonStatus) {
         return this.prisma.accountLessonProgress.update({
             where: {
                 progressId,
             },
             data: {
-                status: LessonStatus.VIEWED,
+                status,
             },
         });
     }
@@ -128,6 +187,15 @@ export class CourseRepository {
             },
             select: {
                 courseId: true,
+            },
+        });
+    }
+
+    async getAllCoursesIdAndMnemocode(): Promise<{ courseId: string; mnemocode: string }[]> {
+        return this.prisma.originalCourse.findMany({
+            select: {
+                courseId: true,
+                mnemocode: true,
             },
         });
     }

@@ -12,7 +12,6 @@ import { UpdatePushTokenRequestDto, UpdatePushTokenResponseDto } from './dto/upd
 import { UpdateGoogleIdRequestDto, UpdateGoogleIdResponseDto } from './dto/updateGoogleId-account.dto';
 import { AxiosError } from 'axios';
 import { UpdatingCourseTokensAccountRequestDto } from './dto/update-course-tokens-account.dto';
-import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
 import { CourseService } from './course.service';
 import { UpdateCourseStatusRequestDto } from './dto/updateCourseStatus-course';
 import { CourseData } from './interfaces/course-data.interface';
@@ -20,6 +19,7 @@ import { ERROR_ACCOUNT_NOT_FOUND } from './constants/error.constant';
 import { UpdatingCookieRequestDto, UpdatingCookieResponseDto } from './dto/updateCookie-account.dto';
 import { DeviceInfoRequestDto, DeviceInfoResponseDto } from './dto/create-deviceInfo.dto';
 import { DeviceInfoService } from './deviceInfo.service';
+import { CourseIdAccountRequestDto } from './dto/course-account.dto';
 
 @Controller('account')
 export class AccountController {
@@ -67,14 +67,22 @@ export class AccountController {
         return account ? 'success' : 'error';
     }
 
+    // @HasZenno()
+    // @Patch('course/status/:accountId')
+    // @HttpCode(200)
+    // async updateCourseStatusAccount(
+    //     @Body() dto: UpdatingCourseStatusAccountRequestDto,
+    //     @Param() params: AccountIdParamsDto,
+    // ): Promise<string> {
+    //     const account = await this.accountService.updateCourseStatusAccount(params.accountId, dto);
+    //     return account ? 'success' : 'error';
+    // }
+
     @HasZenno()
-    @Patch('course/status/:accountId')
+    @Post('course/activate/:accountId')
     @HttpCode(200)
-    async updateCourseStatusAccount(
-        @Body() dto: UpdatingCourseStatusAccountRequestDto,
-        @Param() params: AccountIdParamsDto,
-    ): Promise<string> {
-        const account = await this.accountService.updateCourseStatusAccount(params.accountId, dto);
+    async updateCourseStatusAccount(@Body() dto: CourseIdAccountRequestDto, @Param() params: AccountIdParamsDto): Promise<string> {
+        const account = await this.accountService.activateCourseAccount(params.accountId, dto);
         return account ? 'success' : 'error';
     }
 
