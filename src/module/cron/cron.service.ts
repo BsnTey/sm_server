@@ -28,6 +28,14 @@ export class CronService {
                 console.log('In accountsLoop by', accountId);
                 const accountActiveCourses = await this.courseService.getCoursesByAccountAndStatus(accountId, CourseStatus.ACTIVE);
 
+                //здесь проверка, все курсы просмотрены, но нет статуса финиш аккаунт (после синхрона)
+                const allCoursesFinished = accountActiveCourses.every(course => course.status === CourseStatus.FINISHED);
+                if (allCoursesFinished) {
+                    // Помечаем Аккаунт как завершённый
+                    await this.accountService.updateStatusAccountCourse(accountId, CourseStatus.FINISHED);
+                    continue;
+                }
+
                 for (let i = 0; i < accountActiveCourses.length; i++) {
                     const accountCourse = accountActiveCourses[i];
                     const lessonsWithProgress = await this.courseService.getLessonsWithProgressByAccountAndCourse(
@@ -85,6 +93,7 @@ export class CronService {
                             try {
                                 const isWatched = await this.viewLesson(lessonView, progressId, accountId);
                                 if (!isWatched) continue accountsLoop;
+                                lesson.progress.status = LessonStatus.VIEWED;
                                 console.log('просмотрел', lessonView.mnemocode, lesson.position);
                             } catch (err: any) {
                                 await this.accountService.promblemCourses(accountCourse.accountId);
