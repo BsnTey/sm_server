@@ -122,7 +122,7 @@ export class CronService {
                                     }
                                 } else {
                                     //аккаунт FINISHED
-                                    await this.accountService.updateCourseStatus(accountId, CourseStatus.FINISHED);
+                                    await this.accountService.updateStatusAccountCourse(accountId, CourseStatus.FINISHED);
                                 }
                                 continue accountsLoop;
                             } else {

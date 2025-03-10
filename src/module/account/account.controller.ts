@@ -75,7 +75,7 @@ export class AccountController {
         @Body() dto: UpdatingCourseStatusAccountRequestDto,
         @Param() params: AccountIdParamsDto,
     ): Promise<string> {
-        const account = await this.accountService.updateStatusAccountCourse(params.accountId, dto);
+        const account = await this.accountService.updateStatusAccountCourseDto(params.accountId, dto);
         return account ? 'success' : 'error';
     }
 

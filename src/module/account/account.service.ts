@@ -233,7 +233,11 @@ export class AccountService {
         return this.courseService.updateViewLesson(progressIdFirstLesson, LessonStatus.NONE);
     }
 
-    async updateStatusAccountCourse(accountId: string, { statusCourse }: UpdatingCourseStatusAccountRequestDto) {
+    async updateStatusAccountCourseDto(accountId: string, { statusCourse }: UpdatingCourseStatusAccountRequestDto) {
+        return await this.updateStatusAccountCourse(accountId, statusCourse);
+    }
+
+    async updateStatusAccountCourse(accountId: string, statusCourse: CourseStatus) {
         return await this.accountRep.updateStatusAccountCourse(accountId, statusCourse);
     }
 
