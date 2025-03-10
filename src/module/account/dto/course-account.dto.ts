@@ -1,9 +1,8 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { CourseStatusEnum } from './create-account.dto';
 
 const CourseIdAccountRequestSchema = z.object({
-    courseId: CourseStatusEnum,
+    courseId: z.string(),
 });
 
 const CourseIdAccountResponseSchema = z.object({});
