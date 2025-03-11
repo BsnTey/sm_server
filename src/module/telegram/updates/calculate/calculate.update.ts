@@ -21,7 +21,7 @@ export class CalculateUpdate {
     @Action('go_to_calculate_info')
     async goToCalculateInfo(@Ctx() ctx: WizardContext) {
         await ctx.reply(
-            `Цены на вещи вводим каждую с новой строки.\nВводим изначальную цену, БЕЗ УЧЕТА СКИДКИ\nЕсли на товар установлена скидка от магазина, то через пробел указываем какая.\nЕсли товар по лучшей/финальной/желтой цене, то через пробел пишем букву л (или любую другую)\nНапример:\n7299 35\n8999\n6499 70\n7499 л`,
+            `Цены на вещи вводим каждую с новой строки.\nВводим изначальную цену, БЕЗ УЧЕТА СКИДКИ\nЕсли на товар установлена скидка от магазина, то через пробел указываем какая.\nЕсли товар по лучшей/финальной/желтой цене, то через пробел пишем букву л (или любую другую)\nЕсли товар из категории: тренажеры, велики, лыжи, палатки и прочий инвентарь, то у цены указываем букву "и".\nНапример:\n7299 35\n8999\n6499 70\n7499 л\n 10000и\n80000и 15`,
         );
     }
 
@@ -42,8 +42,18 @@ export class CalculateUpdate {
 
             for (let value of prices) {
                 let discountShop = 0;
+                let hasIndividualBonus = false;
+
                 value = value.trim();
                 const parts = value.split(' ');
+
+                // Проверяем, есть ли у цены маркер "и"
+                if (parts[0].endsWith('и')) {
+                    hasIndividualBonus = true;
+                    // Удаляем "и" из цены для расчетов
+                    parts[0] = parts[0].slice(0, -1);
+                }
+
                 if (parts.length > 1) {
                     discountShop = /^\d+$/.test(parts[1]) ? parseInt(parts[1]) : 228;
                 }
@@ -51,13 +61,18 @@ export class CalculateUpdate {
                 const priceItem = parseInt(parts[0]);
 
                 const currentPriceItem = this.calculateCurrentPrice(priceItem, discountShop);
-                const currentBonus = this.calculateBonus(priceItem, currentPriceItem, discountShop);
+                const currentBonus = this.calculateBonus(priceItem, currentPriceItem, discountShop, hasIndividualBonus);
                 const priceDiscount = currentPriceItem - currentBonus;
 
                 priceWithoutDiscount += currentPriceItem;
 
-                const currentPriceItemPromo = this.calculatePriceWithPromoWithoutBonus(priceItem, currentPriceItem, discountShop);
-                const currentBonusPromo = this.calculateBonus(priceItem, currentPriceItemPromo, discountShop);
+                const currentPriceItemPromo = this.calculatePriceWithPromoWithoutBonus(
+                    priceItem,
+                    currentPriceItem,
+                    discountShop,
+                    hasIndividualBonus,
+                );
+                const currentBonusPromo = this.calculateBonus(priceItem, currentPriceItemPromo, discountShop, hasIndividualBonus);
                 const priceDiscountPromo = currentPriceItemPromo - currentBonusPromo;
 
                 totalPrice += priceDiscount;
@@ -81,7 +96,7 @@ export class CalculateUpdate {
                 `Расчет без промо:
 Цена на кассу: ${totalPrice}
 Количество возможно примененных бонусов: ${totalDiscount}
-                        
+
 Расчет с промо:
 Цена на кассу: ${totalPricePromo}
 Количество возможно примененных бонусов: ${totalDiscountPromo}
@@ -119,12 +134,14 @@ export class CalculateUpdate {
         return Math.floor(currentPriceItem);
     }
 
-    private calculateBonus(price: number, currentPriceItem: number, discountShop: number) {
+    private calculateBonus(price: number, currentPriceItem: number, discountShop: number, hasIndividualBonus: boolean) {
         let currentBonus = 0;
 
         if (0 <= discountShop && discountShop < 50) {
-            currentBonus = currentPriceItem * 0.3;
-            const maxDiscountItem = price / 2;
+            const bonusPercentage = hasIndividualBonus ? 0.2 : 0.3;
+            currentBonus = currentPriceItem * bonusPercentage;
+
+            const maxDiscountItem = hasIndividualBonus ? price * 0.7 : price / 2;
             if (currentPriceItem - currentBonus < maxDiscountItem) {
                 currentBonus = currentPriceItem - maxDiscountItem;
             }
@@ -132,12 +149,17 @@ export class CalculateUpdate {
         return Math.floor(currentBonus);
     }
 
-    private calculatePriceWithPromoWithoutBonus(price: number, currentPriceItem: number, discountShop: number) {
+    private calculatePriceWithPromoWithoutBonus(
+        price: number,
+        currentPriceItem: number,
+        discountShop: number,
+        hasIndividualBonus: boolean,
+    ) {
         let calcPrice = currentPriceItem;
 
         if (0 <= discountShop && discountShop < 50) {
             const priceWithPromo = currentPriceItem * 0.9;
-            const maxDiscountItem = price / 2;
+            const maxDiscountItem = hasIndividualBonus ? price * 0.7 : price / 2;
             if (price - priceWithPromo > maxDiscountItem) {
                 calcPrice = maxDiscountItem;
             } else {
