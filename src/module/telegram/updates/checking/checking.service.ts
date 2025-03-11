@@ -199,7 +199,12 @@ export class CheckingService {
 
             for (const promo of data.list) {
                 const actionName = promo.actionName;
-                if (actionName === 'Скидка 10% на первый онлайн заказ' || actionName === '-15% на обувь для треккинга') {
+                if (
+                    actionName === 'Скидка 10% на первый онлайн заказ' ||
+                    actionName === '-15% на туризм и рыбалку' ||
+                    actionName === '-15% на обувь для горного туризма' ||
+                    actionName === '-20% на фитнес-аксессуары'
+                ) {
                     continue;
                 }
                 if (actionName === '-10% по промокоду на онлайн-покупку') {
