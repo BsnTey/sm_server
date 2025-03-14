@@ -163,9 +163,9 @@ export class AccountController {
     @Get('cookie/:accountId')
     @HttpCode(200)
     async getCookieAccount(@Param() params: AccountIdParamsDto) {
-        const cookie = await this.accountService.getAccountCookie(params.accountId);
+        const accountEntity = await this.accountService.getAccountCookie(params.accountId);
         return {
-            cookie,
+            cookie: JSON.parse(accountEntity.cookie),
         };
     }
 

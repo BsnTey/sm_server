@@ -162,7 +162,7 @@ export class AccountService {
         const account = await this.accountRep.getAccountCookie(accountId);
         if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
 
-        return JSON.stringify(account.cookie);
+        return new AccountEntity(account);
     }
 
     async getFullAccount(accountId: string): Promise<AccountWDevice> {
