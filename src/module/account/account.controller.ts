@@ -163,7 +163,10 @@ export class AccountController {
     @Get('cookie/:accountId')
     @HttpCode(200)
     async getCookieAccount(@Param() params: AccountIdParamsDto) {
-        return this.accountService.getAccountCookie(params.accountId);
+        const cookie = await this.accountService.getAccountCookie(params.accountId);
+        return {
+            cookie,
+        };
     }
 
     @HasZenno()
