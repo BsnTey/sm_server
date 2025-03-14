@@ -37,7 +37,7 @@ import { SportmasterHeadersService } from './entities/headers.entity';
 import { UserGateTokenInterface } from './interfaces/userGateToken.interface';
 import { CourseList } from './interfaces/course-list.interface';
 import { CourseService } from './course.service';
-import { CourseWithLessons, IAccountCourseWLesson, IWatchLesson } from './interfaces/course.interface';
+import { CourseWithLessons, IWatchLesson } from './interfaces/course.interface';
 import { CourseTokensEntity } from './entities/courseTokens.entity';
 import { UpdatingCourseTokensAccountRequestDto } from './dto/update-course-tokens-account.dto';
 import { UpdatingCookieRequestDto } from './dto/updateCookie-account.dto';
@@ -158,6 +158,13 @@ export class AccountService {
         return new AccountEntity(account);
     }
 
+    async getAccountCookie(accountId: string) {
+        const account = await this.accountRep.getAccountCookie(accountId);
+        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+
+        return account;
+    }
+
     async getFullAccount(accountId: string): Promise<AccountWDevice> {
         const account = await this.getAccount(accountId);
 
@@ -241,12 +248,6 @@ export class AccountService {
         return await this.accountRep.updateStatusAccountCourse(accountId, statusCourse);
     }
 
-    async getAccountCoursesWithLessons(accountId: string): Promise<IAccountCourseWLesson[]> {
-        const account = await this.accountRep.getAccountCoursesWithProgress(accountId);
-        if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
-        return account;
-    }
-
     async connectionCourseAccount(accountId: string) {
         const account = await this.getAccount(accountId);
 
@@ -292,11 +293,6 @@ export class AccountService {
         const pushToken = data.pushToken || this.generateFCMLikeToken();
         await this.accountRep.updatePushToken(accountId, pushToken);
         return { pushToken };
-    }
-
-    async getAccessTokenCourse(accountId: string): Promise<{ accessTokenCourse: string }> {
-        const accountWithProxyEntity = await this.getAccountEntity(accountId);
-        return this.createAccessTokenCourse(accountWithProxyEntity);
     }
 
     async createAccessTokenCourse(accountWithProxyEntity: AccountWithProxyEntity): Promise<{

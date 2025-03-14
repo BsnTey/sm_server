@@ -103,12 +103,11 @@ export class AccountRepository {
         });
     }
 
-    async getAccountCookie(accountId: string): Promise<any> {
+    async getAccountCookie(accountId: string) {
         return this.prisma.account.findUnique({
             where: { accountId },
             select: {
                 cookie: true,
-                isOnlyAccessOrder: true,
             },
         });
     }

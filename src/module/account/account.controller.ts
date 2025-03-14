@@ -160,12 +160,11 @@ export class AccountController {
         return await this.accountService.updateCookie(params.accountId, dto);
     }
 
-    // @HasZenno()
-    // @Get(':accountId/accessTokenCourse')
-    // @HttpCode(200)
-    // async getAccessTokenCourseAccount(@Param() params: AccountIdParamsDto): Promise<AccessTokenCourseResponseDto> {
-    //     return await this.accountService.getAccessTokenCourse(params.accountId);
-    // }
+    @Get('cookie/:accountId')
+    @HttpCode(200)
+    async getCookieAccount(@Param() params: AccountIdParamsDto) {
+        return this.accountService.getAccountCookie(params.accountId);
+    }
 
     @HasZenno()
     @Get(':accountId/courses')
