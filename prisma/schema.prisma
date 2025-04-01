@@ -33,8 +33,24 @@ model UserTelegram {
   user           User?
   fortuneCoupons FortuneCoupon[]
   userCities     UserCitySM[]
+  UserTemplate   UserTemplate[]
 
   @@map("user_telegram")
+}
+
+model UserTemplate {
+  id             String       @id @default(uuid()) @db.Uuid
+  name           String
+  template       String       @db.Text
+  userTelegramId String       @map("user_telegram_id")
+  commissionType String       @default("TOTAL") @map("commission_type")
+  commissionRate Float        @default(10) @map("commission_rate")
+  roundTo        Int          @default(10) @map("round_to")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  userTelegram   UserTelegram @relation(fields: [userTelegramId], references: [telegramId])
+
+  @@map("user_template")
 }
 
 model Account {

@@ -191,15 +191,22 @@
 //         return Math.floor(limitPrice);
 //     }
 // }
+
 import { Action, Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { ALL_KEYS_MENU_BUTTON_NAME, CALCULATE_BONUS } from '../base-command/base-command.constants';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { TelegramService } from '../../telegram.service';
-import { calculateInfoKeyboard, calculateShowKeyboard } from '../../keyboards/calculate.keyboard';
+import { calculateInfoKeyboard } from '../../keyboards/calculate.keyboard';
+import { CalculateService } from './calculate.service';
+import { Markup } from 'telegraf';
+import { CALCULATE_SETTINGS_SCENE } from '../../scenes/calculate.scene-constant';
 
 @Scene(CALCULATE_BONUS.scene)
 export class CalculateUpdate {
-    constructor(private telegramService: TelegramService) {}
+    constructor(
+        private telegramService: TelegramService,
+        private calculateService: CalculateService,
+    ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -216,6 +223,11 @@ export class CalculateUpdate {
         await ctx.reply(
             `Цены на вещи вводим каждую с новой строки.\nВводим изначальную цену, БЕЗ УЧЕТА СКИДКИ\nЕсли на товар установлена скидка от магазина, то через пробел указываем какая.\nЕсли товар по лучшей/финальной/желтой цене, то через пробел пишем букву л (или любую другую)\nНапример:\n7299 35\n8999\n6499 70\n7499 л`,
         );
+    }
+
+    @Action('go_to_calculate_settings')
+    async goToCalculateSettings(@Ctx() ctx: WizardContext) {
+        await ctx.scene.enter(CALCULATE_SETTINGS_SCENE);
     }
 
     @On('text')
@@ -269,7 +281,32 @@ export class CalculateUpdate {
                     priceDiscountPromo,
                 });
             }
-            await this.telegramService.setDataCache<any[]>(String(telegramId), outputPrices);
+
+            // Сохраняем результаты расчетов в кеш
+            const calculationResult = {
+                outputPrices,
+                totalPrice,
+                totalDiscount,
+                totalPricePromo,
+                totalDiscountPromo,
+                totalFullDiscount: priceWithoutDiscount - totalPricePromo,
+            };
+
+            await this.telegramService.setDataCache<any>(String(telegramId), calculationResult);
+
+            // Получаем шаблоны пользователя для отображения в клавиатуре
+            const templates = await this.calculateService.getUserTemplates(String(telegramId));
+
+            const keyboardButtons = [[Markup.button.callback(`Показать расчет индивидуально`, `go_to_calculate_show`)]];
+
+            // Если есть шаблоны, добавляем их в клавиатуру
+            if (templates.length > 0) {
+                const templateButtons = templates.map((template: { name: any; id: any }) =>
+                    Markup.button.callback(`Шаблон: ${template.name}`, `use_template_${template.id}`),
+                );
+                keyboardButtons.push(templateButtons);
+            }
+
             await ctx.reply(
                 `Расчет без промо:
 Цена на кассу: ${totalPrice}
@@ -279,7 +316,7 @@ export class CalculateUpdate {
 Цена на кассу: ${totalPricePromo}
 Количество возможно примененных бонусов: ${totalDiscountPromo}
 Общая скидка (бонусы + промо): ${priceWithoutDiscount - totalPricePromo}`,
-                calculateShowKeyboard,
+                Markup.inlineKeyboard(keyboardButtons),
             );
         } catch (e) {
             await ctx.reply('Что то пошло не так. Проверьте правильность введения');
@@ -288,13 +325,55 @@ export class CalculateUpdate {
 
     @Action('go_to_calculate_show')
     async goToCalculateShow(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const calculatePrices = await this.telegramService.getDataFromCache<any[]>(String(telegramId));
+        const calculationResult = await this.telegramService.getDataFromCache<any>(String(telegramId));
+
+        if (!calculationResult || !calculationResult.outputPrices) {
+            await ctx.reply('Данные расчета не найдены. Пожалуйста, сделайте новый расчет.');
+            return;
+        }
 
         let message = '';
-        calculatePrices.forEach(value => {
+        calculationResult.outputPrices.forEach((value: { [x: string]: any }) => {
             message += `Изначальная цена: ${value['price']}\nТекущая цена со скидкой: ${value['priceDiscount']}\nКоличество возможно примененных бонусов: ${value['currentBonus']}\n\n`;
         });
         await ctx.reply(message);
+    }
+
+    @Action(/^use_template_(.+)$/)
+    async useTemplate(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        //@ts-ignore
+        const templateId = ctx.match[1];
+        const template = await this.calculateService.getTemplateById(templateId);
+
+        if (!template) {
+            await ctx.reply('Шаблон не найден.');
+            return;
+        }
+
+        const calculationResult = await this.telegramService.getDataFromCache<any>(String(telegramId));
+
+        if (!calculationResult) {
+            await ctx.reply('Данные расчета не найдены. Пожалуйста, сделайте новый расчет.');
+            return;
+        }
+
+        // Рассчитываем комиссию в зависимости от настроек шаблона
+        const commission = this.calculateService.calculateCommission(
+            template.commissionType,
+            template.commissionRate,
+            template.roundTo,
+            calculationResult.totalDiscount,
+            calculationResult.totalDiscountPromo,
+            calculationResult.totalFullDiscount,
+        );
+
+        // Применяем шаблон
+        const message = this.calculateService.applyTemplate(template.template, calculationResult.totalPricePromo, commission);
+
+        await ctx.reply(`<code>${message}</code>`, {
+            parse_mode: 'HTML',
+        });
     }
 
     private calculateCurrentPrice(price: number, discountShop: number) {

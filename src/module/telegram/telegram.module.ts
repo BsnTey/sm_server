@@ -37,6 +37,17 @@ import { PaymentModule } from '../payment/payment.module';
 import { MirrorModule } from '../mirror/mirror.module';
 import { CouponModule } from '../coupon/coupon.module';
 import { FortuneUpdate } from './updates/fortune/fortune.update';
+import {
+    CalculateSettingsScene,
+    CommissionRateScene,
+    CommissionTypeScene,
+    CustomRoundScene,
+    RoundToScene,
+    TemplateNameScene,
+    TemplateTextScene,
+} from './updates/calculate/calculate-settings.update';
+import { CalculateService } from './updates/calculate/calculate.service';
+import { CalculateRepository } from './updates/calculate/calculate.repository';
 
 @Module({
     imports: [AccountModule, ProxyModule, SharedModule, HttpModule, UserModule, PaymentModule, MirrorModule, CouponModule],
@@ -75,6 +86,15 @@ import { FortuneUpdate } from './updates/fortune/fortune.update';
         PaymentUpdate,
         PaymentPromocodeUpdate,
         FortuneUpdate,
+        CalculateService,
+        CalculateRepository,
+        CalculateSettingsScene,
+        TemplateNameScene,
+        TemplateTextScene,
+        CommissionTypeScene,
+        CommissionRateScene,
+        RoundToScene,
+        CustomRoundScene,
     ],
     exports: [TelegramService],
 })
