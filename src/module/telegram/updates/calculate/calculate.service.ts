@@ -64,9 +64,9 @@ export class CalculateService {
         return Math.floor(commission);
     }
 
-    applyTemplate(template: string, totalPricePromo: number, commission: number): string {
+    applyTemplate(template: string, totalPrice: number, commission: number): string {
         return template
-            .replace(/{payment}/g, totalPricePromo.toString())
+            .replace(/{payment}/g, totalPrice.toString())
             .replace(/{commission}/g, commission.toString())
             .replace(/\/n/g, '\n');
     }

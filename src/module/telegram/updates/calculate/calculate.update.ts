@@ -200,6 +200,7 @@ import { calculateInfoKeyboard } from '../../keyboards/calculate.keyboard';
 import { CalculateService } from './calculate.service';
 import { Markup } from 'telegraf';
 import { CALCULATE_SETTINGS_SCENE } from '../../scenes/calculate.scene-constant';
+import { ICalculateCash } from '../../interfaces/calculate.interface';
 
 @Scene(CALCULATE_BONUS.scene)
 export class CalculateUpdate {
@@ -282,17 +283,20 @@ export class CalculateUpdate {
                 });
             }
 
+            const totalFullDiscountTmp = priceWithoutDiscount - totalPricePromo;
+
             // Сохраняем результаты расчетов в кеш
-            const calculationResult = {
+            const calculationResult: ICalculateCash = {
                 outputPrices,
                 totalPrice,
                 totalDiscount,
-                totalPricePromo,
-                totalDiscountPromo,
-                totalFullDiscount: priceWithoutDiscount - totalPricePromo,
+                totalPriceBonus: totalDiscountPromo,
+                totalDiscountPromo: totalFullDiscountTmp - totalDiscountPromo,
+                totalFullDiscount: totalFullDiscountTmp,
+                totalSumOnKassa: totalPricePromo,
             };
 
-            await this.telegramService.setDataCache<any>(String(telegramId), calculationResult);
+            await this.telegramService.setDataCache<ICalculateCash>(String(telegramId), calculationResult);
 
             // Получаем шаблоны пользователя для отображения в клавиатуре
             const templates = await this.calculateService.getUserTemplates(String(telegramId));
@@ -351,7 +355,7 @@ export class CalculateUpdate {
             return;
         }
 
-        const calculationResult = await this.telegramService.getDataFromCache<any>(String(telegramId));
+        const calculationResult = await this.telegramService.getDataFromCache<ICalculateCash>(String(telegramId));
 
         if (!calculationResult) {
             await ctx.reply('Данные расчета не найдены. Пожалуйста, сделайте новый расчет.');
@@ -363,13 +367,13 @@ export class CalculateUpdate {
             template.commissionType,
             template.commissionRate,
             template.roundTo,
-            calculationResult.totalDiscount,
+            calculationResult.totalPriceBonus,
             calculationResult.totalDiscountPromo,
             calculationResult.totalFullDiscount,
         );
 
         // Применяем шаблон
-        const message = this.calculateService.applyTemplate(template.template, calculationResult.totalPricePromo, commission);
+        const message = this.calculateService.applyTemplate(template.template, calculationResult.totalSumOnKassa, commission);
 
         await ctx.reply(`<code>${message}</code>`, {
             parse_mode: 'HTML',
