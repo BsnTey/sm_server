@@ -40,8 +40,9 @@ export class FortuneUpdate {
             await ctx.reply('😦 Вы уже получили приз сегодня, приходите за ним завтра.');
             return;
         }
-        const prize = this.fortuneCouponService.getRandomPrize();
+        const prize = await this.fortuneCouponService.getRandomPrize(String(telegramId));
         const newCoupon = await this.fortuneCouponService.awardPrizeToUser(prize, String(telegramId));
+
         await ctx.reply(
             `🔥 Поздравляем! Вы выиграли: ${prize.name}.\nДЕЙСТВУЕТ ДО КОНЦА ДНЯ\n(код: <b><code>${newCoupon.coupon}</code></b>)`,
             {

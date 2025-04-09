@@ -6,40 +6,82 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { BottService } from '../bott/bott.service';
-import { extractCsrf } from '../telegram/utils/payment.utils';
+import { extractCsrf, extractUsersStatistics } from '../telegram/utils/payment.utils';
+import { ConfigService } from '@nestjs/config';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 @Injectable()
 export class FortuneCouponService {
-    private readonly prizes: Prize[] = [
+    private readonly replenishPrizes: Prize[] = [
         { name: 'Купон на счет 200р. Активация в Спортивном боте', chance: 7, code: 'Replenish_200' },
         { name: 'Купон на счет 500р. Активация в Спортивном боте', chance: 5, code: 'Replenish_500' },
         { name: 'Купон на счет 50р. Активация в Спортивном боте', chance: 27, code: 'Replenish_50' },
         { name: 'Купон на счет 100р. Активация в Спортивном боте', chance: 23, code: 'Replenish_100' },
-        { name: 'Пополнение 25%. Активация в профиле при пополнении', chance: 3, code: 'Payment_25' },
-        { name: 'Пополнение 30%. Активация в профиле при пополнении', chance: 3, code: 'Payment_30' },
-        { name: 'Скидка 25%. Активация в Спортивном боте', chance: 13, code: 'Discount_25' },
-        { name: 'Скидка 30%. Активация в Спортивном боте', chance: 11, code: 'Discount_30' },
-        { name: 'Скидка 50%. Активация в Спортивном боте', chance: 8, code: 'Discount_50' },
     ];
+
+    private readonly percentagePrizes: Prize[] = [
+        { name: 'Пополнение 25%. Активация в профиле при пополнении', chance: 20, code: 'Payment_25' },
+        { name: 'Пополнение 30%. Активация в профиле при пополнении', chance: 20, code: 'Payment_30' },
+        { name: 'Скидка 25%. Активация в Спортивном боте', chance: 25, code: 'Discount_25' },
+        { name: 'Скидка 30%. Активация в Спортивном боте', chance: 20, code: 'Discount_30' },
+        { name: 'Скидка 50%. Активация в Спортивном боте', chance: 15, code: 'Discount_50' },
+    ];
+
+    private tgNamesExceptionStatistic: string[];
 
     constructor(
         private readonly couponRepository: FortuneCouponRepository,
         private readonly bottService: BottService,
-    ) {}
+        private configService: ConfigService,
+    ) {
+        this.tgNamesExceptionStatistic = this.configService.getOrThrow('TELEGRAM_NAMES_EXCEPTION_STATISTIC').split(',');
+    }
 
-    getRandomPrize(): Prize {
+    async getRandomPrize(telegramId: string): Promise<Prize> {
+        try {
+            const userPosition = await this.getUserPositionInStatistics(telegramId);
+
+            if (userPosition > 15) {
+                return this.getRandomPrizeFromPool(this.percentagePrizes);
+            }
+
+            const allPrizes = [...this.replenishPrizes, ...this.percentagePrizes];
+            return this.getRandomPrizeFromPool(allPrizes);
+        } catch (error) {
+            console.error('Ошибка при получении позиции пользователя:', error);
+            return this.getRandomPrizeFromPool(this.percentagePrizes);
+        }
+    }
+
+    private async getUserPositionInStatistics(telegramId: string): Promise<number> {
+        try {
+            const responseStatistics = await this.bottService.getStatistics();
+
+            const usersStatistic = extractUsersStatistics(responseStatistics, this.tgNamesExceptionStatistic);
+
+            const userStat = usersStatistic.find(user => user.tgId === telegramId);
+
+            return userStat ? userStat.row : 999;
+        } catch (error) {
+            console.error('Ошибка при получении позиции пользователя:', error);
+            return 999;
+        }
+    }
+
+    private getRandomPrizeFromPool(prizePool: Prize[]): Prize {
         const random = Math.random() * 100;
         let cumulative = 0;
-        for (const prize of this.prizes) {
+
+        for (const prize of prizePool) {
             cumulative += prize.chance;
             if (random < cumulative) {
                 return prize;
             }
         }
-        return this.prizes[this.prizes.length - 1];
+
+        return prizePool[prizePool.length - 1];
     }
 
     async getPrizeForToday(telegramId: string): Promise<FortuneCoupon | null> {
