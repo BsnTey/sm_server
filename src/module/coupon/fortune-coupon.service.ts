@@ -14,19 +14,24 @@ dayjs.extend(timezone);
 
 @Injectable()
 export class FortuneCouponService {
-    private readonly replenishPrizes: Prize[] = [
+    private readonly prizes: Prize[] = [
         { name: 'Купон на счет 200р. Активация в Спортивном боте', chance: 7, code: 'Replenish_200' },
         { name: 'Купон на счет 500р. Активация в Спортивном боте', chance: 5, code: 'Replenish_500' },
         { name: 'Купон на счет 50р. Активация в Спортивном боте', chance: 27, code: 'Replenish_50' },
         { name: 'Купон на счет 100р. Активация в Спортивном боте', chance: 23, code: 'Replenish_100' },
+        { name: 'Пополнение 25%. Активация в профиле при пополнении', chance: 3, code: 'Payment_25' },
+        { name: 'Пополнение 30%. Активация в профиле при пополнении', chance: 3, code: 'Payment_30' },
+        { name: 'Скидка 25%. Активация в Спортивном боте', chance: 13, code: 'Discount_25' },
+        { name: 'Скидка 30%. Активация в Спортивном боте', chance: 11, code: 'Discount_30' },
+        { name: 'Скидка 50%. Активация в Спортивном боте', chance: 8, code: 'Discount_50' },
     ];
 
-    private readonly percentagePrizes: Prize[] = [
-        { name: 'Пополнение 25%. Активация в профиле при пополнении', chance: 20, code: 'Payment_25' },
-        { name: 'Пополнение 30%. Активация в профиле при пополнении', chance: 20, code: 'Payment_30' },
-        { name: 'Скидка 25%. Активация в Спортивном боте', chance: 25, code: 'Discount_25' },
-        { name: 'Скидка 30%. Активация в Спортивном боте', chance: 20, code: 'Discount_30' },
-        { name: 'Скидка 50%. Активация в Спортивном боте', chance: 15, code: 'Discount_50' },
+    private readonly smallPrizes: Prize[] = [
+        { name: 'Пополнение 25%. Активация в профиле при пополнении', chance: 8, code: 'Payment_25' },
+        { name: 'Пополнение 30%. Активация в профиле при пополнении', chance: 5, code: 'Payment_30' },
+        { name: 'Скидка 10%. Активация в Спортивном боте', chance: 35, code: 'Discount_10' },
+        { name: 'Скидка 15%. Активация в Спортивном боте', chance: 26, code: 'Discount_15' },
+        { name: 'Скидка 20%. Активация в Спортивном боте', chance: 26, code: 'Discount_20' },
     ];
 
     private tgNamesExceptionStatistic: string[];
@@ -44,14 +49,13 @@ export class FortuneCouponService {
             const userPosition = await this.getUserPositionInStatistics(telegramId);
 
             if (userPosition > 15) {
-                return this.getRandomPrizeFromPool(this.percentagePrizes);
+                return this.getRandomPrizeFromPool(this.smallPrizes);
             }
 
-            const allPrizes = [...this.replenishPrizes, ...this.percentagePrizes];
-            return this.getRandomPrizeFromPool(allPrizes);
+            return this.getRandomPrizeFromPool(this.prizes);
         } catch (error) {
             console.error('Ошибка при получении позиции пользователя:', error);
-            return this.getRandomPrizeFromPool(this.percentagePrizes);
+            return this.getRandomPrizeFromPool(this.smallPrizes);
         }
     }
 
