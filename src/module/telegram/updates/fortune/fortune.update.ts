@@ -8,6 +8,7 @@ import { ALL_KEYS_MENU_BUTTON_NAME } from '../base-command/base-command.constant
 import { getSurprise } from '../../keyboards/profile.keyboard';
 import { FortuneCouponService } from '../../../coupon/fortune-coupon.service';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
+import { SenderTelegram } from '../../interfaces/telegram.context';
 
 @Scene(FORTUNE_BOT_SCENE)
 @UseFilters(TelegrafExceptionFilter)
@@ -18,7 +19,7 @@ export class FortuneUpdate {
     ) {}
 
     @SceneEnter()
-    async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
+    async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: SenderTelegram) {
         const prizeToday = await this.fortuneCouponService.getPrizeForToday(String(telegramId));
         if (prizeToday) {
             await ctx.editMessageText('😦 Вы уже получили приз сегодня, приходите за ним завтра.');
@@ -34,14 +35,14 @@ export class FortuneUpdate {
     }
 
     @Action('get_surprise')
-    async getSurprise(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const prizeToday = await this.fortuneCouponService.getPrizeForToday(String(telegramId));
+    async getSurprise(@Ctx() ctx: WizardContext, @Sender() sender: SenderTelegram) {
+        const prizeToday = await this.fortuneCouponService.getPrizeForToday(String(sender.id));
         if (prizeToday) {
             await ctx.reply('😦 Вы уже получили приз сегодня, приходите за ним завтра.');
             return;
         }
-        const prize = await this.fortuneCouponService.getRandomPrize(String(telegramId));
-        const newCoupon = await this.fortuneCouponService.awardPrizeToUser(prize, String(telegramId));
+        const prize = await this.fortuneCouponService.getRandomPrize(sender);
+        const newCoupon = await this.fortuneCouponService.awardPrizeToUser(prize, String(sender.id));
 
         await ctx.reply(
             `🔥 Поздравляем! Вы выиграли: ${prize.name}.\nДЕЙСТВУЕТ ДО КОНЦА ДНЯ\n(код: <b><code>${newCoupon.coupon}</code></b>)`,

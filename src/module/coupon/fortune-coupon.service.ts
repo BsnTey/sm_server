@@ -8,6 +8,7 @@ import timezone from 'dayjs/plugin/timezone';
 import { BottService } from '../bott/bott.service';
 import { extractCsrf, extractUsersStatistics } from '../telegram/utils/payment.utils';
 import { ConfigService } from '@nestjs/config';
+import { SenderTelegram } from '../telegram/interfaces/telegram.context';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -44,9 +45,9 @@ export class FortuneCouponService {
         this.tgNamesExceptionStatistic = this.configService.getOrThrow('TELEGRAM_NAMES_EXCEPTION_STATISTIC').split(',');
     }
 
-    async getRandomPrize(telegramId: string): Promise<Prize> {
+    async getRandomPrize(sender: SenderTelegram): Promise<Prize> {
         try {
-            const userPosition = await this.getUserPositionInStatistics(telegramId);
+            const userPosition = await this.getUserPositionInStatistics(sender);
 
             if (userPosition > 15) {
                 return this.getRandomPrizeFromPool(this.smallPrizes);
@@ -59,13 +60,13 @@ export class FortuneCouponService {
         }
     }
 
-    private async getUserPositionInStatistics(telegramId: string): Promise<number> {
+    private async getUserPositionInStatistics(sender: SenderTelegram): Promise<number> {
         try {
             const responseStatistics = await this.bottService.getStatistics();
 
             const usersStatistic = extractUsersStatistics(responseStatistics, this.tgNamesExceptionStatistic);
 
-            const userStat = usersStatistic.find(user => user.tgId === telegramId);
+            const userStat = usersStatistic.find(user => user.name === sender.username || user.name === `@${sender.username}`);
 
             return userStat ? userStat.row : 999;
         } catch (error) {
