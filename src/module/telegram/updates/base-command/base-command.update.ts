@@ -1,5 +1,5 @@
 import { UseFilters, UseGuards } from '@nestjs/common';
-import { Ctx, Hears, Message, Scene, SceneEnter, Update } from 'nestjs-telegraf';
+import { Ctx, Hears, Message, On, Scene, SceneEnter, Update } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
 import {
     ADMIN,
@@ -84,6 +84,11 @@ export class BaseUpdate {
     @Hears([CALCULATE_BONUS.name])
     async onStartCalculate(@Ctx() ctx: WizardContext) {
         await ctx.scene.enter(CALCULATE_BONUS.scene);
+    }
+
+    @On('text')
+    async unknowCommand(@Ctx() ctx: WizardContext) {
+        await ctx.reply(`Неизвестная команда. Введите /start`);
     }
 }
 
