@@ -784,7 +784,7 @@ export class AccountService {
 
     async getPromocodeFromProfile(accountId: string): Promise<PromocodeInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
-        const url = this.url + `v2/promocode`;
+        const url = this.url + `v1/promo`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
         return response.data;
