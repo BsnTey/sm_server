@@ -9,9 +9,9 @@ export interface Data {
 export interface Promocode {
     issueDate?: string;
     startDate: string;
-    endDate: string;
+    dateEnd: string;
     actionName: string;
-    couponId: string;
+    promoId: string;
     image: string;
     textLegal: string;
     textDetail: string;

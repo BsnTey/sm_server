@@ -213,9 +213,9 @@ export class CheckingService {
                         continue;
                     }
                 }
-                const couponId = promo.couponId;
-                const endDate = promo.endDate;
-                promocodes += `${actionName} <b><code>${couponId}</code></b> ${endDate} `;
+                const promoId = promo.promoId;
+                const dateEnd = promo.dateEnd;
+                promocodes += `${actionName} <b><code>${promoId}</code></b> ${dateEnd} `;
             }
 
             resultChecking[trimmedAccountId] = accountInfo + (promocodes || 'Нет промо') + '\n';
