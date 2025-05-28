@@ -100,7 +100,8 @@ export class BottService {
 
         const url = this.urlBotT + `lk/common/replenishment/main/statistics`;
         try {
-            const response = await this.httpService.get(url, { headers: this.headers, params, httpsAgent: this.httpsAgent });
+            // const response = await this.httpService.get(url, { headers: this.headers, params, httpsAgent: this.httpsAgent });
+            const response = await this.httpService.get(url, { headers: this.headers, params });
             return response.data;
         } catch (err) {
             throw new BadRequestException(ERROR_GET_STATISTICS);

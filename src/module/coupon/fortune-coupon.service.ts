@@ -39,15 +39,13 @@ export class FortuneCouponService {
         { name: 'Скидка 20%. Активация в Спортивном боте', chance: 26, code: 'Discount_20' },
     ];
 
-    private tgNamesExceptionStatistic: string[];
+    private tgNamesExceptionStatistic = this.configService.getOrThrow<string>('TELEGRAM_NAMES_EXCEPTION_STATISTIC').split(',');
 
     constructor(
         private readonly couponRepository: FortuneCouponRepository,
         private readonly bottService: BottService,
         private configService: ConfigService,
-    ) {
-        this.tgNamesExceptionStatistic = this.configService.getOrThrow('TELEGRAM_NAMES_EXCEPTION_STATISTIC').split(',');
-    }
+    ) {}
 
     async getRandomPrize(sender: SenderTelegram): Promise<Prize> {
         try {
