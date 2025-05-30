@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import Imap from 'imap';
 import { simpleParser } from 'mailparser';
 
 @Injectable()
 export class EmailService {
+    private readonly logger = new Logger(EmailService.name);
+
     private readonly receiptSubjectPatterns: RegExp[] = [/Электронный чек/, /Кассовый чек/];
 
     private readonly receiptLinkPatterns: RegExp[] = [
@@ -39,7 +41,7 @@ export class EmailService {
 
                     resolve(results.filter(result => result.links.length > 0));
                 } catch (error) {
-                    console.error('Error during IMAP operations:', error);
+                    this.logger.error('Error during IMAP operations:', error);
                     reject(error);
                 } finally {
                     imap.end();
@@ -47,12 +49,12 @@ export class EmailService {
             });
 
             imap.once('error', (error: any) => {
-                console.error('IMAP Error:', error);
+                this.logger.error('IMAP Error:', error);
                 reject(error);
             });
 
             imap.once('end', () => {
-                console.log('IMAP connection closed');
+                this.logger.log('IMAP connection closed');
             });
 
             imap.connect();
@@ -93,7 +95,7 @@ export class EmailService {
                             }
                         }
                     } catch (error) {
-                        console.error('Error parsing message:', error);
+                        this.logger.error('Error parsing message:', error);
                     } finally {
                         resolve();
                     }
@@ -101,7 +103,7 @@ export class EmailService {
             });
 
             fetch.once('error', error => {
-                console.error('Fetch error:', error);
+                this.logger.error('Fetch error:', error);
                 reject(error);
             });
 

@@ -4,9 +4,9 @@ import { UserRole } from '@prisma/client';
 
 export const profileKeyboard = (role: UserRole) => {
     const btnArr: any[] = [];
-    // role != 'User' ? btnArr.push([Markup.button.callback('Пополнить баланс', 'payment')]) : null;
-    // role != 'User' ? btnArr.push([Markup.button.callback('Призы фортуны', 'fortune')]) : null;
-    // role != 'User' ? btnArr.push([Markup.button.callback('Получить промокод для бота продаж', 'get_promocode')]) : null;
+    role != 'User' ? btnArr.push([Markup.button.callback('Пополнить баланс', 'payment')]) : null;
+    role != 'User' ? btnArr.push([Markup.button.callback('Призы фортуны', 'fortune')]) : null;
+    role != 'User' ? btnArr.push([Markup.button.callback('Получить промокод для бота продаж', 'get_promocode')]) : null;
     btnArr.push([Markup.button.callback('Чекер промо', 'check_promo')]);
     btnArr.push([Markup.button.callback('Получить инфо по заказу', 'get_info_order')]);
     return Markup.inlineKeyboard(btnArr);

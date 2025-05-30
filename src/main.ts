@@ -7,9 +7,14 @@ import './common/helpers/hbs.helper';
 import { engine } from 'express-handlebars';
 import { handlebarsHelpers } from '@common/helpers/hbs.helper';
 import { ConfigService } from '@nestjs/config';
+import { DEVELOPMENT_STRATEGY, PinoService, PRODUCTION_STRATEGY } from './module/logger';
+import { APP_NAME, APP_VERSION } from './app.constants';
 
 async function bootstrap() {
-    const app = await NestFactory.create<NestExpressApplication>(AppModule);
+    const pinoStrategy = process.env.NODE_ENV === 'production' ? PRODUCTION_STRATEGY : DEVELOPMENT_STRATEGY;
+    const logger = new PinoService(pinoStrategy);
+
+    const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger });
     app.setGlobalPrefix('api');
     app.useGlobalPipes(new ZodValidationPipe());
     app.enableCors();
@@ -30,5 +35,9 @@ async function bootstrap() {
 
     app.setViewEngine('hbs');
     await app.listen(PORT, HOST);
+
+    const context = 'Bootstrap';
+    logger.log(`Listening on ${JSON.stringify(app.getHttpServer().address())}`, context);
+    logger.log(`Application "${APP_NAME}" version ${APP_VERSION} has started`, context);
 }
 bootstrap();

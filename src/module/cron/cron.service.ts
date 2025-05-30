@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { AccountService } from '../account/account.service';
 import { CourseStatus, Lesson, LessonStatus } from '@prisma/client';
 import { CourseService } from '../account/course.service';
@@ -7,6 +7,8 @@ import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class CronService {
+    private readonly logger = new Logger(CronService.name);
+
     private isRunning = false;
 
     constructor(
@@ -25,7 +27,7 @@ export class CronService {
             if (accounts.length === 0) return;
 
             accountsLoop: for (const accountId of accounts) {
-                console.log('In accountsLoop by', accountId);
+                this.logger.log('In accountsLoop by', accountId);
                 const accountActiveCourses = await this.courseService.getCoursesByAccountAndStatus(accountId, CourseStatus.ACTIVE);
 
                 //здесь проверка, все курсы просмотрены, но нет статуса финиш аккаунт (после синхрона)
@@ -59,25 +61,6 @@ export class CronService {
 
                         if (lesson.progress.status === LessonStatus.VIEWED) continue;
 
-                        // if (accountLessonProgress.status == LessonStatus.VIEWED) {
-                        //     //здесь проверяем, последний ли урок и курс. нужно на проверку после синхронизации
-                        //     if (i < accountWithCourses.length - 1 && j === lessons.length - 1) {
-                        //         const allCoursesFinished = accountWithCourses.every(
-                        //             course =>
-                        //                 course.status === CourseStatus.FINISHED &&
-                        //                 course.course.lessons.every(lesson =>
-                        //                     lesson.AccountLessonProgress.some(progress => progress.status === LessonStatus.VIEWED),
-                        //                 ),
-                        //         );
-                        //
-                        //         if (allCoursesFinished) {
-                        //             await this.accountService.updateCourseStatus(accountLessonProgress.accountId, CourseStatus.FINISHED);
-                        //             continue accountsLoop;
-                        //         }
-                        //     }
-                        //     continue;
-                        // }
-
                         // Проверяем, наступило ли время для просмотра лекции
                         if (!lesson.progress.nextViewAt || new Date(lesson.progress.nextViewAt).toISOString() <= new Date().toISOString()) {
                             const accountId = lesson.progress.accountId;
@@ -94,10 +77,10 @@ export class CronService {
                                 const isWatched = await this.viewLesson(lessonView, progressId, accountId);
                                 if (!isWatched) continue accountsLoop;
                                 lesson.progress.status = LessonStatus.VIEWED;
-                                console.log('просмотрел', lessonView.mnemocode, lesson.position);
+                                this.logger.log('просмотрел', lessonView.mnemocode, lesson.position);
                             } catch (err: any) {
                                 await this.accountService.promblemCourses(accountCourse.accountId);
-                                console.error('Проблема с курсом isWatched', accountCourse.accountId);
+                                this.logger.error('Проблема с курсом isWatched', accountCourse.accountId);
                             }
 
                             // Если это последняя лекция в курсе
@@ -149,7 +132,7 @@ export class CronService {
                 }
             }
         } catch (err: any) {
-            console.error(err);
+            this.logger.error(err);
         } finally {
             this.isRunning = false;
         }
@@ -164,7 +147,7 @@ export class CronService {
         try {
             isWatching = await Promise.race([isWatchingPromise, timeout]);
         } catch (error) {
-            console.error('ОШИБКА В ПРОСМОТРЕ', accountId);
+            this.logger.error('ОШИБКА В ПРОСМОТРЕ', accountId);
             isWatching = false;
         }
 

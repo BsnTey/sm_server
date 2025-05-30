@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { FortuneCouponRepository } from './forune-coupon.repository';
 import { FortuneCoupon, FortuneSurpriseType } from '@prisma/client';
 import { Prize } from './interfaces/fortune.interface';
@@ -15,6 +15,8 @@ dayjs.extend(timezone);
 
 @Injectable()
 export class FortuneCouponService {
+    private readonly logger = new Logger(FortuneCouponService.name);
+
     private readonly prizes: Prize[] = [
         // { name: 'Купон на счет 200р. Активация в Спортивном боте', chance: 7, code: 'Replenish_200' },
         // { name: 'Купон на счет 500р. Активация в Спортивном боте', chance: 5, code: 'Replenish_500' },
@@ -57,7 +59,7 @@ export class FortuneCouponService {
 
             return this.getRandomPrizeFromPool(this.prizes);
         } catch (error) {
-            console.error('Ошибка при получении позиции пользователя:', error);
+            this.logger.error('Ошибка при получении позиции пользователя:', error);
             return this.getRandomPrizeFromPool(this.smallPrizes);
         }
     }
@@ -72,7 +74,7 @@ export class FortuneCouponService {
 
             return userStat ? userStat.row : 999;
         } catch (error) {
-            console.error('Ошибка при получении позиции пользователя:', error);
+            this.logger.error('Ошибка при получении позиции пользователя:', error);
             return 999;
         }
     }

@@ -4,10 +4,9 @@ export const prisma = new PrismaClient().$extends({
     name: 'StatusHistoryExtension',
     query: {
         paymentOrder: {
-            async update({ model, operation, args, query }) {
+            async update({ args, query }) {
                 // Проверяем, изменяется ли статус
                 const newStatus = args.data.status;
-                console.log(newStatus);
 
                 // Выполняем обновление PaymentOrder
                 const result = await query(args);

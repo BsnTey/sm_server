@@ -1,9 +1,10 @@
 import axios, { AxiosResponse } from 'axios';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { IHttpInterface } from './interfaces/http.interface';
 
 @Injectable()
 export class HttpService implements IHttpInterface {
+    private readonly logger = new Logger(HttpService.name);
     private timeout = 10000;
 
     constructor() {}
@@ -12,7 +13,7 @@ export class HttpService implements IHttpInterface {
         try {
             return await axios.get<T>(url, { timeout: this.timeout, ...options });
         } catch (error: any) {
-            console.error(`HTTP GET error on url ${url}:`, error.message);
+            this.logger.error(`HTTP GET error on url ${url}:`, error.message);
             throw error;
         }
     }
@@ -21,7 +22,7 @@ export class HttpService implements IHttpInterface {
         try {
             return await axios.post<T>(url, payload, { timeout: this.timeout, ...options });
         } catch (error: any) {
-            console.error(`HTTP POST error on url ${url}:`, error.message);
+            this.logger.error(`HTTP POST error on url ${url}:`, error.message);
             throw error;
         }
     }
@@ -30,7 +31,7 @@ export class HttpService implements IHttpInterface {
         try {
             return await axios.delete<T>(url, { timeout: this.timeout, ...options });
         } catch (error: any) {
-            console.error(`HTTP DELETE error on url ${url}:`, error.message);
+            this.logger.error(`HTTP DELETE error on url ${url}:`, error.message);
             throw error;
         }
     }

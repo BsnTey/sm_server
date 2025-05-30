@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Ctx, InjectBot } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
@@ -10,6 +10,7 @@ import { Telegraf } from 'telegraf';
 
 @Injectable()
 export class TelegramService {
+    private readonly logger = new Logger(TelegramService.name);
     private TTL_CASH = this.configService.getOrThrow('TTL_CASH', 86000000);
 
     constructor(
@@ -59,7 +60,7 @@ export class TelegramService {
         try {
             await this.bot.telegram.sendMessage(chatId, text);
         } catch (error) {
-            console.error('Ошибка при отправке сообщения:', error);
+            this.logger.error('Ошибка при отправке сообщения:', error);
         }
     }
 }

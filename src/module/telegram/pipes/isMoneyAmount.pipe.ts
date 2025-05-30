@@ -1,9 +1,9 @@
-import { ArgumentMetadata, BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
+import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 import { ERROR_INTEGER, ERROR_LOW_MONEY_COUNT, ERROR_NOT_MULTIPLE_OF_50 } from '../constants/error.constant';
 
 @Injectable()
 export class isMoneyAmountPipe implements PipeTransform<string> {
-    transform(amountCount: string, metadata: ArgumentMetadata): number {
+    transform(amountCount: string): number {
         const amount = Math.floor(Number(amountCount));
 
         if (!Number.isInteger(amount)) {

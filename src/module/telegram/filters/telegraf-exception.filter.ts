@@ -1,4 +1,4 @@
-import { ArgumentsHost, Catch, ExceptionFilter } from '@nestjs/common';
+import { ArgumentsHost, Catch, ExceptionFilter, Logger } from '@nestjs/common';
 import { TelegrafArgumentsHost } from 'nestjs-telegraf';
 import { Context } from 'telegraf';
 import { AxiosError } from 'axios';
@@ -7,6 +7,8 @@ import { AccountService } from '../../account/account.service';
 
 @Catch()
 export class TelegrafExceptionFilter implements ExceptionFilter {
+    private readonly logger = new Logger(TelegrafExceptionFilter.name);
+
     constructor(private accountService: AccountService) {}
 
     async catch(exception: Error, host: ArgumentsHost): Promise<void> {
@@ -20,8 +22,6 @@ export class TelegrafExceptionFilter implements ExceptionFilter {
                     switch (exception.response.statusText) {
                         case 'Unauthorized':
                             if (exception.response!.data.error.code == 'UNAUTHORIZED') {
-                                const accountId = exception.config!.headers['Account-Id'];
-                                // await this.accountService.setBanMp(accountId);
                                 exception.message = ERROR_LOGOUT_MP;
                                 break;
                             }
@@ -41,14 +41,14 @@ export class TelegrafExceptionFilter implements ExceptionFilter {
                             exception.message = exception.response!.data.error.message;
                             break;
                         default:
-                            console.log(exception.response);
+                            this.logger.log(exception.response);
                     }
                 } else {
-                    console.log('pass');
+                    this.logger.log('pass');
                 }
             }
         }
-        console.log(exception.message);
+        this.logger.log(exception.message);
         await ctx.replyWithHTML(`<b>❌</b>  ${exception.message}`);
     }
 }

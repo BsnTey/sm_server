@@ -1,6 +1,6 @@
 import { Action, Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
-import { BadRequestException, UseFilters } from '@nestjs/common';
+import { BadRequestException, Logger, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { ALL_KEYS_MENU_BUTTON_NAME } from '../base-command/base-command.constants';
 import { TelegramService } from '../../telegram.service';
@@ -19,6 +19,8 @@ import { FortuneCouponService } from '../../../coupon/fortune-coupon.service';
 @Scene(MAKE_DEPOSIT_SCENE)
 @UseFilters(TelegrafExceptionFilter)
 export class PaymentUpdate {
+    private readonly logger = new Logger(PaymentUpdate.name);
+
     constructor(
         private telegramService: TelegramService,
         private paymentService: PaymentService,
@@ -138,7 +140,7 @@ export class PaymentUpdate {
                 gotoCoupon,
             );
         } catch (error) {
-            console.error('Error processing receipt:', error);
+            this.logger.error('Error processing receipt:', error);
             await ctx.reply('Произошла ошибка при обработке квитанции.');
         }
     }
@@ -191,6 +193,7 @@ export class PaymentUpdate {
 @Scene(PAYMENT_PROMOCODE_BOT_SCENE)
 @UseFilters(TelegrafExceptionFilter)
 export class PaymentPromocodeUpdate {
+    private readonly logger = new Logger(PaymentUpdate.name);
     constructor(
         private telegramService: TelegramService,
         private paymentService: PaymentService,
@@ -236,7 +239,7 @@ export class PaymentPromocodeUpdate {
             await ctx.reply(`Купон успешно применен! Новая сумма зачисления: ${updatedPaymentOrder.amountCredited}₽.`);
             await ctx.scene.enter(MAKE_DEPOSIT_SCENE);
         } catch (error: any) {
-            console.error(error);
+            this.logger.error(error);
             await ctx.reply(`Ошибка при применении купона: ${error.message}`);
         }
     }

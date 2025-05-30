@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { HttpService } from '../http/http.service';
@@ -6,6 +6,8 @@ import { fromBuffer } from 'pdf2pic';
 
 @Injectable()
 export class FileService {
+    private readonly logger = new Logger(FileService.name);
+
     private uploadDir = './public/receipts';
 
     constructor(private httpService: HttpService) {
@@ -53,7 +55,7 @@ export class FileService {
                 throw new Error('Результат не содержит буфер');
             }
         } catch (error) {
-            console.error('Ошибка при конвертации PDF в JPG:', error);
+            this.logger.error('Ошибка при конвертации PDF в JPG:', error);
             throw new Error('Ошибка при конвертации PDF в изображение');
         }
     }
