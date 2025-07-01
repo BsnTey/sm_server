@@ -84,12 +84,12 @@ export class PaymentService {
 
     private calculateAmountWithBonus(amount: number, userTelegramId: string): number {
         switch (true) {
-            case this.tgIdVipCoef.includes(userTelegramId):
-                return Math.floor(amount * 1.25);
+            // case this.tgIdVipCoef.includes(userTelegramId):
+            //     return Math.floor(amount * 1.25);
             case amount >= 5000:
-                return Math.floor(amount * 1.2);
+                return Math.floor(amount * 1.05);
             case amount >= 2000:
-                return Math.floor(amount * 1.1);
+                return Math.floor(amount * 1.02);
             default:
                 return amount;
         }
