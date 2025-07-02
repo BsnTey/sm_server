@@ -11,7 +11,7 @@ export class HttpService implements IHttpInterface {
 
     async get<T = any>(url: string, options: any = {}): Promise<AxiosResponse<T>> {
         try {
-            return await axios.get<T>(url, { timeout: this.timeout, ...options });
+            return axios.get<T>(url, { timeout: this.timeout, ...options });
         } catch (error: any) {
             this.logger.error(`HTTP GET error on url ${url}:`, error.message);
             throw error;
@@ -20,7 +20,7 @@ export class HttpService implements IHttpInterface {
 
     async post<T = any>(url: string, payload: any, options: any = {}): Promise<AxiosResponse<T>> {
         try {
-            return await axios.post<T>(url, payload, { timeout: this.timeout, ...options });
+            return axios.post<T>(url, payload, { timeout: this.timeout, ...options });
         } catch (error: any) {
             this.logger.error(`HTTP POST error on url ${url}:`, error.message);
             throw error;
@@ -29,7 +29,7 @@ export class HttpService implements IHttpInterface {
 
     async delete<T = any>(url: string, options: any = {}): Promise<AxiosResponse<T>> {
         try {
-            return await axios.delete<T>(url, { timeout: this.timeout, ...options });
+            return axios.delete<T>(url, { timeout: this.timeout, ...options });
         } catch (error: any) {
             this.logger.error(`HTTP DELETE error on url ${url}:`, error.message);
             throw error;
