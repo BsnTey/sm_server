@@ -147,7 +147,7 @@ export class CronService {
         try {
             isWatching = await Promise.race([isWatchingPromise, timeout]);
         } catch (error) {
-            this.logger.error('ОШИБКА В ПРОСМОТРЕ', accountId);
+            this.logger.error('ОШИБКА В ПРОСМОТРЕ', accountId, error);
             isWatching = false;
         }
 
