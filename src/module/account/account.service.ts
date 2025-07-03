@@ -349,8 +349,7 @@ export class AccountService {
 
     private async getHttpOptions(url: string, accountWithProxy: AccountWithProxyEntity): Promise<any> {
         const headers = this.sportmasterHeaders.getHeadersMobile(url, accountWithProxy);
-        // const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
-        const httpsAgent = undefined;
+        const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
 
         return { headers, httpsAgent };
     }
