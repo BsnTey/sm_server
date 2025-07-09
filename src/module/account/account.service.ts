@@ -254,8 +254,10 @@ export class AccountService {
         await this.accountRep.addAccountCourses(accountId);
         const lessons = await this.courseService.getAllLesson();
         try {
+            console.log('попытка в try');
             await this.courseService.createAccountLessonProgress(account.accountId, lessons);
         } catch (e) {
+            console.log('попытка в catch');
             await this.initializeAccountProgress(account.accountId);
         }
     }

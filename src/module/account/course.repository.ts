@@ -43,6 +43,8 @@ export class CourseRepository {
             };
         });
 
+        console.log(lessonProgressData);
+
         await this.prisma.accountLessonProgress.createMany({
             data: lessonProgressData,
         });
