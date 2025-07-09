@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@common/database/prisma.service';
 import { CourseWithLessons } from './interfaces/course.interface';
 import { AccountCourse, CourseStatus, Lesson, LessonStatus } from '@prisma/client';
+import { LessonProgressData } from './interfaces/lesson-progress.interface';
 
 @Injectable()
 export class CourseRepository {
@@ -43,8 +44,12 @@ export class CourseRepository {
             };
         });
 
-        console.log(lessonProgressData);
+        await this.prisma.accountLessonProgress.createMany({
+            data: lessonProgressData,
+        });
+    }
 
+    async createAccountLessonProgressByExistCourses(lessonProgressData: LessonProgressData[]): Promise<void> {
         await this.prisma.accountLessonProgress.createMany({
             data: lessonProgressData,
         });
@@ -198,6 +203,14 @@ export class CourseRepository {
             select: {
                 courseId: true,
                 mnemocode: true,
+            },
+        });
+    }
+
+    async getAccountCoursesByAccountId(accountId: string) {
+        return this.prisma.accountCourse.findMany({
+            where: {
+                accountId: accountId,
             },
         });
     }

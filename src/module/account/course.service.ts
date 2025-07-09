@@ -1,8 +1,9 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { CourseWithLessons } from './interfaces/course.interface';
 import { CourseRepository } from './course.repository';
-import { CourseStatus, Lesson, LessonStatus } from '@prisma/client';
+import { AccountCourse, CourseStatus, Lesson, LessonStatus } from '@prisma/client';
 import { CourseData } from './interfaces/course-data.interface';
+import { LessonProgressData } from './interfaces/lesson-progress.interface';
 
 @Injectable()
 export class CourseService implements OnModuleInit {
@@ -49,6 +50,25 @@ export class CourseService implements OnModuleInit {
 
     async createAccountLessonProgress(accountId: string, lessons: Lesson[]): Promise<void> {
         return this.courseRepository.createAccountLessonProgress(accountId, lessons);
+    }
+
+    async createAccountLessonProgressFromExistCourses(accountId: string, lessons: Lesson[]): Promise<void> {
+        const accountCourse = await this.courseRepository.getAccountCoursesByAccountId(accountId);
+        const lessonProgressData: LessonProgressData[] = lessons.map(lesson => {
+            const foundedCourse = accountCourse.find(course => {
+                return course.courseId == lesson.courseId;
+            });
+            if (!foundedCourse) throw new NotFoundException('Не найден курс для createAccountLessonProgressFromExistCourses');
+
+            return {
+                accountId,
+                accountCourseAccountCourseId: foundedCourse?.accountCourseId,
+                lessonId: lesson.lessonId,
+                nextViewAt: null,
+            };
+        });
+
+        return this.courseRepository.createAccountLessonProgressByExistCourses(lessonProgressData);
     }
 
     async getFirstLessonProgressId(accountId: string, courseId: string) {

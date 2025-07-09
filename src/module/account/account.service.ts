@@ -251,17 +251,12 @@ export class AccountService {
     async connectionCourseAccount(accountId: string) {
         const account = await this.getAccount(accountId);
 
-        try {
-            await this.accountRep.addAccountCourses(accountId);
-        } catch (e) {}
-
         const lessons = await this.courseService.getAllLesson();
         try {
-            console.log('попытка в try');
+            await this.accountRep.addAccountCourses(accountId);
             await this.courseService.createAccountLessonProgress(account.accountId, lessons);
         } catch (e) {
-            console.log('попытка в catch');
-            await this.initializeAccountProgress(account.accountId);
+            await this.courseService.createAccountLessonProgressFromExistCourses(account.accountId, lessons);
         }
     }
 
