@@ -79,6 +79,10 @@ export class CourseService implements OnModuleInit {
         return this.courseRepository.getLessonsWithProgressByAccountAndCourse(accountId, courseId);
     }
 
+    async getLessonsProgressByAccountId(accountId: string) {
+        return this.courseRepository.getLessonsProgressByAccountId(accountId);
+    }
+
     async updateViewLesson(progressId: number, status: LessonStatus) {
         return this.courseRepository.updateViewLesson(progressId, status);
     }

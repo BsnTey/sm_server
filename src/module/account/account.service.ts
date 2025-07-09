@@ -143,7 +143,18 @@ export class AccountService {
                 await this.createAccountCourseAndLessons(accountId, course);
             }
         }
+        const isExist = await this.checkOnExistProgressLesson(accountId);
+
+        if (!isExist) {
+            const lessons = await this.courseService.getAllLesson();
+            await this.courseService.createAccountLessonProgressFromExistCourses(accountId, lessons);
+        }
         return coursesInAccount;
+    }
+
+    async checkOnExistProgressLesson(accountId: string) {
+        const lessonsProgress = await this.courseService.getLessonsProgressByAccountId(accountId);
+        return lessonsProgress.length != 0;
     }
 
     async createAccountCourseAndLessons(accountId: string, course: CourseWithLessons) {

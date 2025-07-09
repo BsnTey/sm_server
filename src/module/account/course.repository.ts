@@ -67,6 +67,12 @@ export class CourseRepository {
         });
     }
 
+    async getLessonsProgressByAccountId(accountId: string) {
+        return this.prisma.accountLessonProgress.findMany({
+            where: { accountId },
+        });
+    }
+
     async getLessonsWithProgressByAccountAndCourse(accountId: string, courseId: string) {
         const lessons = await this.prisma.lesson.findMany({
             where: {
