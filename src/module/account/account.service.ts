@@ -253,7 +253,11 @@ export class AccountService {
 
         await this.accountRep.addAccountCourses(accountId);
         const lessons = await this.courseService.getAllLesson();
-        await this.courseService.createAccountLessonProgress(account.accountId, lessons);
+        try {
+            await this.courseService.createAccountLessonProgress(account.accountId, lessons);
+        } catch (e) {
+            await this.initializeAccountProgress(account.accountId);
+        }
     }
 
     private async updateCourseTokensAccountPrivate(

@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { CourseWithLessons } from './interfaces/course.interface';
 import { CourseRepository } from './course.repository';
 import { CourseStatus, Lesson, LessonStatus } from '@prisma/client';
 import { CourseData } from './interfaces/course-data.interface';
 
 @Injectable()
-export class CourseService {
+export class CourseService implements OnModuleInit {
     coursesId: string[] = [];
     coursesMnemocode: Record<string, string> = {};
 
@@ -44,11 +44,11 @@ export class CourseService {
     }
 
     async createAccountCourse(accountId: string, course: CourseWithLessons): Promise<void> {
-        return await this.courseRepository.createAccountCourse(accountId, course);
+        return this.courseRepository.createAccountCourse(accountId, course);
     }
 
     async createAccountLessonProgress(accountId: string, lessons: Lesson[]): Promise<void> {
-        return await this.courseRepository.createAccountLessonProgress(accountId, lessons);
+        return this.courseRepository.createAccountLessonProgress(accountId, lessons);
     }
 
     async getFirstLessonProgressId(accountId: string, courseId: string) {
