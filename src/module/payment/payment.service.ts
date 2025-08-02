@@ -159,16 +159,16 @@ export class PaymentService {
         return null;
     }
 
-    async createPromocode(telegramId: string, userName: string) {
-        const responseStatistics = await this.bottService.getStatistics();
-        const csrfToken = extractCsrf(responseStatistics);
-        const usersStatistic = extractUsersStatistics(responseStatistics, this.tgNamesExceptionStatistic);
-        const promoName = userName || telegramId;
-        const discountPercent = this.getDiscountFromStatistic(telegramId, userName, usersStatistic);
-        const responseStatus = await this.bottService.createPromocode(csrfToken, promoName, discountPercent);
-        if (responseStatus != 200) throw new BadRequestException(ERROR_CREATE_PROMOCODE);
-        return { promoName, discountPercent };
-    }
+    // async createPromocode(telegramId: string, userName: string) {
+    //     const responseStatistics = await this.bottService.getStatistics();
+    //     const csrfToken = extractCsrf(responseStatistics);
+    //     const usersStatistic = extractUsersStatistics(responseStatistics, this.tgNamesExceptionStatistic);
+    //     const promoName = userName || telegramId;
+    //     const discountPercent = this.getDiscountFromStatistic(telegramId, userName, usersStatistic);
+    //     const responseStatus = await this.bottService.createPromocode(csrfToken, promoName, discountPercent);
+    //     if (responseStatus != 200) throw new BadRequestException(ERROR_CREATE_PROMOCODE);
+    //     return { promoName, discountPercent };
+    // }
 
     async getInfoAboutPromocode(telegramId: string, userName: string) {
         const responseStatistics = await this.bottService.getStatistics();

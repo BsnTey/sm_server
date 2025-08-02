@@ -135,10 +135,7 @@ export class PaymentUpdate {
             await this.fileService.saveFileFromTg(fileName, fileLink);
 
             const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
-            await ctx.reply(
-                `Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.\nНе забывайте о своем промокоде`,
-                gotoCoupon,
-            );
+            await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
         } catch (error) {
             this.logger.error('Error processing receipt:', error);
             await ctx.reply('Произошла ошибка при обработке квитанции.');
@@ -162,10 +159,7 @@ export class PaymentUpdate {
 
                 const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
                 const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
-                await ctx.reply(
-                    `Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.\nНе забывайте о своем промокоде`,
-                    gotoCoupon,
-                );
+                await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
             } else {
                 await ctx.reply('Пожалуйста, отправьте файл в формате PDF.');
             }
@@ -179,10 +173,10 @@ export class PaymentUpdate {
         throw new BadRequestException(ERROR_SCRINSHOT);
     }
 
-    @Action('goto_coupon')
-    async gotoCoupon(@Ctx() ctx: WizardContext) {
-        await ctx.scene.enter(PROMOCODE_BOT_SCENE);
-    }
+    // @Action('goto_coupon')
+    // async gotoCoupon(@Ctx() ctx: WizardContext) {
+    //     await ctx.scene.enter(PROMOCODE_BOT_SCENE);
+    // }
 
     @Action('payment_coupon')
     async selectCouponPayment(@Ctx() ctx: WizardContext) {

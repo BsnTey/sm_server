@@ -24,7 +24,7 @@ import { EmailService } from './updates/email/email.service';
 import { CookieUpdate } from './updates/cookie/cookie.update';
 import { QrCodeUpdate } from './updates/qr-code/qr-code.update';
 import { QrCodeService } from './updates/qr-code/qr-code.service';
-import { GetInfoOrderUpdate, ProfileUpdate, PromocodeBotUpdate } from './updates/profile/profile.update';
+import { GetInfoOrderUpdate, ProfileUpdate } from './updates/profile/profile.update';
 import { AdminUpdate } from './updates/admin/admin.update';
 import { AuthMirrorUpdate } from './updates/auth-mirror/auth-mirror.update';
 import { PaymentPromocodeUpdate, PaymentUpdate } from './updates/payment/payment.update';
@@ -81,7 +81,6 @@ import { CalculateRepository } from './updates/calculate/calculate.repository';
         QrCodeService,
         ProfileUpdate,
         GetInfoOrderUpdate,
-        PromocodeBotUpdate,
         AuthMirrorUpdate,
         PaymentUpdate,
         PaymentPromocodeUpdate,
