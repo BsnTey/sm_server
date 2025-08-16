@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { AccountRepository } from './account.repository';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
 import { AccountEntity } from './entities/account.entity';
@@ -46,9 +46,11 @@ import { IDeviceInfo } from './interfaces/deviceInfo.interface';
 import { DeviceInfoRequestDto } from './dto/create-deviceInfo.dto';
 import { CourseIdAccountRequestDto } from './dto/course-account.dto';
 import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
+import { TlsProxyService } from '../http/tls-forwarder.service';
 
 @Injectable()
 export class AccountService {
+    private readonly logger = new Logger(AccountService.name);
     private url = this.configService.getOrThrow('API_DONOR');
     private urlSite = this.configService.getOrThrow('API_DONOR_SITE');
     private adminsId: string[] = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
@@ -58,6 +60,7 @@ export class AccountService {
         private configService: ConfigService,
         private accountRep: AccountRepository,
         private proxyService: ProxyService,
+        private readonly tlsForwarder: TlsProxyService,
         private httpService: HttpService,
         private courseService: CourseService,
         private deviceInfoService: DeviceInfoService,
@@ -486,33 +489,42 @@ export class AccountService {
     async sendSmsWithAnalytics(accountId: string, phoneNumber: string): Promise<string> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         await this.analyticsTags(accountWithProxyEntity);
-        await new Promise<void>(resolve => {
-            setTimeout(() => {
-                resolve();
-            }, 1000);
-        });
+        await new Promise<void>(resolve => setTimeout(resolve, 1000));
+
         return await this.sendSms(accountWithProxyEntity, phoneNumber);
     }
 
-    async sendSms(accountWithProxyEntity: string | AccountWithProxyEntity, phoneNumber: string): Promise<string> {
-        if (typeof accountWithProxyEntity == 'string') {
-            accountWithProxyEntity = await this.getAccountEntity(accountWithProxyEntity);
-        }
-        const url = this.url + `v1/verify/sendSms`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+    async sendSms(accountOrId: string | AccountWithProxyEntity, phoneNumber: string): Promise<string> {
+        const account = typeof accountOrId === 'string' ? await this.getAccountEntity(accountOrId) : accountOrId;
+
+        const targetUrl = this.url + `v1/verify/sendSms`;
+
+        const headers = this.sportmasterHeaders.getHeadersForSearchAccount(targetUrl, account);
 
         const payload = {
             phone: {
-                countryCode: 7,
+                countryCode: '7',
                 nationalNumber: phoneNumber,
                 isoCode: 'RU',
             },
-            operation: 'change_phone',
+            operation: 'search_account',
             communicationChannel: 'SMS',
         };
-        const response = await this.httpService.post(url, payload, httpOptions);
 
-        return response.data.data.requestId;
+        const responseData = await this.tlsForwarder.forwardRequest<{ data: { requestId: string } }>({
+            requestUrl: targetUrl,
+            requestMethod: 'POST',
+            headers,
+            requestBody: payload,
+            proxyUrl: account.proxy!.proxy,
+        });
+
+        if (!responseData?.data?.requestId) {
+            this.logger.error('Unexpected response from Sportmaster after TLS forwarding', responseData);
+            throw new Error('Failed to get requestId from Sportmaster API');
+        }
+
+        return responseData.data.requestId;
     }
 
     async phoneChange(accountId: string, requestId: string, code: string) {

@@ -6,7 +6,7 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class SportmasterHeadersService {
     private prefixHash = 'eb1a3e30291bc971c4da0e86375961a4';
-    private userAgentMobile: string = 'android-4.44.0-google(44971)';
+    private userAgentMobile: string = 'android-4.70.0-google(56380)';
     private userAgentMobileWeb: string =
         'Mozilla/5.0 (Linux; Android 7.1.2; ASUS_Z01QD Build/N2G48H; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/68.0.3440.70 Mobile Safari/537.36 android-4.52.0-google(48799)';
     private locale: string = 'ru';
@@ -42,12 +42,35 @@ export class SportmasterHeadersService {
             Eutc: this.eutc,
             'x-user-id': xUserId,
             Authorization: accessToken,
-            Host: this.host,
+            //Host: this.host,
             'Accept-Encoding': this.acceptEncoding,
             'Content-Type': this.contentType,
             Timestamp: timestamp,
             'Aplaut-Id': this.generateHash(url, xUserId, timestamp),
             'Aplaut-Build': this.aplautBuild,
+        };
+    }
+
+    getHeadersForSearchAccount(url: string, { deviceId, installationId, cityId, xUserId, accessToken }: any): Record<string, string> {
+        const timestamp = String(Math.floor(Date.now() / 1000));
+
+        return {
+            'User-Agent': this.userAgentMobile,
+            Locale: 'ru',
+            Country: 'RU',
+            'Device-Id': deviceId,
+            'X-Device-Id': deviceId,
+            'Installation-Id': installationId,
+            'X-Request-Id': crypto.randomUUID(),
+            'City-Id': cityId,
+            'X-User-Id': xUserId,
+            Timestamp: timestamp,
+            'Aplaut-Id': this.generateHash(url, xUserId, timestamp),
+            'Aplaut-Build': '2',
+            Accept: 'application/json',
+            Authorization: accessToken,
+            'Content-Type': 'application/json; charset=UTF-8',
+            'Accept-Encoding': 'gzip, deflate, br',
         };
     }
 
