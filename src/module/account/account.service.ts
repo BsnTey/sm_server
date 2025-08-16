@@ -507,7 +507,7 @@ export class AccountService {
                 nationalNumber: phoneNumber,
                 isoCode: 'RU',
             },
-            operation: 'search_account',
+            operation: 'change_phone',
             communicationChannel: 'SMS',
         };
 
@@ -521,7 +521,7 @@ export class AccountService {
 
         if (!responseData?.data?.requestId) {
             this.logger.error('Unexpected response from Sportmaster after TLS forwarding', responseData);
-            throw new Error('Failed to get requestId from Sportmaster API');
+            throw new Error('Ошибка при проверке номера на стороне СМ');
         }
 
         return responseData.data.requestId;
@@ -529,6 +529,7 @@ export class AccountService {
 
     async phoneChange(accountId: string, requestId: string, code: string) {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        await this.analyticsTags(accountWithProxyEntity);
         const token = await this.verifyCheck(accountWithProxyEntity, requestId, code);
         await this.changePhone(accountWithProxyEntity, token);
     }

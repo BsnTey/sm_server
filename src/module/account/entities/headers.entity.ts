@@ -33,6 +33,7 @@ export class SportmasterHeadersService {
         const timestamp = String(Math.floor(Date.now() / 1000));
         return {
             'User-Agent': this.userAgentMobile,
+            Host: this.host,
             Locale: this.locale,
             Country: this.country,
             'Device-Id': deviceId,
