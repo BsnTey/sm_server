@@ -6,7 +6,6 @@ import { PaymentRepository } from './payment.repository';
 import { BottService } from '../bott/bott.service';
 import {
     ERROR_CHANGE_BALANCE,
-    ERROR_CREATE_PROMOCODE,
     ERROR_GET_BOT_ID,
     ERROR_GET_SEARCH_ID,
     ERROR_GET_TRANSACTIONS,
@@ -16,11 +15,14 @@ import { extractCsrf, extractUserBotId, extractUsersStatistics, getPromoCodeDeta
 import { IReplenishmentUsersBotT } from '../bott/interfaces/replenishment-bot-t.interface';
 import { UserStatistic } from './interfaces/statistic.interface';
 import { ConfigService } from '@nestjs/config';
+import { Payment } from './interfaces/payment.interface';
+import { FilterStatusPayment, Pagination } from './dto/queryFilter.dto';
 
 @Injectable()
 export class PaymentService {
     private tgNamesExceptionStatistic: string[] = this.configService.getOrThrow('TELEGRAM_NAMES_EXCEPTION_STATISTIC').split(',');
     private tgIdVipCoef: string[] = this.configService.getOrThrow('TELEGRAM_ID_VIP_COEF').split(',');
+    private domain: string = this.configService.getOrThrow('DOMAIN');
 
     constructor(
         private paymentRepository: PaymentRepository,
@@ -100,8 +102,36 @@ export class PaymentService {
         return paymentOrderModel ? new PaymentOrderEntity(paymentOrderModel) : null;
     }
 
-    async getAllPaymentOrders() {
-        return await this.paymentRepository.getAllPaymentOrders();
+    async getPaymentOrders(
+        pagination: Pagination,
+        filters: FilterStatusPayment,
+    ): Promise<{
+        data: Payment[];
+        meta: { total: number; page: number; limit: number; pages: number };
+        sumAmount: number;
+    }> {
+        const res = await this.paymentRepository.getPaymentOrders(pagination, filters);
+
+        const data: Payment[] = res.data.map(order => ({
+            id: order.id,
+            transactionId: order.transactionId ?? null,
+            userTelegramName: order.userTelegram?.telegramName ?? null,
+            completedAt: order.completedAt ?? null,
+            amount: order.amount,
+            amountCredited: order.amountCredited,
+            status: order.status,
+            receiptUrl: order.receiptUrl ? `${this.domain}/receipts/${order.receiptUrl}` : null,
+            statusHistory: order.statusHistory.map((h: { status: any; changedAt: { toISOString: () => any } }) => ({
+                status: h.status,
+                date: h.changedAt.toISOString(),
+            })),
+        }));
+
+        return {
+            data,
+            meta: res.meta,
+            sumAmount: res.sumAmount,
+        };
     }
 
     async updatePaymentOrderStatus(id: string, status: StatusPayment): Promise<PaymentOrderEntity> {
@@ -197,5 +227,34 @@ export class PaymentService {
     async applyCouponToPaymentOrder(paymentId: string, newAmountCredited: number, couponId: string): Promise<PaymentOrderEntity> {
         const paymentOrderModel = await this.paymentRepository.applyCouponToPaymentOrder(paymentId, newAmountCredited, couponId);
         return new PaymentOrderEntity(paymentOrderModel);
+    }
+
+    async getPaymentStats(params: { from?: Date; to?: Date; status?: StatusPayment }) {
+        const [byDay, byMonth, totals] = await Promise.all([
+            this.paymentRepository.getStatsDaily(params.from, params.to, params.status),
+            this.paymentRepository.getStatsMonthly(params.from, params.to, params.status),
+            this.paymentRepository.getStatsTotals(params.from, params.to, params.status),
+        ]);
+
+        const byDayOut = byDay.map(r => ({
+            date: r.bucket.toISOString().slice(0, 10),
+            count: r.count,
+            sumAmount: Number(r.sum_amount) ?? 0,
+        }));
+
+        const byMonthOut = byMonth.map(r => ({
+            month: r.bucket.toISOString().slice(0, 7),
+            count: r.count,
+            sumAmount: Number(r.sum_amount) ?? 0,
+        }));
+
+        return {
+            byDay: byDayOut,
+            byMonth: byMonthOut,
+            totals: {
+                count: totals.count,
+                sumAmount: Number(totals.sum_amount) ?? 0,
+            },
+        };
     }
 }

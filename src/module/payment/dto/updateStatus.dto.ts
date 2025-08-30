@@ -3,13 +3,7 @@ import { z } from 'zod';
 import { StatusPayment } from '@prisma/client';
 
 const StatusRequestSchema = z.object({
-    status: z.enum([
-        StatusPayment.Created,
-        StatusPayment.Transfered,
-        StatusPayment.Completed,
-        StatusPayment.Cancelled,
-        StatusPayment.Proceedings,
-    ]),
+    status: z.nativeEnum(StatusPayment),
 });
 
 export namespace StatusCommand {
