@@ -15,7 +15,7 @@ import { UserRole } from '@prisma/client';
 
 export function getMainMenuKeyboard(role?: UserRole) {
     const firstRow = [CHANGE_NUMBER.name, MAKE_ORDER.name];
-    if (role != 'User') firstRow.unshift(AUTH_MIRROR.name);
+    if (role == 'Admin') firstRow.unshift(AUTH_MIRROR.name);
     const keyboard = [
         firstRow,
         [CALCULATE_BONUS.name, CHECK.name],

@@ -111,7 +111,7 @@ export class PaymentRepository {
                         orderBy: { changedAt: 'asc' },
                     },
                 },
-                orderBy: { createdAt: 'asc' },
+                orderBy: { createdAt: 'desc' },
                 skip,
                 take: limit,
             }),
