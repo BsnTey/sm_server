@@ -12,10 +12,7 @@ type StatsRow = {
 
 @Injectable()
 export class PaymentRepository {
-    constructor(
-        private prisma: PrismaService,
-        private configService: ConfigService,
-    ) {}
+    constructor(private prisma: PrismaService) {}
 
     private statusSQL(status?: StatusPayment) {
         if (status) return Prisma.sql`AND p.status::text = ${status}`;
@@ -141,16 +138,13 @@ export class PaymentRepository {
         });
     }
 
-    async getStatsDaily(from?: Date, to?: Date, status?: StatusPayment) {
-        const _from = from ?? new Date(Date.now() - 90 * 24 * 3600 * 1000);
-        const _to = to ?? new Date();
-
+    async getStatsDaily(from: Date, toExclusive: Date, status?: StatusPayment) {
         return this.prisma.$queryRaw<StatsRow[]>(Prisma.sql`
     WITH series AS (
       SELECT gs::date AS bucket
       FROM generate_series(
-        date_trunc('day', ${_from}::timestamp),
-        date_trunc('day', ${_to}::timestamp) - interval '1 day',
+        date_trunc('day', ${from}::timestamp),
+        date_trunc('day', ${toExclusive}::timestamp) - interval '1 day',
         interval '1 day'
       ) AS gs
     ),
@@ -160,63 +154,58 @@ export class PaymentRepository {
              COALESCE(SUM(p.amount), 0)             AS sum_amount
       FROM "payment_order" p
       WHERE p.completed_at IS NOT NULL
-        AND p.completed_at >= ${_from}
-        AND p.completed_at <  ${_to}
+        AND p.completed_at >= ${from}
+        AND p.completed_at <  ${toExclusive}
         ${this.statusSQL(status)}
       GROUP BY 1
     )
-    SELECT s.bucket,
-           COALESCE(a.count, 0)       AS count,
-           COALESCE(a.sum_amount, 0)  AS sum_amount
+    SELECT s.bucket, COALESCE(a.count, 0) AS count, COALESCE(a.sum_amount, 0) AS sum_amount
     FROM series s
     LEFT JOIN agg a ON a.bucket = s.bucket
     ORDER BY s.bucket ASC
   `);
     }
 
-    /** Получить границы по месяцам для всего периода (если from/to не заданы) */
     private async getMonthlyBounds(status?: StatusPayment) {
-        const [row] = await this.prisma.$queryRaw<Array<{ min_bucket: Date | null; max_bucket: Date | null }>>(Prisma.sql`
-    SELECT date_trunc('month', MIN(p.completed_at)) AS min_bucket,
-           date_trunc('month', MAX(p.completed_at)) AS max_bucket
-    FROM "payment_order" p
-    WHERE p.completed_at IS NOT NULL
-      ${this.statusSQL(status)}
-  `);
+        const [row] = await this.prisma.$queryRaw<
+            Array<{
+                min_bucket: Date | null;
+                max_bucket: Date | null;
+            }>
+        >(Prisma.sql`
+      SELECT date_trunc('month', MIN(p.completed_at)) AS min_bucket,
+             date_trunc('month', MAX(p.completed_at)) AS max_bucket
+      FROM "payment_order" p
+      WHERE p.completed_at IS NOT NULL
+        ${this.statusSQL(status)}
+    `);
+
         const now = new Date();
-        // если данных нет — дефолт 12 последних месяцев
         if (!row?.min_bucket || !row?.max_bucket) {
-            const defaultFrom = new Date(now);
-            defaultFrom.setMonth(now.getMonth() - 11, 1);
-            defaultFrom.setHours(0, 0, 0, 0);
-            const defaultTo = new Date(now);
-            defaultTo.setMonth(now.getMonth() + 1, 1);
-            defaultTo.setHours(0, 0, 0, 0);
-            return { from: defaultFrom, to: defaultTo };
+            const from = new Date(now);
+            from.setMonth(now.getMonth() - 11, 1);
+            from.setHours(0, 0, 0, 0);
+
+            const to = new Date(now);
+            to.setMonth(now.getMonth() + 1, 1);
+            to.setHours(0, 0, 0, 0);
+
+            return { from, to };
         }
+
         const from = new Date(row.min_bucket);
         const to = new Date(row.max_bucket);
-        to.setMonth(to.getMonth() + 1); // правая граница — начало след. месяца
+        to.setMonth(to.getMonth() + 1, 1); // правая граница — начало след. месяца
         return { from, to };
     }
 
-    /** Ежемесячно: полный ряд по всем месяцам (либо весь период, либо заданный диапазон) */
-    async getStatsMonthly(from?: Date, to?: Date, status?: StatusPayment) {
-        let _from = from;
-        let _to = to;
-
-        if (!_from || !_to) {
-            const bounds = await this.getMonthlyBounds(status);
-            _from = _from ?? bounds.from;
-            _to = _to ?? bounds.to;
-        }
-
+    async getStatsMonthly(fromMonthStart: Date, toMonthStartNext: Date, status?: StatusPayment) {
         return this.prisma.$queryRaw<StatsRow[]>(Prisma.sql`
     WITH series AS (
       SELECT date_trunc('month', gs)::date AS bucket
       FROM generate_series(
-        date_trunc('month', ${_from!}::timestamp),
-        date_trunc('month', ${_to!}::timestamp) - interval '1 month',
+        date_trunc('month', ${fromMonthStart}::timestamp),
+        date_trunc('month', ${toMonthStartNext}::timestamp) - interval '1 month',
         interval '1 month'
       ) AS gs
     ),
@@ -226,39 +215,27 @@ export class PaymentRepository {
              COALESCE(SUM(p.amount), 0)               AS sum_amount
       FROM "payment_order" p
       WHERE p.completed_at IS NOT NULL
-        AND p.completed_at >= ${_from!}
-        AND p.completed_at <  ${_to!}
+        AND p.completed_at >= ${fromMonthStart}
+        AND p.completed_at <  ${toMonthStartNext}
         ${this.statusSQL(status)}
       GROUP BY 1
     )
-    SELECT s.bucket,
-           COALESCE(a.count, 0)       AS count,
-           COALESCE(a.sum_amount, 0)  AS sum_amount
+    SELECT s.bucket, COALESCE(a.count, 0) AS count, COALESCE(a.sum_amount, 0) AS sum_amount
     FROM series s
     LEFT JOIN agg a ON a.bucket = s.bucket
     ORDER BY s.bucket ASC
   `);
     }
 
-    async getStatsTotals(from?: Date, to?: Date, status?: StatusPayment) {
-        const _from = from ?? new Date(0);
-        const _to = to ?? new Date();
-
-        const [row] = await this.prisma.$queryRaw<
-            Array<{
-                count: number;
-                sum_amount: number;
-            }>
-        >(Prisma.sql`
-    SELECT COUNT(*)::int              AS count,
-           COALESCE(SUM(p.amount), 0) AS sum_amount
+    async getStatsTotals(from: Date, toExclusive: Date, status?: StatusPayment) {
+        const [row] = await this.prisma.$queryRaw<Array<{ count: number; sum_amount: number }>>(Prisma.sql`
+    SELECT COUNT(*)::int AS count, COALESCE(SUM(p.amount), 0) AS sum_amount
     FROM "payment_order" p
     WHERE p.completed_at IS NOT NULL
-      AND p.completed_at >= ${_from}
-      AND p.completed_at <  ${_to}
+      AND p.completed_at >= ${from}
+      AND p.completed_at <  ${toExclusive}
       ${this.statusSQL(status)}
   `);
-
         return row ?? { count: 0, sum_amount: 0 };
     }
 }

@@ -3,8 +3,13 @@ import { z } from 'zod';
 import { StatusPayment } from '@prisma/client';
 
 export const PaymentStatsQuerySchema = z.object({
-    from: z.coerce.date().optional(),
-    to: z.coerce.date().optional(),
-    status: z.nativeEnum(StatusPayment).optional(), // если не задан — считаем Transfered+Completed
+    dayFrom: z.coerce.date().optional(),
+    dayTo: z.coerce.date().optional(),
+
+    monthFrom: z.coerce.date().optional(),
+    monthTo: z.coerce.date().optional(),
+
+    status: z.nativeEnum(StatusPayment).optional(),
 });
+
 export class PaymentStatsQueryDto extends createZodDto(PaymentStatsQuerySchema) {}

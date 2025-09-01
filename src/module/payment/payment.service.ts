@@ -229,32 +229,73 @@ export class PaymentService {
         return new PaymentOrderEntity(paymentOrderModel);
     }
 
-    async getPaymentStats(params: { from?: Date; to?: Date; status?: StatusPayment }) {
-        const [byDay, byMonth, totals] = await Promise.all([
-            this.paymentRepository.getStatsDaily(params.from, params.to, params.status),
-            this.paymentRepository.getStatsMonthly(params.from, params.to, params.status),
-            this.paymentRepository.getStatsTotals(params.from, params.to, params.status),
+    startOfDay(d: Date) {
+        const x = new Date(d);
+        x.setHours(0, 0, 0, 0);
+        return x;
+    }
+    addDays(d: Date, n: number) {
+        const x = new Date(d);
+        x.setDate(x.getDate() + n);
+        return x;
+    }
+    startOfMonth(d: Date) {
+        const x = new Date(d);
+        x.setDate(1);
+        x.setHours(0, 0, 0, 0);
+        return x;
+    }
+    addMonths(d: Date, n: number) {
+        const x = new Date(d);
+        x.setMonth(x.getMonth() + n, 1);
+        return this.startOfMonth(x);
+    }
+    toISODate(d: Date) {
+        return d.toISOString().slice(0, 10);
+    }
+
+    async getPaymentStats(params: { dayFrom?: Date; dayTo?: Date; monthFrom?: Date; monthTo?: Date; status?: StatusPayment }) {
+        const now = new Date();
+
+        // ---- ДНИ: дефолт последние 7 дат, включая сегодня ----
+        const df = this.startOfDay(params.dayFrom ?? this.addDays(now, -6));
+        const dt = this.startOfDay(params.dayTo ?? now);
+        const dToExclusive = this.addDays(dt, 1);
+
+        // ---- МЕСЯЦЫ: дефолт последние 12 месяцев, включая текущий ----
+        const thisMonth = this.startOfMonth(now);
+        const mf = this.startOfMonth(params.monthFrom ?? this.addMonths(thisMonth, -11));
+        const mt = this.startOfMonth(params.monthTo ?? thisMonth);
+        const mToExclusive = this.addMonths(mt, 1);
+
+        const [byDay, byMonth, totalsDay, totalsMonth] = await Promise.all([
+            this.paymentRepository.getStatsDaily(df, dToExclusive, params.status),
+            this.paymentRepository.getStatsMonthly(mf, mToExclusive, params.status),
+            this.paymentRepository.getStatsTotals(df, dToExclusive, params.status),
+            this.paymentRepository.getStatsTotals(mf, mToExclusive, params.status),
         ]);
 
         const byDayOut = byDay.map(r => ({
-            date: r.bucket.toISOString().slice(0, 10),
+            date: this.toISODate(r.bucket),
             count: r.count,
-            sumAmount: Number(r.sum_amount) ?? 0,
+            sumAmount: Number(r.sum_amount) || 0,
         }));
 
         const byMonthOut = byMonth.map(r => ({
-            month: r.bucket.toISOString().slice(0, 7),
+            month: this.toISODate(r.bucket).slice(0, 7),
             count: r.count,
-            sumAmount: Number(r.sum_amount) ?? 0,
+            sumAmount: Number(r.sum_amount) || 0,
         }));
 
         return {
+            range: {
+                day: { from: this.toISODate(df), to: this.toISODate(dt) },
+                month: { from: this.toISODate(mf), to: this.toISODate(mt) },
+            },
             byDay: byDayOut,
             byMonth: byMonthOut,
-            totals: {
-                count: totals.count,
-                sumAmount: Number(totals.sum_amount) ?? 0,
-            },
+            totalsDay: { count: totalsDay.count, sumAmount: Number(totalsDay.sum_amount) || 0 },
+            totalsMonth: { count: totalsMonth.count, sumAmount: Number(totalsMonth.sum_amount) || 0 },
         };
     }
 }

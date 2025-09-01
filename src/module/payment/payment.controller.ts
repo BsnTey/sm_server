@@ -30,8 +30,10 @@ export class PaymentController {
     @HttpCode(200)
     async getStats(@Query() q: PaymentStatsQueryDto) {
         return this.paymentService.getPaymentStats({
-            from: q.from,
-            to: q.to,
+            dayFrom: q.dayFrom,
+            dayTo: q.dayTo,
+            monthFrom: q.monthFrom,
+            monthTo: q.monthTo,
             status: q.status,
         });
     }
