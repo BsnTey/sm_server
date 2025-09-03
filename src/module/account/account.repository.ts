@@ -390,4 +390,68 @@ export class AccountRepository {
             })
             .sort((a, b) => a.course.courseId.localeCompare(b.course.courseId));
     }
+
+    async getCredentials(accountId: string) {
+        return this.prisma.account.findUnique({
+            where: { accountId },
+            select: {
+                accountId: true,
+                email: true,
+                passEmail: true,
+                passImap: true,
+                cookie: true,
+                accessToken: true,
+                refreshToken: true,
+                xUserId: true,
+                deviceId: true,
+                installationId: true,
+                expiresInAccess: true,
+                expiresInRefresh: true,
+            },
+        });
+    }
+
+    async updateCredentials(
+        accountId: string,
+        data: Partial<{
+            email: string;
+            passEmail: string;
+            passImap: string;
+            cookie: string;
+            accessToken: string;
+            refreshToken: string;
+            xUserId: string;
+            deviceId: string;
+            installationId: string;
+            expiresInAccess: Date;
+            expiresInRefresh: Date;
+        }>,
+    ) {
+        const patch: Prisma.AccountUpdateInput = {};
+        for (const [k, v] of Object.entries(data)) {
+            if (typeof v !== 'undefined' && v !== null) {
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                patch[k] = v;
+            }
+        }
+        return this.prisma.account.update({
+            where: { accountId },
+            data: patch,
+            select: {
+                accountId: true,
+                email: true,
+                passEmail: true,
+                passImap: true,
+                cookie: true,
+                accessToken: true,
+                refreshToken: true,
+                xUserId: true,
+                deviceId: true,
+                installationId: true,
+                expiresInAccess: true,
+                expiresInRefresh: true,
+            },
+        });
+    }
 }

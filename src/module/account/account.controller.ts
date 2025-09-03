@@ -21,6 +21,11 @@ import { DeviceInfoRequestDto, DeviceInfoResponseDto } from './dto/create-device
 import { DeviceInfoService } from './deviceInfo.service';
 import { CourseIdAccountRequestDto } from './dto/course-account.dto';
 import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
+import {
+    GetAccountCredentialsResponseDto,
+    UpdateAccountCredentialsRequestDto,
+    UpdateAccountCredentialsResponseDto,
+} from './dto/account-credentials.dto';
 
 @Controller('account')
 export class AccountController {
@@ -228,5 +233,35 @@ export class AccountController {
         @Body() deviceInfoDto: DeviceInfoRequestDto,
     ): Promise<DeviceInfoResponseDto> {
         return this.deviceInfoService.updateDeviceInfo(params.accountId, deviceInfoDto);
+    }
+
+    @Get(':accountId/credentials')
+    @HttpCode(200)
+    async getAccountCredentials(@Param() params: AccountIdParamsDto): Promise<GetAccountCredentialsResponseDto> {
+        const acc = await this.accountService.getAccountCredentials(params.accountId);
+        return {
+            accountId: acc.accountId,
+            email: acc.email,
+            passEmail: acc.passEmail,
+            passImap: acc.passImap,
+            cookie: acc.cookie,
+            accessToken: acc.accessToken,
+            refreshToken: acc.refreshToken,
+            xUserId: acc.xUserId,
+            deviceId: acc.deviceId,
+            installationId: acc.installationId,
+            expiresInAccess: acc.expiresInAccess,
+            expiresInRefresh: acc.expiresInRefresh,
+        };
+    }
+
+    @Patch(':accountId/credentials')
+    @HttpCode(200)
+    async updateAccountCredentials(
+        @Param() params: AccountIdParamsDto,
+        @Body() dto: UpdateAccountCredentialsRequestDto,
+    ): Promise<UpdateAccountCredentialsResponseDto> {
+        const ok = await this.accountService.updateAccountCredentials(params.accountId, dto);
+        return { status: ok ? 'success' : 'error' };
     }
 }

@@ -47,6 +47,11 @@ import { DeviceInfoRequestDto } from './dto/create-deviceInfo.dto';
 import { CourseIdAccountRequestDto } from './dto/course-account.dto';
 import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
 import { TlsProxyService } from '../http/tls-forwarder.service';
+import {
+    GetAccountCredentialsResponseDto,
+    UpdateAccountCredentialsRequestDto,
+    UpdateAccountCredentialsResponseDto,
+} from './dto/account-credentials.dto';
 
 @Injectable()
 export class AccountService {
@@ -406,6 +411,16 @@ export class AccountService {
         accountWithProxy.refreshToken = refreshTokensEntity.refreshToken;
         accountWithProxy.expiresInAccess = refreshTokensEntity.expiresInAccess;
         return refreshTokensEntity;
+    }
+
+    async getAccountCredentials(accountId: string): Promise<GetAccountCredentialsResponseDto> {
+        const acc = await this.accountRep.getCredentials(accountId);
+        if (!acc) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        return acc;
+    }
+
+    async updateAccountCredentials(accountId: string, dto: UpdateAccountCredentialsRequestDto) {
+        return this.accountRep.updateCredentials(accountId, dto);
     }
 
     private async refreshForValidation(accountWithProxyEntity: AccountWithProxyEntity): Promise<IRefreshAccount> {
