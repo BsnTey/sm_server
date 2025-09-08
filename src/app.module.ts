@@ -19,6 +19,8 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { CronModule } from './module/cron/cron.module';
 import { WebappModule } from './module/webapp/webapp.module';
 import { CouponModule } from './module/coupon/coupon.module';
+import { BrokerModule } from '@common/broker/broker.module';
+import { NotificationModule } from './module/notification/notification.module';
 
 @Module({
     imports: [
@@ -32,6 +34,7 @@ import { CouponModule } from './module/coupon/coupon.module';
             max: 1000,
         }),
         TelegrafModule.forRootAsync(getTelegramConfig()),
+        BrokerModule,
         AuthModule,
         TelegramModule,
         UserModule,
@@ -47,6 +50,7 @@ import { CouponModule } from './module/coupon/coupon.module';
         CronModule,
         WebappModule,
         CouponModule,
+        NotificationModule,
     ],
 })
 export class AppModule {}

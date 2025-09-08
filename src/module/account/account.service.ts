@@ -2,8 +2,15 @@ import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from
 import { AccountRepository } from './account.repository';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
 import { AccountEntity } from './entities/account.entity';
-import { AccountWDevice, IAccountWithProxy, IFindCitiesAccount, IRecipientOrder, IRefreshAccount } from './interfaces/account.interface';
-import { CourseStatus, LessonStatus, Order } from '@prisma/client';
+import {
+    AccountWDevice,
+    AddressSuggestList,
+    IAccountWithProxy,
+    IRecipientOrder,
+    IRefreshAccount,
+    ResolvedCity,
+} from './interfaces/account.interface';
+import { CitySM, CourseStatus, LessonStatus, Order } from '@prisma/client';
 import { ProxyService } from '../proxy/proxy.service';
 import {
     ERROR_ACCESS_TOKEN_COURSE,
@@ -17,7 +24,6 @@ import { ConfigService } from '@nestjs/config';
 import { HttpService } from '../http/http.service';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { AccountWithProxyEntity } from './entities/accountWithProxy.entity';
-import { CitySMEntity } from './entities/citySM.entity';
 import { CartInterface } from './interfaces/cart.interface';
 import { IItemsCart, selectMainFromCart } from '../telegram/utils/cart.utils';
 import { SearchProductInterface } from './interfaces/search-product.interface';
@@ -47,11 +53,11 @@ import { DeviceInfoRequestDto } from './dto/create-deviceInfo.dto';
 import { CourseIdAccountRequestDto } from './dto/course-account.dto';
 import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
 import { TlsProxyService } from '../http/tls-forwarder.service';
-import {
-    GetAccountCredentialsResponseDto,
-    UpdateAccountCredentialsRequestDto,
-    UpdateAccountCredentialsResponseDto,
-} from './dto/account-credentials.dto';
+import { GetAccountCredentialsResponseDto, UpdateAccountCredentialsRequestDto } from './dto/account-credentials.dto';
+import { DataProfile } from './interfaces/profile.interface';
+import { DataAddress, DataCoord, GeoPointLng, Location } from './interfaces/geo.interface';
+import { CitySMEntity } from './entities/citySM.entity';
+import { encodeXlocation } from './utils/x-location.utils';
 
 @Injectable()
 export class AccountService {
@@ -263,8 +269,17 @@ export class AccountService {
         return await this.updateStatusAccountCourse(accountId, statusCourse);
     }
 
+    async updateStatusAccountCourseBulk(accountIds: string[], status: CourseStatus): Promise<number> {
+        return this.accountRep.updateStatusAccountCourseBulk(accountIds, status);
+    }
+
     async updateStatusAccountCourse(accountId: string, statusCourse: CourseStatus) {
         return await this.accountRep.updateStatusAccountCourse(accountId, statusCourse);
+    }
+
+    async getAccountsCourseByStatus(statusCourse: CourseStatus) {
+        const accounts = await this.accountRep.getAccountsCourseByStatus(statusCourse);
+        return accounts.map(acc => acc.accountId);
     }
 
     async connectionCourseAccount(accountId: string) {
@@ -358,11 +373,7 @@ export class AccountService {
     }
 
     async addOrder(accountId: string, orderNumber: string): Promise<Order> {
-        return await this.accountRep.addOrderNumber(accountId, orderNumber);
-    }
-
-    async setAccountCity(accountId: string, cityId: string) {
-        return await this.accountRep.setCityToAccount(accountId, cityId);
+        return this.accountRep.addOrderNumber(accountId, orderNumber);
     }
 
     async openForceRefresh(accountId: string) {
@@ -472,15 +483,114 @@ export class AccountService {
         return accountWithProxyEntity;
     }
 
-    private async getAccountEntity(accountId: string): Promise<AccountWithProxyEntity> {
+    private async loadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
         const accountWithProxy = await this.accountRep.getAccountWithProxy(accountId);
 
         if (!accountWithProxy) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
         if (!accountWithProxy.isAccessMp) throw new HttpException(ERROR_LOGOUT_MP, HttpStatus.FORBIDDEN);
-        const accountWithProxyEntity = await this.getAndValidateOrSetProxyAccount(accountWithProxy);
-        await this.validationToken(accountWithProxyEntity);
 
-        return accountWithProxyEntity;
+        const entity = await this.getAndValidateOrSetProxyAccount(accountWithProxy);
+        await this.validationToken(entity);
+        return entity;
+    }
+
+    private async getAccountEntity(accountId: string): Promise<AccountWithProxyEntity> {
+        return this.loadAccountCore(accountId);
+    }
+
+    private async resolveCityByUri(accountId: string, uri: string): Promise<ResolvedCity> {
+        const account = await this.getAccountEntity(accountId);
+
+        const address = await this.getAddressByUri(account, uri);
+        const { lat, lon } = address.location.geoPoint;
+        const infoCity = await this.findCityByCoord(account, { lat, lng: lon });
+
+        const city = await this.ensureCityRecord(infoCity, address.location);
+
+        return { account, city, location: address.location };
+    }
+
+    private async ensureCityRecord(
+        infoCity: { city: { id: string; name: string }; location: { locationName: string } },
+        location: Location,
+    ): Promise<CitySM> {
+        const existing = await this.findCityBD(infoCity.city.id);
+
+        if (!existing) {
+            const entity = new CitySMEntity({
+                cityId: infoCity.city.id,
+                name: infoCity.city.name,
+                fullName: infoCity.location.locationName,
+                xLocation: encodeXlocation(location),
+            });
+            return this.addingCityBD(entity);
+        }
+
+        return existing;
+    }
+
+    async getCity(accountId: string, uri: string) {
+        const { city } = await this.resolveCityByUri(accountId, uri);
+        return city;
+    }
+
+    async setAccountCity(accountId: string, uri: string) {
+        const { account, city, location } = await this.resolveCityByUri(accountId, uri);
+        await this.setGeo(account, location);
+
+        if (account.cityId !== city.cityId) {
+            await this.setCityToAccount(accountId, city.cityId);
+        }
+
+        return city;
+    }
+
+    async setCityToAccount(accountId: string, cityId: string) {
+        await this.accountRep.setCityToAccount(accountId, cityId);
+    }
+
+    async suggestCityByGeo(accountId: string, city: string): Promise<AddressSuggestList[]> {
+        const acc = await this.getAccountEntity(accountId);
+        const encodedCity = encodeURI(city.toUpperCase());
+        const url = this.url + `v1/geo/suggest?query=${encodedCity}`;
+        const httpOptions = await this.getHttpOptions(url, acc);
+        const response = await this.httpService.get(url, httpOptions);
+        return response.data.data.addressSuggestList;
+    }
+
+    private async getAddressByUri(account: AccountWithProxyEntity, uri: string): Promise<DataAddress> {
+        const encodedQuery = encodeURIComponent(uri);
+        const url = `${this.url}v1/geo/address?query=${encodedQuery}&mode=URI`;
+
+        const httpOptions = await this.getHttpOptions(url, account);
+        const response = await this.httpService.get(url, httpOptions);
+        return response.data.data;
+    }
+
+    private async findCityByCoord(account: AccountWithProxyEntity, coord: GeoPointLng): Promise<DataCoord> {
+        const url = this.url + `v1/city/coord?lat=${coord.lat}&lng=${coord.lng}`;
+        const httpOptions = await this.getHttpOptions(url, account);
+        const response = await this.httpService.get(url, httpOptions);
+        return response.data.data;
+    }
+
+    private async setGeo(account: AccountWithProxyEntity, location: Location): Promise<void> {
+        const url = this.url + `v1/geo/location`;
+        const httpOptions = await this.getHttpOptions(url, account);
+
+        const payload = {
+            location,
+        };
+
+        await this.httpService.post(url, payload, httpOptions);
+    }
+
+    async addingCityBD(city: CitySMEntity) {
+        return this.accountRep.addingCitySM(city);
+    }
+
+    async findCityBD(cityId: string) {
+        return this.accountRep.findCitySM(cityId);
     }
 
     async shortInfo(accountId: string): Promise<ShortInfoInterface> {
@@ -586,22 +696,22 @@ export class AccountService {
         return true;
     }
 
-    async findCity(accountId: string, city: string) {
-        const findCities = await this.findCityPrivate(accountId, city);
+    // async findCity(accountId: string, city: string) {
+    //     const suggestCitysByGeo = await this.suggestCityByGeo(accountId, city);
+    //
+    //     const cityEntities = suggestCitysByGeo.map(city => new CitySMEntity(city));
+    //     await Promise.allSettled(cityEntities.map(cityEntity => this.accountRep.addingCitySM(cityEntity)));
+    //     return cityEntities;
+    // }
 
-        const cityEntities = findCities.map(city => new CitySMEntity(city));
-        await Promise.allSettled(cityEntities.map(cityEntity => this.accountRep.addingCitySM(cityEntity)));
-        return cityEntities;
-    }
-
-    private async findCityPrivate(accountId: string, city: string): Promise<IFindCitiesAccount[]> {
-        const accountWithProxyEntity = await this.getAccountEntity(accountId);
-        const encodedCity = encodeURI(city.toUpperCase());
-        const url = this.url + `v1/city?query=${encodedCity}`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
-        const response = await this.httpService.get(url, httpOptions);
-        return response.data.data.list;
-    }
+    // private async findCityPrivate(accountId: string, city: string): Promise<IFindCitiesAccount[]> {
+    //     const accountWithProxyEntity = await this.getAccountEntity(accountId);
+    //     const encodedCity = encodeURI(city.toUpperCase());
+    //     const url = this.url + `v1/city?query=${encodedCity}`;
+    //     const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+    //     const response = await this.httpService.get(url, httpOptions);
+    //     return response.data.data.list;
+    // }
 
     async getCart(accountWithProxyEntity: string | AccountWithProxyEntity): Promise<CartInterface> {
         if (typeof accountWithProxyEntity == 'string') {
@@ -833,7 +943,7 @@ export class AccountService {
         return response.data;
     }
 
-    async getProfile(accountId: string): Promise<PromocodeInterface> {
+    async getProfile(accountId: string): Promise<DataProfile> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/profile`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);

@@ -20,12 +20,13 @@ import { UpdatingCookieRequestDto, UpdatingCookieResponseDto } from './dto/updat
 import { DeviceInfoRequestDto, DeviceInfoResponseDto } from './dto/create-deviceInfo.dto';
 import { DeviceInfoService } from './deviceInfo.service';
 import { CourseIdAccountRequestDto } from './dto/course-account.dto';
-import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
+import { UpdatingCourseStatusAccountRequestDto, UpdatingCourseStatusBulkRequestDto } from './dto/update-course-status-account.dto';
 import {
     GetAccountCredentialsResponseDto,
     UpdateAccountCredentialsRequestDto,
     UpdateAccountCredentialsResponseDto,
 } from './dto/account-credentials.dto';
+import { StatusCourseParamsDto } from './dto/status-course-param.dto';
 
 @Controller('account')
 export class AccountController {
@@ -82,6 +83,21 @@ export class AccountController {
     ): Promise<string> {
         const account = await this.accountService.updateStatusAccountCourseDto(params.accountId, dto);
         return account ? 'success' : 'error';
+    }
+
+    @HasZenno()
+    @Patch('course/status')
+    @HttpCode(200)
+    async updateCourseStatusBulk(@Body() dto: UpdatingCourseStatusBulkRequestDto): Promise<{ updated: number }> {
+        const count = await this.accountService.updateStatusAccountCourseBulk(dto.accountIds, dto.statusCourse);
+        return { updated: count };
+    }
+
+    @HasZenno()
+    @Get('course/:status')
+    @HttpCode(200)
+    async getCourseStatusAccount(@Param() params: StatusCourseParamsDto): Promise<string[]> {
+        return this.accountService.getAccountsCourseByStatus(params.status);
     }
 
     @HasZenno()

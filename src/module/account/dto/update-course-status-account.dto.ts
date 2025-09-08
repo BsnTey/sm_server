@@ -18,3 +18,10 @@ export namespace UpdatingCourseStatusAccountCommand {
 
 export class UpdatingCourseStatusAccountRequestDto extends createZodDto(UpdatingCourseStatusAccountCommand.RequestSchema) {}
 export class UpdatingCourseStatusAccountResponseDto extends createZodDto(UpdatingCourseStatusAccountCommand.ResponseSchema) {}
+
+const UpdatingCourseStatusBulkSchema = z.object({
+    accountIds: z.array(z.string().uuid()).min(1),
+    statusCourse: CourseStatusEnum,
+});
+
+export class UpdatingCourseStatusBulkRequestDto extends createZodDto(UpdatingCourseStatusBulkSchema) {}

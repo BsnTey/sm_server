@@ -32,6 +32,7 @@ model UserTelegram {
   paymentOrders  PaymentOrder[]
   user           User?
   fortuneCoupons FortuneCoupon[]
+  userStatusPref OrderStatus[]   @map("user_status_pref")
   userCities     UserCitySM[]
   UserTemplate   UserTemplate[]
 
@@ -116,6 +117,7 @@ model CitySM {
   name      String       @default("Москва")
   cityId    String       @id @unique @default("1720920299") @map("city_id")
   fullName  String       @default("Москва") @map("full_name")
+  xLocation String       @default("H4sIAAAAAAAAAL2Vz2rbQBDGX0XsKSEmaGX99a0oKhG1JaPKgbYUoSZqENgWyErABEOchF5a8KWnkkNy6a1g3IS6Tu1nmH2jjmzStKnWLqXNRbuaHfT9mPl2dET2o6SexO2MVI5IM8RFUTY1RdGpUSLNpE0qZW1TpZoqy71Snvw4au9GHVJ5cfTjzd4jFUKprEplUTIMcpfnhK0Iz+AjXMOUnbBjGMINe4f7t/BVYGcYvoLre2GYwYQds1P4vPhSNexGaY53u1/oibp4pzaPm8lerua4TmC6tZq7ZfvPgueuY5Fer/Q7rqwqHNxzmLE+TGAEw+UIklSMUHtkeq6J8kXKoiHL2mplYY312QkW4wbG7A0M1zE9i9I0zpK0u/iSJonGfYIiSk6hfMvzbN/1iigV3TAMDuRFDomYYzYoYJIVXUFFSpdDiRwo0204fiES1cqKrD5g4SiP8em2Xa9Zjs81l2hoP7uTS4qb3P0jBO3DFIZsIMAXJJ/Ojfd33ZZ50Ja3Y5vWkgtBdcplvoQPG6Kw1vDNjfL6CrtRjt3s2jJ1RV11KWYwmq9YpoAGcB4g1SW8D34pKT6m7HQ+a8YCfMvT4WoFcLkYeMuq2juWx58hOqXSH7V5gB3FQYdzrS9gDI0Jk//EVKaKLD3kdFE5fqvb5pNGPai79pKLoqNdeVP4Iu/wJ+wvmuPfFOtl/kvbDbM4aReP+tvTanQYNfHY9bctD+Nxx0zar+O0FaFglh5EJRIehnEzfBU346xrNg86WU5GWkknjfZJ7zvc83UVWAcAAA==") @map("x_location")
   createdAt DateTime     @default(now()) @map("created_at")
   updatedAt DateTime     @updatedAt @map("updated_at")
   accounts  Account[]
@@ -333,4 +335,24 @@ enum LessonStatus {
   NONE
   VIEWED
   BLOCKED
+}
+
+enum OrderStatus {
+  accepted
+  check_availability
+  availability_confirmed
+  completing
+  ready_to_issue
+  issued
+
+  accepted_in_work
+  ord_sent_to_cc
+  ord_accepted_to_cc
+  ord_sent_to_delivery_region
+  arrived_to_region_and_awaiting_delivery
+  transfered_for_delivery
+  ord_full_delivered
+  delivered
+  at_pickup
+  cancelled
 }

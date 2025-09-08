@@ -39,20 +39,22 @@ export class ProfileUpdate {
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
 
         const allAccounts = inputAccounts.split('\n');
-        const accounts = allAccounts.slice(0, 22);
-        const extraAccounts = allAccounts.slice(22);
 
-        if (extraAccounts.length > 0) {
-            await ctx.reply(`Не вместилось, отправьте еще раз:\n${extraAccounts.join('\n')}`);
-        }
         await ctx.reply('Началась проверка');
-        const checkedAccounts = await this.checkingService.checkingAccountsOnPromocodes(accounts);
-        await ctx.reply(checkedAccounts.join(''), { parse_mode: 'HTML', ...getMainMenuKeyboard(user.role) });
+        const checkedAccounts = await this.checkingService.checkingAccountsOnPromocodes(allAccounts);
+        const chunks = this.checkingService.toTelegramChunks(checkedAccounts);
+        for (let i = 0; i < chunks.length; i++) {
+            if (i == chunks.length - 1) {
+                await ctx.reply(chunks[i], { parse_mode: 'HTML', ...getMainMenuKeyboard(user.role) });
+                return;
+            }
+            await ctx.reply(chunks[i], { parse_mode: 'HTML' });
+        }
     }
 
     @Action('check_promo')
     async goToCheckerPromo(@Ctx() ctx: WizardContext) {
-        await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки. За раз не больше 20');
+        await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки');
     }
 
     @Action('get_info_order')

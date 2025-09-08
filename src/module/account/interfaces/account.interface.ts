@@ -4,6 +4,9 @@ import { CartInterface } from './cart.interface';
 import { PickupAvabilityInterface, Shop } from './pickup-avability.interface';
 import { IItemsCart } from '../../telegram/utils/cart.utils';
 import { IDeviceInfo } from './deviceInfo.interface';
+import { AccountWithProxyEntity } from '../entities/accountWithProxy.entity';
+import { Location } from './geo.interface';
+import { FormatGeo } from '../../telegram/updates/make-order/make-order.service';
 
 export interface IRefreshAccount {
     accessToken: string;
@@ -57,6 +60,7 @@ export interface IEmailFromDb {
 
 export interface IAccountCashing {
     accountId: string;
+    geo: FormatGeo[];
     email: string;
     requestId: string;
     foundedProduct?: SearchProductInterface;
@@ -73,13 +77,27 @@ export interface IAccountWithProxy extends Account {
     citySM: CitySM;
 }
 
-export interface IFindCitiesAccount {
-    id: string;
-    name: string;
-    fullName: string;
-    eutc: string;
-    macrocityId: string;
-    hasMetro: boolean;
+export interface AddressSuggestList {
+    title: Title;
+    subtitle?: Subtitle;
+    tags: string[];
+    formattedAddress: string;
+    uri: string;
+}
+
+export interface Subtitle {
+    text: string;
+    hl: Hl[];
+}
+
+export interface Title {
+    text: string;
+    hl?: Hl[];
+}
+
+export interface Hl {
+    begin: number;
+    end: number;
 }
 
 export interface IRecipient {
@@ -92,3 +110,13 @@ export interface IRecipient {
 export interface IRecipientOrder extends IRecipient {
     potentialOrder: string;
 }
+
+export type GetAccountOpts = {
+    ensureXLocation?: boolean;
+};
+
+export type ResolvedCity = {
+    account: AccountWithProxyEntity;
+    city: CitySM;
+    location: Location;
+};

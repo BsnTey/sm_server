@@ -29,25 +29,25 @@ export class SportmasterHeadersService {
 
     constructor(private configService: ConfigService) {}
 
-    getHeadersMobile(url: string, { deviceId, accountId, installationId, cityId, xUserId, accessToken }: any): ISportmasterRequestHeaders {
+    getHeadersMobile(url: string, acc: any): ISportmasterRequestHeaders {
         const timestamp = String(Math.floor(Date.now() / 1000));
         return {
             'User-Agent': this.userAgentMobile,
             Host: this.host,
             Locale: this.locale,
             Country: this.country,
-            'Device-Id': deviceId,
-            'Account-Id': accountId,
-            'Installation-Id': installationId,
-            'City-Id': cityId,
+            'Device-Id': acc.deviceId,
+            'Account-Id': acc.accountId,
+            'Installation-Id': acc.installationId,
+            'City-Id': acc.cityId,
             Eutc: this.eutc,
-            'x-user-id': xUserId,
-            Authorization: accessToken,
-            //Host: this.host,
+            'x-user-id': acc.xUserId,
+            'X-Location': acc.citySM.xLocation,
+            Authorization: acc.accessToken,
             'Accept-Encoding': this.acceptEncoding,
             'Content-Type': this.contentType,
             Timestamp: timestamp,
-            'Aplaut-Id': this.generateHash(url, xUserId, timestamp),
+            'Aplaut-Id': this.generateHash(url, acc.xUserId, timestamp),
             'Aplaut-Build': this.aplautBuild,
         };
     }

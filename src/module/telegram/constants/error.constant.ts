@@ -18,3 +18,4 @@ export const ERROR_NOT_MULTIPLE_OF_50 = 'Сумма должна быть кра
 export const ERROR_SCRINSHOT = 'Пришлите скриншот перевода или Pdf';
 export const ERROR_FOUND_USER = 'Пользователь не найден';
 export const ERROR_ACCESS = 'Доступ запрещен';
+export const ERROR_FOUND_CASH = 'Ошибка. Начните заново';

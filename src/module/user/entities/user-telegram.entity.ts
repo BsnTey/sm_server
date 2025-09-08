@@ -1,4 +1,4 @@
-import { UserRole, UserTelegram } from '@prisma/client';
+import { OrderStatus, UserRole, UserTelegram } from '@prisma/client';
 
 export class UserTelegramEntity implements UserTelegram {
     telegramId: string;
@@ -6,6 +6,7 @@ export class UserTelegramEntity implements UserTelegram {
     countBonuses: number;
     role: UserRole;
     isBan: boolean;
+    userStatusPref: OrderStatus[];
     createdAt: Date;
     updatedAt: Date;
 

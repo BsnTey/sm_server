@@ -1,12 +1,14 @@
-import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { CourseWithLessons } from './interfaces/course.interface';
 import { CourseRepository } from './course.repository';
-import { AccountCourse, CourseStatus, Lesson, LessonStatus } from '@prisma/client';
+import { CourseStatus, Lesson, LessonStatus } from '@prisma/client';
 import { CourseData } from './interfaces/course-data.interface';
 import { LessonProgressData } from './interfaces/lesson-progress.interface';
 
 @Injectable()
 export class CourseService implements OnModuleInit {
+    private readonly logger = new Logger(CourseService.name);
+
     coursesId: string[] = [];
     coursesMnemocode: Record<string, string> = {};
 
@@ -35,8 +37,12 @@ export class CourseService implements OnModuleInit {
     }
 
     private async loadAvailableCoursesId(): Promise<void> {
-        const coursesIdObj = await this.getAvailableCoursesIdFromDB();
-        this.coursesId = coursesIdObj.map(course => course.courseId);
+        try {
+            const coursesIdObj = await this.getAvailableCoursesIdFromDB();
+            this.coursesId = coursesIdObj.map(course => course.courseId);
+        } catch (e) {
+            this.logger.error('Необходимо добавить оригинальные курсы в БД');
+        }
     }
 
     async getIsAccountCourses(accountId: string) {

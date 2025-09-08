@@ -223,4 +223,35 @@ export class CheckingService {
             this.handleError(err, trimmedAccountId, resultChecking);
         }
     }
+
+    toTelegramChunks(parts: Array<string | undefined | null>, limit = 4096): string[] {
+        const out: string[] = [];
+        let buf = '';
+
+        for (const part of parts) {
+            const s = part ?? '';
+            if (s.length === 0) continue;
+
+            if (s.length > limit) {
+                if (buf) {
+                    out.push(buf);
+                    buf = '';
+                }
+                for (let i = 0; i < s.length; i += limit) {
+                    out.push(s.slice(i, i + limit));
+                }
+                continue;
+            }
+
+            if (buf.length + s.length > limit) {
+                out.push(buf);
+                buf = s;
+            } else {
+                buf += s;
+            }
+        }
+
+        if (buf) out.push(buf);
+        return out;
+    }
 }

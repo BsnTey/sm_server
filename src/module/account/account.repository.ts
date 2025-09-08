@@ -212,6 +212,22 @@ export class AccountRepository {
         });
     }
 
+    async updateStatusAccountCourseBulk(accountIds: string[], statusCourse: CourseStatus) {
+        const res = await this.prisma.account.updateMany({
+            where: { accountId: { in: accountIds } },
+            data: { statusCourse },
+        });
+        return res.count;
+    }
+
+    async getAccountsCourseByStatus(statusCourse: CourseStatus): Promise<Account[]> {
+        return this.prisma.account.findMany({
+            where: {
+                statusCourse,
+            },
+        });
+    }
+
     async setBanMp(accountId: string): Promise<Account> {
         return this.prisma.account.update({
             where: {
@@ -307,13 +323,21 @@ export class AccountRepository {
         });
     }
 
-    async addingCitySM(city: CitySMEntity): Promise<CitySMEntity> {
+    async addingCitySM(city: CitySMEntity) {
         return this.prisma.citySM.create({
             data: {
                 cityId: city.cityId,
                 name: city.name,
                 fullName: city.fullName,
+                xLocation: city.xLocation,
             },
+        });
+    }
+
+    async updateCityXLocation(cityId: string, xLocation: string) {
+        await this.prisma.citySM.update({
+            where: { cityId },
+            data: { xLocation },
         });
     }
 
@@ -323,6 +347,12 @@ export class AccountRepository {
                 orderNumber,
                 accountId,
             },
+        });
+    }
+
+    async findCitySM(cityId: string) {
+        return this.prisma.citySM.findUnique({
+            where: { cityId },
         });
     }
 
@@ -349,46 +379,6 @@ export class AccountRepository {
         await this.prisma.accountCourse.createMany({
             data,
         });
-    }
-
-    async getAccountCoursesWithProgress(accountId: string): Promise<IAccountCourseWLesson[]> {
-        const accountCourses = await this.prisma.accountCourse.findMany({
-            where: {
-                accountId: accountId,
-            },
-            include: {
-                course: {
-                    include: {
-                        lessons: {
-                            include: {
-                                AccountLessonProgress: {
-                                    where: {
-                                        accountId: accountId,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        });
-
-        return accountCourses
-            .map(accountCourse => {
-                return {
-                    ...accountCourse,
-                    course: {
-                        ...accountCourse.course,
-                        lessons: accountCourse.course.lessons
-                            .map(lesson => ({
-                                ...lesson,
-                                AccountLessonProgress: lesson.AccountLessonProgress.filter(progress => progress.accountId === accountId),
-                            }))
-                            .sort((a, b) => a.position - b.position),
-                    },
-                };
-            })
-            .sort((a, b) => a.course.courseId.localeCompare(b.course.courseId));
     }
 
     async getCredentials(accountId: string) {

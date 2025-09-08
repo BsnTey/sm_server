@@ -4,6 +4,7 @@ import { SearchProductInterface } from '../../account/interfaces/search-product.
 import { PickupAvabilityInterface } from '../../account/interfaces/pickup-avability.interface';
 import { OrdersInterface } from '../../account/interfaces/orders.interface';
 import { ICartItemsInfo } from '../../account/interfaces/cart.interface';
+import { FormatGeo } from '../updates/make-order/make-order.service';
 
 export const mainMenuOrderKeyboard = (city: string) => {
     return Markup.inlineKeyboard([
@@ -13,10 +14,10 @@ export const mainMenuOrderKeyboard = (city: string) => {
     ]);
 };
 
-export const getCitiesKeyboard = (cities: CitySMEntity[]) => {
+export const getCitiesKeyboard = (geo: FormatGeo[]) => {
     return Markup.inlineKeyboard([
-        ...cities.map(city => {
-            return [Markup.button.callback(`${city.fullName}`, `id_city_${city.cityId}`)];
+        ...geo.map(city => {
+            return [Markup.button.callback(`${city.title}`, `find_uri_${city.id}`)];
         }),
         [Markup.button.callback('Назад', 're_enter_scene')],
     ]);
@@ -31,10 +32,10 @@ export const getCitiesForDeleteKeyboard = (cities: CitySMEntity[]) => {
     ]);
 };
 
-export const getFoundedCitiesForFavKeyboard = (cities: CitySMEntity[]) => {
+export const getFoundedCitiesForFavKeyboard = (geo: FormatGeo[]) => {
     return Markup.inlineKeyboard([
-        ...cities.map(city => {
-            return [Markup.button.callback(`${city.fullName}`, `add_favourite_city_${city.cityId}`)];
+        ...geo.map(city => {
+            return [Markup.button.callback(`${city.title}`, `add_favourite_city_${city.id}`)];
         }),
         [Markup.button.callback('Назад', 'go_back')],
     ]);
@@ -44,7 +45,7 @@ export const getUserCitiesKeyboard = (userCities: CitySMEntity[]) => {
     const btns = [
         [Markup.button.callback('Добавить город в избранное', 'add_new_user_city')],
         ...userCities.map(city => {
-            return [Markup.button.callback(`${city.name}`, `id_city_${city.cityId}`)];
+            return [Markup.button.callback(`${city.name}`, `id_favourite_city_${city.cityId}`)];
         }),
         userCities.length != 0 ? [Markup.button.callback('Удалить город из избранного', 'del_favourite_city')] : [],
         [Markup.button.callback('Вернуться в меню', 'go_to_menu')],

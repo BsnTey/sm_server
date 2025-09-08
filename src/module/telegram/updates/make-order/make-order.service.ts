@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { aproveShopKeyboard, comebackShopSelection } from '../../keyboards/make-order.keyboard';
-import { IAccountCashing } from '../../../account/interfaces/account.interface';
+import { AddressSuggestList, IAccountCashing } from '../../../account/interfaces/account.interface';
+
+export type FormatGeo = {
+    id: string;
+    title: string;
+    uri: string;
+};
 
 @Injectable()
 export class MakeOrderService {
@@ -48,5 +54,16 @@ export class MakeOrderService {
             keyboard: comebackShopSelection,
             shop: null,
         };
+    }
+
+    formatGeo(addressSuggestList: AddressSuggestList[]): FormatGeo[] {
+        return addressSuggestList.map(i => {
+            const id = 'id' + Math.random().toString(16).slice(2);
+            return {
+                id,
+                title: i.title.text,
+                uri: i.uri,
+            };
+        });
     }
 }

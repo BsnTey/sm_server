@@ -1,3 +1,5 @@
+import { GeoPointLon } from './geo.interface';
+
 export interface OrderInfoInterface {
     data: Data;
 }
@@ -123,7 +125,7 @@ export interface IntPickup {
     shopAddress: string;
     shopName: string;
     shopPhone: ShopPhone;
-    geoPoint: GeoPoint;
+    geoPoint: GeoPointLon;
     weekSchedule: WeekSchedule[];
     convenienceShop: boolean;
     inventory?: any;
@@ -139,11 +141,6 @@ export interface WeekSchedule {
 export interface WorkTime {
     workStartTime: string;
     workEndTime: string;
-}
-
-export interface GeoPoint {
-    lat: number;
-    lng: number;
 }
 
 export interface ShopPhone {

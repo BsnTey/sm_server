@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+#  mainApp:
+#    container_name: sm-main-app
+#    image: sm-server-app
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    ports:
+#      - "38081:3000"
+#    depends_on:
+#      - postgres
+#      - rabbit
+#    env_file:
+#      .env
+#    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: postgres-sm
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "55432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbit:
+    image: heidiks/rabbitmq-delayed-message-exchange:4.1.0-management
+    container_name: rabbit-sm
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "35672:5672"
+      - "35673:15672"
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  rabbitmqdata:

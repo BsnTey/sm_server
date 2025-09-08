@@ -31,7 +31,7 @@ export class CheckingUpdate {
             telegramId: String(telegramId),
         });
 
-        await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки. За раз не больше 20', getMainMenuKeyboard(user.role));
+        await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки', getMainMenuKeyboard(user.role));
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
@@ -45,15 +45,16 @@ export class CheckingUpdate {
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
 
         const allAccounts = inputAccounts.split('\n');
-        const accounts = allAccounts.slice(0, 22);
-        const extraAccounts = allAccounts.slice(22);
-
-        if (extraAccounts.length > 0) {
-            await ctx.reply(`Следующие аккаунты не вместились, отправьте их ещё раз:\n${extraAccounts.join('\n')}`);
-        }
 
         await ctx.reply('Началась проверка');
-        const checkedAccounts = await this.checkingService.checkingAccounts(accounts);
-        await ctx.reply(checkedAccounts.join(''), getMainMenuKeyboard(user.role));
+        const checkedAccounts = await this.checkingService.checkingAccounts(allAccounts);
+        const chunks = this.checkingService.toTelegramChunks(checkedAccounts);
+        for (let i = 0; i < chunks.length; i++) {
+            if (i == chunks.length - 1) {
+                await ctx.reply(chunks[i], getMainMenuKeyboard(user.role));
+                return;
+            }
+            await ctx.reply(chunks[i]);
+        }
     }
 }

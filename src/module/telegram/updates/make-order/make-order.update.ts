@@ -37,7 +37,7 @@ import {
 } from '../../keyboards/make-order.keyboard';
 import { UserService } from '../../../user/user.service';
 import { isCityPipe } from '../../pipes/isCity.pipe';
-import { ERROR_FIND_CITY, ERROR_FOUND_USER } from '../../constants/error.constant';
+import { ERROR_FIND_CITY, ERROR_FOUND_CASH, ERROR_FOUND_USER } from '../../constants/error.constant';
 import { getTextCart } from '../../utils/cart.utils';
 import { isUrlPipe } from '../../pipes/isUrl.pipe';
 import { prepareForInternalPickupAvailability } from '../../utils/order.utils';
@@ -139,6 +139,7 @@ export class OrderCity {
         private accountService: AccountService,
         private telegramService: TelegramService,
         private userService: UserService,
+        private makeOrderService: MakeOrderService,
     ) {}
 
     @SceneEnter()
@@ -162,23 +163,42 @@ export class OrderCity {
     @On('text')
     async inputCity(@Message('text', new isCityPipe()) city: string, @Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         const account = await this.telegramService.getFromCache(telegramId);
-        const findCities = await this.accountService.findCity(account.accountId, city);
-        if (findCities.length == 0) {
+        const suggestCitysByGeo = await this.accountService.suggestCityByGeo(account.accountId, city);
+        if (suggestCitysByGeo.length == 0) {
             await ctx.reply(ERROR_FIND_CITY);
             await ctx.scene.reenter();
+            return;
         }
-        const keyboard = getCitiesKeyboard(findCities);
+
+        const formattingGeo = this.makeOrderService.formatGeo(suggestCitysByGeo);
+        account.geo = formattingGeo;
+
+        const keyboard = getCitiesKeyboard(formattingGeo);
         await ctx.reply('Выберете город для изменения', keyboard);
     }
 
-    @Action(/^id_city_\d+$/)
+    @Action(/^find_uri_(.+)$/)
     async setCity(@Sender() { id: telegramId }: any, @Ctx() ctx: WizardContext) {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
-        const cityId = ctx.match[0].split('_')[2];
+        const id = ctx.match[0].split('_')[2];
         const account = await this.telegramService.getFromCache(telegramId);
-        await this.accountService.setAccountCity(account.accountId, cityId);
-        await this.accountService.getProfile(account.accountId);
+
+        const uri = account.geo.find(i => i.id === id)?.uri;
+        if (!uri) throw new NotFoundException(ERROR_FOUND_CASH);
+
+        await this.accountService.setAccountCity(account.accountId, uri);
+        await ctx.scene.enter(ORDER_MENU_ACCOUNT_SCENE);
+    }
+
+    @Action(/^id_favourite_city_(.+)$/)
+    async selectFavouriteCity(@Sender() { id: telegramId }: any, @Ctx() ctx: WizardContext) {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        //@ts-ignore
+        const cityId = ctx.match[0].split('_')[3];
+        const account = await this.telegramService.getFromCache(telegramId);
+
+        await this.accountService.setCityToAccount(account.accountId, cityId);
         await ctx.scene.enter(ORDER_MENU_ACCOUNT_SCENE);
     }
 
@@ -222,6 +242,7 @@ export class OrderFavouriteCity {
         private accountService: AccountService,
         private telegramService: TelegramService,
         private userService: UserService,
+        private makeOrderService: MakeOrderService,
     ) {}
 
     @SceneEnter()
@@ -241,21 +262,33 @@ export class OrderFavouriteCity {
         @Sender() { id: telegramId }: any,
     ) {
         const account = await this.telegramService.getFromCache(telegramId);
-        const findCities = await this.accountService.findCity(account.accountId, city);
-        if (findCities.length == 0) {
+        const suggestCitysByGeo = await this.accountService.suggestCityByGeo(account.accountId, city);
+        if (suggestCitysByGeo.length == 0) {
             await ctx.reply(ERROR_FIND_CITY);
             await ctx.scene.reenter();
+            return;
         }
-        const keyboard = getFoundedCitiesForFavKeyboard(findCities);
+
+        const formattingGeo = this.makeOrderService.formatGeo(suggestCitysByGeo);
+        account.geo = formattingGeo;
+
+        const keyboard = getFoundedCitiesForFavKeyboard(formattingGeo);
         await ctx.reply('Выберете город для добавления', keyboard);
     }
 
-    @Action(/^add_favourite_city_\d+$/)
+    @Action(/^add_favourite_city_(.+)$/)
     async selectFavouriteCity(@Sender() { id: telegramId }: any, @Ctx() ctx: WizardContext) {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
-        const cityId = ctx.match[0].split('_')[3];
-        await this.userService.addUserCity(String(telegramId), cityId);
+        const id = ctx.match[0].split('_')[3];
+        const account = await this.telegramService.getFromCache(telegramId);
+
+        const uri = account.geo.find(i => i.id === id)?.uri;
+        if (!uri) throw new NotFoundException(ERROR_FOUND_CASH);
+
+        const city = await this.accountService.getCity(account.accountId, uri);
+
+        await this.userService.addUserCity(String(telegramId), city.cityId);
         await ctx.scene.enter(ORDER_CITY_SCENE);
     }
 

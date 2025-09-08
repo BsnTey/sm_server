@@ -6,6 +6,7 @@ interface IRequestHeaders {
     'Account-Id': string;
     'Installation-Id': string;
     'City-Id': string;
+    'X-Location': string;
     Eutc: string;
     'x-user-id': string;
     Authorization: string;

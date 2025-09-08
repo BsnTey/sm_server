@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { UserRepository } from './user.repository';
 import { ITelegramUser } from './interfaces/user-telegram.interface';
-import { UserTelegram } from '@prisma/client';
+import { OrderStatus, UserTelegram } from '@prisma/client';
 import { UserTelegramEntity } from './entities/user-telegram.entity';
 import { CitySMEntity } from '../account/entities/citySM.entity';
 
@@ -41,7 +41,7 @@ export class UserService {
     }
 
     async getUserCities(telegramId: string): Promise<CitySMEntity[]> {
-        const cities: any[] = await this.userRepository.getUserCities(telegramId);
+        const cities = await this.userRepository.getUserCities(telegramId);
         return cities.map(city => {
             return new CitySMEntity(city.city);
         });
@@ -53,5 +53,13 @@ export class UserService {
 
     async deleteUserCity(telegramId: string, cityId: string) {
         return await this.userRepository.deleteUserCity(telegramId, cityId);
+    }
+
+    async setNotificationPrefs(tgId: string, statuses: OrderStatus[]) {
+        await this.userRepository.setNotificationPrefs(tgId, statuses);
+    }
+
+    async getNotificationPrefs(tgId: string) {
+        return this.userRepository.getNotificationPrefs(tgId);
     }
 }

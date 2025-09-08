@@ -38,8 +38,8 @@ export const UpdateAccountCredentialsRequestSchema = z
         deviceId: z.string().uuid().optional(),
         installationId: z.string().uuid().optional(),
 
-        expiresInAccess: z.date().optional(),
-        expiresInRefresh: z.date().optional(),
+        expiresInAccess: z.coerce.date().optional(),
+        expiresInRefresh: z.coerce.date().optional(),
     })
     .strict()
     .refine(data => Object.values(data).some(v => v !== undefined), { message: 'Передайте хотя бы одно поле для обновления' });

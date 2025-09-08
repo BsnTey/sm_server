@@ -1,3 +1,5 @@
+import { City, GeoPointLon } from './geo.interface';
+
 export interface PickupAvabilityInterface {
     data: Data;
 }
@@ -41,7 +43,7 @@ export interface Shop {
     name: string;
     weekSchedule: WeekSchedule[];
     shopFormat: ShopFormat;
-    geoPoint: GeoPoint;
+    geoPoint: GeoPointLon;
     metroStations: any[];
     isConvenience: boolean;
     shopCondition: string;
@@ -51,23 +53,10 @@ export interface Shop {
     inventory?: any;
 }
 
-export interface City {
-    id: string;
-    name: string;
-    eutc?: any;
-    macrocityId?: any;
-    hasMetro?: any;
-}
-
 export interface Phone {
     countryCode: number;
     nationalNumber: number;
     isoCode: string;
-}
-
-export interface GeoPoint {
-    lat: number;
-    lng: number;
 }
 
 export interface ShopFormat {

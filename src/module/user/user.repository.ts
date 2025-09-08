@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@common/database/prisma.service';
-import { UserTelegram } from '@prisma/client';
+import { OrderStatus, UserTelegram } from '@prisma/client';
 import { UserTelegramEntity } from './entities/user-telegram.entity';
 
 @Injectable()
@@ -35,7 +35,7 @@ export class UserRepository {
         });
     }
 
-    async getUserCities(telegramId: string): Promise<any> {
+    async getUserCities(telegramId: string) {
         return this.prisma.userCitySM.findMany({
             where: {
                 userTelegramId: telegramId,
@@ -79,5 +79,20 @@ export class UserRepository {
                 },
             },
         });
+    }
+
+    async setNotificationPrefs(tgId: string, statuses: OrderStatus[]) {
+        await this.prisma.userTelegram.update({
+            where: { telegramId: tgId },
+            data: { userStatusPref: { set: Array.from(new Set(statuses)) } },
+        });
+    }
+
+    async getNotificationPrefs(tgId: string) {
+        const u = await this.prisma.userTelegram.findUnique({
+            where: { telegramId: tgId },
+            select: { userStatusPref: true },
+        });
+        return u?.userStatusPref ?? [];
     }
 }
