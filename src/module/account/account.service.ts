@@ -58,6 +58,8 @@ import { DataProfile } from './interfaces/profile.interface';
 import { DataAddress, DataCoord, GeoPointLng, Location } from './interfaces/geo.interface';
 import { CitySMEntity } from './entities/citySM.entity';
 import { encodeXlocation } from './utils/x-location.utils';
+import { format } from 'date-fns';
+import { ru } from 'date-fns/locale';
 
 @Injectable()
 export class AccountService {
@@ -280,6 +282,15 @@ export class AccountService {
     async getAccountsCourseByStatus(statusCourse: CourseStatus) {
         const accounts = await this.accountRep.getAccountsCourseByStatus(statusCourse);
         return accounts.map(acc => acc.accountId);
+    }
+
+    async getRefreshExpirationDates(accountIds: string[]) {
+        const accounts = await this.accountRep.getAccountsCredentials(accountIds);
+
+        return accounts.map(acc => ({
+            accountId: acc.accountId,
+            expiresInRefresh: acc.expiresInRefresh ? format(new Date(acc.expiresInRefresh), 'dd.MM.yyyy', { locale: ru }) : null,
+        }));
     }
 
     async connectionCourseAccount(accountId: string) {

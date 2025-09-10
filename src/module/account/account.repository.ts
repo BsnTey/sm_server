@@ -444,4 +444,14 @@ export class AccountRepository {
             },
         });
     }
+
+    async getAccountsCredentials(accountIds: string[]) {
+        return this.prisma.account.findMany({
+            where: { accountId: { in: accountIds } },
+            select: {
+                accountId: true,
+                expiresInRefresh: true,
+            },
+        });
+    }
 }

@@ -280,4 +280,11 @@ export class AccountController {
         const ok = await this.accountService.updateAccountCredentials(params.accountId, dto);
         return { status: ok ? 'success' : 'error' };
     }
+
+    @Post('refresh-expiration')
+    @HttpCode(200)
+    async getRefreshExpiration(@Body() body: { accountIds: string[] }) {
+        const { accountIds } = body;
+        return this.accountService.getRefreshExpirationDates(accountIds);
+    }
 }
