@@ -21,7 +21,6 @@ import { FilterStatusPayment, Pagination } from './dto/queryFilter.dto';
 @Injectable()
 export class PaymentService {
     private tgNamesExceptionStatistic: string[] = this.configService.getOrThrow('TELEGRAM_NAMES_EXCEPTION_STATISTIC').split(',');
-    private tgIdVipCoef: string[] = this.configService.getOrThrow('TELEGRAM_ID_VIP_COEF').split(',');
     private domain: string = this.configService.getOrThrow('DOMAIN');
 
     constructor(
@@ -259,8 +258,8 @@ export class PaymentService {
 
         // ---- ДНИ: дефолт последние 7 дат, включая сегодня ----
         const df = this.startOfDay(params.dayFrom ?? this.addDays(now, -6));
-        const dt = this.startOfDay(params.dayTo ?? now);
-        const dToExclusive = this.addDays(dt, 1);
+        const dt = new Date(params.dayTo ?? now);
+        dt.setHours(23, 59, 59, 999);
 
         // ---- МЕСЯЦЫ: дефолт последние 12 месяцев, включая текущий ----
         const thisMonth = this.startOfMonth(now);
@@ -269,9 +268,9 @@ export class PaymentService {
         const mToExclusive = this.addMonths(mt, 1);
 
         const [byDay, byMonth, totalsDay, totalsMonth] = await Promise.all([
-            this.paymentRepository.getStatsDaily(df, dToExclusive, params.status),
+            this.paymentRepository.getStatsDaily(df, dt, params.status),
             this.paymentRepository.getStatsMonthly(mf, mToExclusive, params.status),
-            this.paymentRepository.getStatsTotals(df, dToExclusive, params.status),
+            this.paymentRepository.getStatsTotals(df, dt, params.status),
             this.paymentRepository.getStatsTotals(mf, mToExclusive, params.status),
         ]);
 

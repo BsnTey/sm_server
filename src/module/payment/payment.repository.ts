@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@common/database/prisma.service';
 import { PaymentOrder, PaymentOrderStatusHistory, Prisma, StatusPayment } from '@prisma/client';
-import { ConfigService } from '@nestjs/config';
 import { FilterStatusPayment, Pagination } from './dto/queryFilter.dto';
 
 type StatsRow = {
@@ -138,13 +137,13 @@ export class PaymentRepository {
         });
     }
 
-    async getStatsDaily(from: Date, toExclusive: Date, status?: StatusPayment) {
+    async getStatsDaily(from: Date, toInclusive: Date, status?: StatusPayment) {
         return this.prisma.$queryRaw<StatsRow[]>(Prisma.sql`
     WITH series AS (
       SELECT gs::date AS bucket
       FROM generate_series(
         date_trunc('day', ${from}::timestamp),
-        date_trunc('day', ${toExclusive}::timestamp) - interval '1 day',
+        date_trunc('day', ${toInclusive}::timestamp) - interval '1 day',
         interval '1 day'
       ) AS gs
     ),
@@ -155,7 +154,7 @@ export class PaymentRepository {
       FROM "payment_order" p
       WHERE p.completed_at IS NOT NULL
         AND p.completed_at >= ${from}
-        AND p.completed_at <  ${toExclusive}
+        AND p.completed_at <=  ${toInclusive}
         ${this.statusSQL(status)}
       GROUP BY 1
     )
@@ -227,13 +226,13 @@ export class PaymentRepository {
   `);
     }
 
-    async getStatsTotals(from: Date, toExclusive: Date, status?: StatusPayment) {
+    async getStatsTotals(from: Date, toInclusive: Date, status?: StatusPayment) {
         const [row] = await this.prisma.$queryRaw<Array<{ count: number; sum_amount: number }>>(Prisma.sql`
     SELECT COUNT(*)::int AS count, COALESCE(SUM(p.amount), 0) AS sum_amount
     FROM "payment_order" p
     WHERE p.completed_at IS NOT NULL
       AND p.completed_at >= ${from}
-      AND p.completed_at <  ${toExclusive}
+      AND p.completed_at <=  ${toInclusive}
       ${this.statusSQL(status)}
   `);
         return row ?? { count: 0, sum_amount: 0 };
