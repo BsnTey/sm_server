@@ -15,7 +15,7 @@ export const OrderStatusTiming: Record<OrderStatus, StatusTimingMeta> = {
     [OrderStatus.accepted]: { label: 'Создан', strategy: { kind: 'fixed', minutes: 1 } },
     [OrderStatus.check_availability]: { label: 'Проверка наличия', strategy: { kind: 'fixed', minutes: 1 } },
     [OrderStatus.availability_confirmed]: { label: 'Наличие подтверждено', strategy: { kind: 'fixed', minutes: 1 } },
-    [OrderStatus.completing]: { label: 'Комплектуется', strategy: { kind: 'fixed', minutes: 1 } },
+    [OrderStatus.completing]: { label: 'Комплектуется', strategy: { kind: 'fixed', minutes: 0.3 } },
 
     // === особый: прогрессивный backoff (1m → 2m → 4m ... cap 60m) ===
     [OrderStatus.ready_to_issue]: {
