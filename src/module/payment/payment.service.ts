@@ -258,8 +258,7 @@ export class PaymentService {
 
         // ---- ДНИ: дефолт последние 7 дат, включая сегодня ----
         const df = this.startOfDay(params.dayFrom ?? this.addDays(now, -6));
-        const dt = new Date(params.dayTo ?? now);
-        dt.setHours(23, 59, 59, 999);
+        const dt = this.addDays(new Date(params.dayTo ?? now), 1);
 
         // ---- МЕСЯЦЫ: дефолт последние 12 месяцев, включая текущий ----
         const thisMonth = this.startOfMonth(now);

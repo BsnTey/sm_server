@@ -60,6 +60,7 @@ import { CitySMEntity } from './entities/citySM.entity';
 import { encodeXlocation } from './utils/x-location.utils';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { RetryOn403 } from './decorators/retry-on-403.decorator';
 
 @Injectable()
 export class AccountService {
@@ -560,6 +561,7 @@ export class AccountService {
         await this.accountRep.setCityToAccount(accountId, cityId);
     }
 
+    @RetryOn403()
     async suggestCityByGeo(accountId: string, city: string): Promise<AddressSuggestList[]> {
         const acc = await this.getAccountEntity(accountId);
         const encodedCity = encodeURI(city.toUpperCase());
@@ -569,6 +571,7 @@ export class AccountService {
         return response.data.data.addressSuggestList;
     }
 
+    @RetryOn403()
     private async getAddressByUri(account: AccountWithProxyEntity, uri: string): Promise<DataAddress> {
         const encodedQuery = encodeURIComponent(uri);
         const url = `${this.url}v1/geo/address?query=${encodedQuery}&mode=URI`;
@@ -578,6 +581,7 @@ export class AccountService {
         return response.data.data;
     }
 
+    @RetryOn403()
     private async findCityByCoord(account: AccountWithProxyEntity, coord: GeoPointLng): Promise<DataCoord> {
         const url = this.url + `v1/city/coord?lat=${coord.lat}&lng=${coord.lng}`;
         const httpOptions = await this.getHttpOptions(url, account);
@@ -585,6 +589,7 @@ export class AccountService {
         return response.data.data;
     }
 
+    @RetryOn403()
     private async setGeo(account: AccountWithProxyEntity, location: Location): Promise<void> {
         const url = this.url + `v1/geo/location`;
         const httpOptions = await this.getHttpOptions(url, account);
@@ -610,6 +615,7 @@ export class AccountService {
         return { bonusCount, qrCode, bonusDetails, citySMName };
     }
 
+    @RetryOn403()
     private async shortInfoPrivate(accountId: string): Promise<ShortInfoInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v2/bonus/shortInfo';
@@ -630,6 +636,7 @@ export class AccountService {
         return await this.sendSms(accountWithProxyEntity, phoneNumber);
     }
 
+    @RetryOn403()
     async sendSms(accountOrId: string | AccountWithProxyEntity, phoneNumber: string): Promise<string> {
         const account = typeof accountOrId === 'string' ? await this.getAccountEntity(accountOrId) : accountOrId;
 
@@ -663,6 +670,7 @@ export class AccountService {
         return responseData.data.requestId;
     }
 
+    @RetryOn403()
     async phoneChange(accountId: string, requestId: string, code: string) {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         await this.analyticsTags(accountWithProxyEntity);
@@ -670,6 +678,7 @@ export class AccountService {
         await this.changePhone(accountWithProxyEntity, token);
     }
 
+    @RetryOn403()
     private async verifyCheck(accountWithProxyEntity: AccountWithProxyEntity, requestId: string, code: string): Promise<string> {
         const url = this.url + `v1/verify/check`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
@@ -683,6 +692,7 @@ export class AccountService {
         return response.data.data.token;
     }
 
+    @RetryOn403()
     private async changePhone(accountWithProxyEntity: AccountWithProxyEntity, token: string): Promise<boolean> {
         const url = this.url + `v1/profile/changePhone`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
@@ -694,6 +704,7 @@ export class AccountService {
         return true;
     }
 
+    @RetryOn403()
     async analyticsTags(accountWithProxyEntity: string | AccountWithProxyEntity): Promise<boolean> {
         if (typeof accountWithProxyEntity == 'string') {
             accountWithProxyEntity = await this.getAccountEntity(accountWithProxyEntity);
@@ -707,23 +718,7 @@ export class AccountService {
         return true;
     }
 
-    // async findCity(accountId: string, city: string) {
-    //     const suggestCitysByGeo = await this.suggestCityByGeo(accountId, city);
-    //
-    //     const cityEntities = suggestCitysByGeo.map(city => new CitySMEntity(city));
-    //     await Promise.allSettled(cityEntities.map(cityEntity => this.accountRep.addingCitySM(cityEntity)));
-    //     return cityEntities;
-    // }
-
-    // private async findCityPrivate(accountId: string, city: string): Promise<IFindCitiesAccount[]> {
-    //     const accountWithProxyEntity = await this.getAccountEntity(accountId);
-    //     const encodedCity = encodeURI(city.toUpperCase());
-    //     const url = this.url + `v1/city?query=${encodedCity}`;
-    //     const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
-    //     const response = await this.httpService.get(url, httpOptions);
-    //     return response.data.data.list;
-    // }
-
+    @RetryOn403()
     async getCart(accountWithProxyEntity: string | AccountWithProxyEntity): Promise<CartInterface> {
         if (typeof accountWithProxyEntity == 'string') {
             accountWithProxyEntity = await this.getAccountEntity(accountWithProxyEntity);
@@ -736,6 +731,7 @@ export class AccountService {
         return response.data;
     }
 
+    @RetryOn403()
     async applySnapshot(accountId: string, snapshotUrl: string): Promise<CartInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart/applySnapshot';
@@ -748,6 +744,7 @@ export class AccountService {
         return response.data;
     }
 
+    @RetryOn403()
     async addPromocode(accountId: string, promocode: string): Promise<boolean> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart2/promoCode';
@@ -760,6 +757,7 @@ export class AccountService {
         return response.data;
     }
 
+    @RetryOn403()
     async createSnapshot(accountId: string): Promise<string> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart/createSnapshot';
@@ -770,6 +768,7 @@ export class AccountService {
         return response.data.data.snapshotUrl;
     }
 
+    @RetryOn403()
     async deletePromocode(accountId: string): Promise<void> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + this.url + 'v1/cart/promoCode';
@@ -788,6 +787,7 @@ export class AccountService {
         }
     }
 
+    @RetryOn403()
     async removeFromCart(accountWithProxyEntity: string | AccountWithProxyEntity, removeList: IItemsCart[]): Promise<any> {
         if (typeof accountWithProxyEntity == 'string') {
             accountWithProxyEntity = await this.getAccountEntity(accountWithProxyEntity);
@@ -810,6 +810,7 @@ export class AccountService {
         await this.httpService.post(url, payload, httpOptions);
     }
 
+    @RetryOn403()
     async addInCart(accountId: string, { productId, sku }: IItemsCart): Promise<any> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart2/add';
@@ -831,6 +832,7 @@ export class AccountService {
         return response.data;
     }
 
+    @RetryOn403()
     async searchProduct(accountId: string, article: string): Promise<SearchProductInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v2/products/search?limit=10&offset=0';
@@ -843,6 +845,7 @@ export class AccountService {
         return response.data;
     }
 
+    @RetryOn403()
     async internalPickupAvailability(accountId: string, internalPickupAvabilityItems: IItemsCart[]): Promise<PickupAvabilityInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart2/internalPickupAvailability';
@@ -855,6 +858,7 @@ export class AccountService {
         return response.data;
     }
 
+    @RetryOn403()
     async internalPickup(accountId: string, shopId: string, internalPickupAvabilityItems: IItemsCart[]) {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart2/obtainPoint/internalPickup';
@@ -873,6 +877,7 @@ export class AccountService {
         return { potentialOrder, version };
     }
 
+    @RetryOn403()
     async submitOrder(accountId: string, version: string): Promise<string> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart/submit';
@@ -888,6 +893,7 @@ export class AccountService {
         return orderNumber.orderNumber;
     }
 
+    @RetryOn403()
     async approveRecipientOrder(accountId: string, recipient: IRecipientOrder): Promise<any> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/cart2/receiver`;
@@ -913,6 +919,7 @@ export class AccountService {
         return data;
     }
 
+    @RetryOn403()
     private async orderHistoryPrivate(accountId: string): Promise<OrdersInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v3/orderHistory`;
@@ -921,6 +928,7 @@ export class AccountService {
         return response.data;
     }
 
+    @RetryOn403()
     async orderInfo(accountId: string, orderNumber: string): Promise<OrderInfoInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v4/order/${orderNumber}`;
@@ -930,6 +938,7 @@ export class AccountService {
         return response.data;
     }
 
+    @RetryOn403()
     async cancellOrder(accountId: string, orderNumber: string): Promise<NonNullable<unknown>> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const reasons = [103, 104, 105, 106];
@@ -946,6 +955,7 @@ export class AccountService {
         return response.data;
     }
 
+    @RetryOn403()
     async getPromocodeFromProfile(accountId: string): Promise<PromocodeInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/promo`;
@@ -954,6 +964,7 @@ export class AccountService {
         return response.data;
     }
 
+    @RetryOn403()
     async getProfile(accountId: string): Promise<DataProfile> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/profile`;
@@ -962,6 +973,7 @@ export class AccountService {
         return response.data;
     }
 
+    @RetryOn403()
     async pushToken(accountId: string, pushToken: string): Promise<any> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/profile/pushToken';
@@ -976,6 +988,7 @@ export class AccountService {
         return response.data;
     }
 
+    @RetryOn403()
     private async getUserGateToken(accountWithProxyEntity: AccountWithProxyEntity): Promise<UserGateTokenInterface> {
         const url = this.url + `v1/profile/userGateToken`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
@@ -983,6 +996,7 @@ export class AccountService {
         return response.data;
     }
 
+    @RetryOn403()
     async getCoursesHtml(accountWithProxyEntity: AccountWithProxyEntity): Promise<string> {
         const url = this.urlSite + `courses/?webview=true`;
         const httpOptions = await this.getHttpOptionsSiteUserGate(accountWithProxyEntity);
@@ -999,6 +1013,7 @@ export class AccountService {
         throw new HttpException(ERROR_GET_ACCESS_TOKEN_COURSE, HttpStatus.BAD_REQUEST);
     }
 
+    @RetryOn403()
     private async getCourses(accessTokenCourse: string, accountWithProxyEntity: AccountWithProxyEntity): Promise<CourseList> {
         const url = this.urlSite + `courses/api/courses?limit=10`;
         const httpOptions = await this.getHttpOptionsSiteCourse(accountWithProxyEntity, accessTokenCourse);
@@ -1021,6 +1036,7 @@ export class AccountService {
         return status == 204;
     }
 
+    @RetryOn403()
     private async privateWatchingLesson(
         { mnemocode, videoId, lessonId, duration }: IWatchLesson,
         accountWithProxyEntity: AccountWithProxyEntity,
