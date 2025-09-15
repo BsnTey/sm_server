@@ -158,7 +158,7 @@ export class AccountController {
         @Body() dto: UpdatePushTokenRequestDto,
         @Param() params: AccountIdParamsDto,
     ): Promise<UpdatePushTokenResponseDto> {
-        return await this.accountService.updatePushToken(params.accountId, dto);
+        return this.accountService.updatePushToken(params.accountId, dto);
     }
 
     @HasZenno()
@@ -168,7 +168,7 @@ export class AccountController {
         @Body() dto: UpdateGoogleIdRequestDto,
         @Param() params: AccountIdParamsDto,
     ): Promise<UpdateGoogleIdResponseDto> {
-        return await this.accountService.updateGoogleId(params.accountId, dto);
+        return this.accountService.updateGoogleId(params.accountId, dto);
     }
 
     @HasZenno()
@@ -178,7 +178,7 @@ export class AccountController {
         @Body() dto: UpdatingCookieRequestDto,
         @Param() params: AccountIdParamsDto,
     ): Promise<UpdatingCookieResponseDto> {
-        return await this.accountService.updateCookie(params.accountId, dto);
+        return this.accountService.updateCookie(params.accountId, dto);
     }
 
     @Get('cookie/:accountId')
@@ -194,14 +194,24 @@ export class AccountController {
     @Get(':accountId/courses')
     @HttpCode(200)
     async getCoursesAccount(@Param() params: AccountIdParamsDto): Promise<any> {
-        return await this.accountService.getCoursesList(params.accountId);
+        return this.accountService.getCoursesList(params.accountId);
     }
 
     @Get('checking/:accountId')
     @HttpCode(200)
     async getBonusAccount(@Param() params: AccountIdParamsDto): Promise<any> {
         try {
-            return await this.accountService.shortInfo(params.accountId);
+            return this.accountService.shortInfo(params.accountId);
+        } catch (err: any) {
+            return this.handleError(err);
+        }
+    }
+
+    @Get('checking/:accountId/personal-discount')
+    @HttpCode(200)
+    async getPersonalDiscount(@Param() params: AccountIdParamsDto): Promise<any> {
+        try {
+            return this.accountService.getPersonalDiscount(params.accountId);
         } catch (err: any) {
             return this.handleError(err);
         }

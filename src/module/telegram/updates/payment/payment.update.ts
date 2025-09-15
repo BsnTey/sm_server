@@ -4,7 +4,7 @@ import { BadRequestException, Logger, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { ALL_KEYS_MENU_BUTTON_NAME } from '../base-command/base-command.constants';
 import { TelegramService } from '../../telegram.service';
-import { MAKE_DEPOSIT_SCENE, PAYMENT_PROMOCODE_BOT_SCENE, PROMOCODE_BOT_SCENE } from '../../scenes/profile.scene-constant';
+import { MAKE_DEPOSIT_SCENE, PAYMENT_PROMOCODE_BOT_SCENE } from '../../scenes/profile.scene-constant';
 import { isMoneyAmountPipe } from '../../pipes/isMoneyAmount.pipe';
 import { cancelPaymentKeyboard, comebackPayment, createdPaymentKeyboard } from '../../keyboards/profile.keyboard';
 import { StatusPayment } from '@prisma/client';
@@ -13,7 +13,6 @@ import { FileService } from '../../../shared/file.service';
 import { getFileNameForReceipt } from '../../utils/receipt.utils';
 import { extractAmountFTransferedPay } from '../../utils/payment.utils';
 import { PaymentService } from '../../../payment/payment.service';
-import { gotoCoupon } from '../../keyboards/payment.keyboard';
 import { FortuneCouponService } from '../../../coupon/fortune-coupon.service';
 
 @Scene(MAKE_DEPOSIT_SCENE)
@@ -136,6 +135,7 @@ export class PaymentUpdate {
 
             const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
             await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
+            await ctx.scene.leave();
         } catch (error) {
             this.logger.error('Error processing receipt:', error);
             await ctx.reply('Произошла ошибка при обработке квитанции.');
@@ -160,6 +160,7 @@ export class PaymentUpdate {
                 const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
                 const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
                 await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
+                await ctx.scene.leave();
             } else {
                 await ctx.reply('Пожалуйста, отправьте файл в формате PDF.');
             }
