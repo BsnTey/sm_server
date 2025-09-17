@@ -34,6 +34,7 @@ async function bootstrap() {
     const HOST = configService.getOrThrow<string>('HOST', 'localhost');
 
     app.setViewEngine('hbs');
+    app.enableShutdownHooks();
     await app.listen(PORT, HOST);
 
     const context = 'Bootstrap';

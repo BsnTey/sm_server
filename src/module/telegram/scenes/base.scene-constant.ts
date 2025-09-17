@@ -10,3 +10,4 @@ export const HELP_SCENE = 'helpScene';
 export const AUTH_MIRROR_SCENE = 'authMirrorScene';
 export const START_SCENE = 'startScene';
 export const ADMIN_SCENE = 'adminScene';
+export const FAMILY_SCENE = 'familyScene';

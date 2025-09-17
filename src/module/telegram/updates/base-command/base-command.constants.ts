@@ -6,6 +6,7 @@ import {
     CHANGE_NUMBER_SCENE,
     CHECKER_SCENE,
     COOKIE_SCENE,
+    FAMILY_SCENE,
     HELP_SCENE,
     ORDER_SCENE,
     PROFILE_SCENE,
@@ -73,6 +74,11 @@ export const ADMIN = {
     scene: ADMIN_SCENE,
 };
 
+export const FAMILY = {
+    name: '/family',
+    scene: FAMILY_SCENE,
+};
+
 export const ALL_KEYS_MENU_BUTTON = [
     AUTH_MIRROR,
     CALCULATE_BONUS,
@@ -86,6 +92,7 @@ export const ALL_KEYS_MENU_BUTTON = [
     HELP,
     START,
     ADMIN,
+    FAMILY,
 ];
 
 export const ALL_KEYS_MENU_BUTTON_NAME = ALL_KEYS_MENU_BUTTON.map(item => item.name);

@@ -41,7 +41,7 @@ export class FortuneUpdate {
             await ctx.reply('😦 Вы уже получили приз сегодня, приходите за ним завтра.');
             return;
         }
-        const prize = await this.fortuneCouponService.getRandomPrize(sender);
+        const prize = this.fortuneCouponService.getRandomPrize(sender);
         const newCoupon = await this.fortuneCouponService.awardPrizeToUser(prize, String(sender.id));
 
         await ctx.reply(

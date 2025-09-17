@@ -1,10 +1,11 @@
-import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { AccountRepository } from './account.repository';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
 import { AccountEntity } from './entities/account.entity';
 import {
     AccountWDevice,
     AddressSuggestList,
+    IAccountCashing,
     IAccountWithProxy,
     IRecipientOrder,
     IRefreshAccount,
@@ -62,6 +63,9 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { RetryOn401 } from './decorators/retry-on-403.decorator';
 import { PersonalDiscount, PersonalDiscountResponse } from './interfaces/personal-discount.interface';
+import { ProfileFamilyResponse } from './interfaces/profile-family.interface';
+import { FamilyInviteResponse, InviteMemberFamily, MemberFamily } from './interfaces/family-invite.interface';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 
 @Injectable()
 export class AccountService {
@@ -70,6 +74,8 @@ export class AccountService {
     private urlSite = this.configService.getOrThrow('API_DONOR_SITE');
     private adminsId: string[] = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
     private durationTimeProxyBlock = this.configService.getOrThrow('TIME_DURATION_PROXY_BLOCK_IN_MIN');
+
+    private TTL_CASH_ACCOUNT = 20_000;
 
     constructor(
         private configService: ConfigService,
@@ -80,6 +86,7 @@ export class AccountService {
         private courseService: CourseService,
         private deviceInfoService: DeviceInfoService,
         private sportmasterHeaders: SportmasterHeadersService,
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) {}
 
     async addingAccount(accountDto: AddingAccountRequestDto): Promise<AccountEntity> {
@@ -508,7 +515,13 @@ export class AccountService {
     }
 
     private async getAccountEntity(accountId: string): Promise<AccountWithProxyEntity> {
-        return this.loadAccountCore(accountId);
+        const accountEntityFromCache = await this.cacheManager.get<AccountWithProxyEntity>(accountId);
+        if (!accountEntityFromCache) {
+            const account = await this.loadAccountCore(accountId);
+            await this.cacheManager.set(accountId, account, this.TTL_CASH_ACCOUNT);
+            return account;
+        }
+        return accountEntityFromCache;
     }
 
     private async resolveCityByUri(accountId: string, uri: string): Promise<ResolvedCity> {
@@ -1100,5 +1113,68 @@ export class AccountService {
 
         const response = await this.httpService.post(url, payload, httpOptions);
         return response.data.data;
+    }
+
+    @RetryOn401()
+    async getProfileFamily(accountId: string): Promise<ProfileFamilyResponse> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const url = this.url + `v1/profile/family`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const response = await this.httpService.get<ProfileFamilyResponse>(url, httpOptions);
+        return response.data;
+    }
+
+    @RetryOn401()
+    async familyInvite(accountId: string, member: InviteMemberFamily): Promise<FamilyInviteResponse> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const url = this.url + `v1/profile/family/_invite`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+
+        const payload: InviteMemberFamily = {
+            memberPhone: member.memberPhone,
+            memberName: member.memberName,
+        };
+
+        if (member.familyId) {
+            payload.familyId = member.familyId;
+        }
+
+        const response = await this.httpService.post<FamilyInviteResponse>(url, payload, httpOptions);
+        return response.data;
+    }
+
+    @RetryOn401()
+    async familyAnswer(accountId: string, familyId: string): Promise<ProfileFamilyResponse> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const url = this.url + `v1/profile/family/${familyId}/_answer`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+
+        const payload = {
+            answer: true,
+        };
+
+        const response = await this.httpService.post<ProfileFamilyResponse>(url, payload, httpOptions);
+        return response.data;
+    }
+
+    @RetryOn401()
+    async deleteFamily(accountId: string, familyId: string): Promise<ProfileFamilyResponse> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const url = this.url + `v1/profile/family/${familyId}`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+
+        const response = await this.httpService.delete<ProfileFamilyResponse>(url, httpOptions);
+        return response.data;
+    }
+
+    //чтоб удалить участника из семьи, а также ливнуть самому
+    @RetryOn401()
+    async deleteFamilyMember(accountId: string, member: MemberFamily): Promise<ProfileFamilyResponse> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const url = this.url + `v1/profile/family/${member.familyId}/members/${member.memberId}`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+
+        const response = await this.httpService.delete<ProfileFamilyResponse>(url, httpOptions);
+        return response.data;
     }
 }
