@@ -79,6 +79,11 @@ export const FAMILY = {
     scene: FAMILY_SCENE,
 };
 
+export const FAMILY_ALIAS = {
+    name: '🏰 Семья',
+    scene: FAMILY_SCENE,
+};
+
 export const ALL_KEYS_MENU_BUTTON = [
     AUTH_MIRROR,
     CALCULATE_BONUS,
@@ -93,6 +98,7 @@ export const ALL_KEYS_MENU_BUTTON = [
     START,
     ADMIN,
     FAMILY,
+    FAMILY_ALIAS,
 ];
 
 export const ALL_KEYS_MENU_BUTTON_NAME = ALL_KEYS_MENU_BUTTON.map(item => item.name);

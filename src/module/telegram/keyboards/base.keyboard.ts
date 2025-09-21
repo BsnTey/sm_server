@@ -6,6 +6,7 @@ import {
     CHANGE_NUMBER,
     CHECK,
     COOKIE,
+    FAMILY_ALIAS,
     HELP,
     MAKE_ORDER,
     PROFILE,
@@ -15,13 +16,12 @@ import { UserRole } from '@prisma/client';
 
 export function getMainMenuKeyboard(role?: UserRole) {
     const firstRow = [CHANGE_NUMBER.name, MAKE_ORDER.name];
+    const secondRow = [CALCULATE_BONUS.name, CHECK.name];
+    const thirdRow = [COOKIE.name, QR_CODE.name, CASH_RECEIPT.name];
+    const fourthRow = [PROFILE.name, HELP.name];
     if (role == 'Admin') firstRow.unshift(AUTH_MIRROR.name);
-    const keyboard = [
-        firstRow,
-        [CALCULATE_BONUS.name, CHECK.name],
-        [COOKIE.name, QR_CODE.name, CASH_RECEIPT.name],
-        [PROFILE.name, HELP.name],
-    ];
+    if (role == 'Admin') fourthRow.unshift(FAMILY_ALIAS.name);
+    const keyboard = [firstRow, secondRow, thirdRow, fourthRow];
 
     return Markup.keyboard(keyboard).resize();
 }

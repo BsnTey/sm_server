@@ -11,6 +11,7 @@ import {
     CHECK,
     COOKIE,
     FAMILY,
+    FAMILY_ALIAS,
     HELP,
     MAKE_ORDER,
     PROFILE,
@@ -89,6 +90,11 @@ export class BaseUpdate {
 
     @Hears([FAMILY.name])
     async onFamily(@Ctx() ctx: WizardContext) {
+        await ctx.scene.enter(FAMILY.scene);
+    }
+
+    @Hears([FAMILY_ALIAS.name])
+    async onFamilyAlias(@Ctx() ctx: WizardContext) {
         await ctx.scene.enter(FAMILY.scene);
     }
 
