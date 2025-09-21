@@ -48,6 +48,8 @@ import {
 } from './updates/calculate/calculate-settings.update';
 import { CalculateService } from './updates/calculate/calculate.service';
 import { CalculateRepository } from './updates/calculate/calculate.repository';
+import { FamilyInputAccountUpdate, FamilyInviteUpdate, FamilyUpdate } from './updates/family/family.update';
+import { FamilyService } from './updates/family/family.service';
 
 @Module({
     imports: [AccountModule, ProxyModule, SharedModule, HttpModule, UserModule, PaymentModule, MirrorModule, CouponModule],
@@ -94,6 +96,10 @@ import { CalculateRepository } from './updates/calculate/calculate.repository';
         CommissionRateScene,
         RoundToScene,
         CustomRoundScene,
+        FamilyUpdate,
+        FamilyInputAccountUpdate,
+        FamilyInviteUpdate,
+        FamilyService,
     ],
     exports: [TelegramService],
 })

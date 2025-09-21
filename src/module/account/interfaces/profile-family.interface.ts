@@ -50,7 +50,7 @@ export interface Member {
 export interface CurrentMember {
     id: string;
     phone: string;
-    status: string;
+    status: StatusFamilyMember;
     availableInvitationsAmount: number;
     limitsRefreshDate: string;
     invitationEndTime?: any;
@@ -58,8 +58,14 @@ export interface CurrentMember {
     limitsJoinsRefreshDate?: any;
 }
 
-enum StatusFamilyMember {
+export enum StatusFamilyMember {
     OWNER = 'OWNER',
     INVITED = 'INVITED',
     MEMBER = 'MEMBER',
 }
+
+export const statusFamilyMemberRus = {
+    OWNER: 'Владелец',
+    INVITED: 'Приглашен',
+    MEMBER: 'Участник',
+};

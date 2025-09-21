@@ -72,7 +72,7 @@ export class BotTHeadersService implements OnModuleInit {
 
                 const page = await context.newPage();
                 await page.goto(`${this.urlBotT}lk/common/replenishment/main/statistics?bot_id=${this.sellerTradeBotId}`, {
-                    waitUntil: 'networkidle',
+                    waitUntil: 'domcontentloaded',
                     timeout: 30000,
                 });
 

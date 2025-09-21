@@ -5,7 +5,6 @@ import { AccountEntity } from './entities/account.entity';
 import {
     AccountWDevice,
     AddressSuggestList,
-    IAccountCashing,
     IAccountWithProxy,
     IRecipientOrder,
     IRefreshAccount,
@@ -993,7 +992,7 @@ export class AccountService {
         const url = this.url + `v1/profile`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
-        return response.data;
+        return response.data.data;
     }
 
     @RetryOn401()
@@ -1120,8 +1119,8 @@ export class AccountService {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/profile/family`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
-        const response = await this.httpService.get<ProfileFamilyResponse>(url, httpOptions);
-        return response.data;
+        const response = await this.httpService.get(url, httpOptions);
+        return response.data.data;
     }
 
     @RetryOn401()
@@ -1144,13 +1143,13 @@ export class AccountService {
     }
 
     @RetryOn401()
-    async familyAnswer(accountId: string, familyId: string): Promise<ProfileFamilyResponse> {
+    async familyAnswer(accountId: string, familyId: string, answer: boolean): Promise<ProfileFamilyResponse> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/profile/family/${familyId}/_answer`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
-            answer: true,
+            answer,
         };
 
         const response = await this.httpService.post<ProfileFamilyResponse>(url, payload, httpOptions);
@@ -1167,7 +1166,6 @@ export class AccountService {
         return response.data;
     }
 
-    //чтоб удалить участника из семьи, а также ливнуть самому
     @RetryOn401()
     async deleteFamilyMember(accountId: string, member: MemberFamily): Promise<ProfileFamilyResponse> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);

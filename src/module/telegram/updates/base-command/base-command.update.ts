@@ -10,6 +10,7 @@ import {
     CHANGE_NUMBER,
     CHECK,
     COOKIE,
+    FAMILY,
     HELP,
     MAKE_ORDER,
     PROFILE,
@@ -84,6 +85,11 @@ export class BaseUpdate {
     @Hears([CALCULATE_BONUS.name])
     async onStartCalculate(@Ctx() ctx: WizardContext) {
         await ctx.scene.enter(CALCULATE_BONUS.scene);
+    }
+
+    @Hears([FAMILY.name])
+    async onFamily(@Ctx() ctx: WizardContext) {
+        await ctx.scene.enter(FAMILY.scene);
     }
 
     @On('text')

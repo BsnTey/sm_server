@@ -9,14 +9,15 @@ import { CitySMEntity } from '../account/entities/citySM.entity';
 export class UserService {
     constructor(private readonly userRepository: UserRepository) {}
 
-    async createOrUpdateUserByTelegram({ telegramName, telegramId }: ITelegramUser): Promise<UserTelegram | void> {
+    async createOrUpdateUserByTelegram({ telegramName, telegramId }: ITelegramUser): Promise<UserTelegram> {
         const existUser = await this.getUserByTelegramId(telegramId);
         if (!existUser) {
-            return await this.createUserByTelegram({ telegramName, telegramId });
+            return this.createUserByTelegram({ telegramName, telegramId });
         }
         if (existUser.telegramName != telegramName) {
-            return await this.updateUserByTelegram({ telegramName, telegramId });
+            return this.updateUserByTelegram({ telegramName, telegramId });
         }
+        return existUser;
     }
 
     async getUserByTelegramId(telegramId: string): Promise<UserTelegram | null> {

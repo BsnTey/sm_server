@@ -154,29 +154,29 @@ export class CheckingService {
                 const errorResponse = err.response?.data?.error;
 
                 if (errorResponse?.message) {
-                    const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Axios Error: ${JSON.stringify(errorResponse, null, 2)}\n`;
+                    const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Axios Error1: ${JSON.stringify(errorResponse, null, 2)}\n`;
                     fs.appendFileSync(logFilePath, errorMessage, 'utf8');
 
                     resultChecking[accountId] = `${accountId}: ${errorResponse.message}\n`;
                 } else {
-                    const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Axios Error: ${JSON.stringify(err.response?.data || err.toJSON(), null, 2)}\n`;
+                    const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Axios Error2: ${JSON.stringify(err.response?.data || err.toJSON(), null, 2)}\n`;
                     fs.appendFileSync(logFilePath, errorMessage, 'utf8');
 
                     resultChecking[accountId] = `${accountId}: Ошибка запроса, повторите\n`;
                 }
             } catch (writeError: any) {
-                const writeErrorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Write Error: ${writeError.message}\n`;
+                const writeErrorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Write Error3: ${writeError.message}\n`;
                 fs.appendFileSync(logFilePath, writeErrorMessage, 'utf8');
 
                 resultChecking[accountId] = `${accountId}: Ошибка запроса, повторите\n`;
             }
         } else {
             try {
-                const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Error: ${err.message}\n`;
+                const errorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Error4: ${err.message}\n`;
                 fs.appendFileSync(logFilePath, errorMessage, 'utf8');
                 resultChecking[accountId] = `${accountId}: ${err.message || 'Неизвестная ошибка'}\n`;
             } catch (writeError: any) {
-                const writeErrorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Write Error: ${writeError.message}\n`;
+                const writeErrorMessage = `${new Date().toISOString()} - Account ID: ${accountId} - Write Error5: ${writeError.message}\n`;
                 fs.appendFileSync(logFilePath, writeErrorMessage, 'utf8');
                 resultChecking[accountId] = `${accountId}: Неизвестная ошибка\n`;
             }

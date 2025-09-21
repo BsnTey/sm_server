@@ -1,3 +1,4 @@
+//возвращает с 9
 export const isPhone = (phone: string) => {
     const regex1 = new RegExp('^7\\d{10}$');
     const regex2 = new RegExp('^8\\d{10}$');
