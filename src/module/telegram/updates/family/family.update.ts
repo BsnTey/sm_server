@@ -1,5 +1,5 @@
 import { Action, Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
-import { HttpException, NotFoundException, UseFilters } from '@nestjs/common';
+import { HttpException, Logger, NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { Context, SenderTelegram } from '../../interfaces/telegram.context';
 import { WizardContext } from 'telegraf/typings/scenes';
@@ -41,6 +41,7 @@ export class FamilyUpdate extends BaseUpdate {
 @Scene(FAMILY_INPUT_SCENE)
 @UseFilters(TelegrafExceptionFilter)
 export class FamilyInputAccountUpdate extends BaseUpdate {
+    private readonly logger = new Logger(FamilyInputAccountUpdate.name);
     constructor(private readonly familyService: FamilyService) {
         super();
     }
@@ -51,6 +52,8 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
         const accountId = await this.familyService.getAccountIdByTelegram(telegramId);
         const user = await this.userService.getUserByTelegramId(String(telegramId));
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
+
+        this.logger.log(`Пользователь ${sender.first_name} - ${sender.id} вошел в сцену семьи`);
 
         try {
             const { text, keyboard } = await this.familyService.getFamilyView(accountId, user.role);
@@ -66,7 +69,8 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
     }
 
     @Action('refresh_info_family')
-    async refreshInfoFamily(@Ctx() ctx: WizardContext) {
+    async refreshInfoFamily(@Ctx() ctx: WizardContext, @Sender() sender: SenderTelegram) {
+        this.logger.log(`Пользователь ${sender.first_name} - ${sender.id} запросил обновить статус семьи`);
         try {
             await ctx.deleteMessage();
         } catch (e: any) {}
@@ -81,6 +85,8 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
 
         const telegramId = String(sender.id);
         const accountId = await this.familyService.getAccountIdByTelegram(telegramId);
+
+        this.logger.log(`Пользователь ${sender.first_name} - ${sender.id} запросил исключить из семьи accountId ${accountId}`);
 
         try {
             await this.familyService.excludeMemberFamily(accountId, { familyId, memberId });
@@ -103,6 +109,8 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
         const telegramId = String(sender.id);
         const accountId = await this.familyService.getAccountIdByTelegram(telegramId);
 
+        this.logger.log(`Пользователь ${sender.first_name} - ${sender.id} запросил развалить семью для accountId ${accountId}`);
+
         try {
             await this.familyService.leaveFamily(accountId);
             await ctx.deleteMessage();
@@ -124,6 +132,10 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
     async onAccept(@Ctx() ctx: Context, @Sender() sender: SenderTelegram) {
         const telegramId = String(sender.id);
         const accountId = await this.familyService.getAccountIdByTelegram(telegramId);
+
+        this.logger.log(
+            `Пользователь ${sender.first_name} - ${sender.id} запросил подтвердить его приглашение в семью для accountId ${accountId}`,
+        );
         try {
             await this.familyService.answerInvite(accountId, true);
             await ctx.deleteMessage();
@@ -142,6 +154,10 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
         const telegramId = String(sender.id);
         const accountId = await this.familyService.getAccountIdByTelegram(telegramId);
 
+        this.logger.log(
+            `Пользователь ${sender.first_name} - ${sender.id} запросил отклонить его приглашение из семьи для accountId ${accountId}`,
+        );
+
         try {
             await this.familyService.answerInvite(accountId, false);
             await ctx.deleteMessage();
@@ -157,6 +173,8 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
 @Scene(FAMILY_INVITE_SCENE)
 @UseFilters(TelegrafExceptionFilter)
 export class FamilyInviteUpdate extends BaseUpdate {
+    private readonly logger = new Logger(FamilyInviteUpdate.name);
+
     constructor(private readonly familyService: FamilyService) {
         super();
     }
@@ -181,6 +199,8 @@ export class FamilyInviteUpdate extends BaseUpdate {
     ) {
         const telegramId = String(sender.id);
         const accountIdOwner = await this.familyService.getAccountIdByTelegram(telegramId);
+
+        this.logger.log(`Пользователь ${sender.first_name} - ${sender.id} запросил принять его в семью по accountId ${accountIdOwner}`);
 
         let namePhoneInvited;
         try {
@@ -213,6 +233,10 @@ export class FamilyInviteUpdate extends BaseUpdate {
     ) {
         const telegramId = String(sender.id);
         const accountId = await this.familyService.getAccountIdByTelegram(telegramId);
+
+        this.logger.log(
+            `Пользователь ${sender.first_name} - ${sender.id} запросил принять его в семью по телефону и имени для accountId ${accountId}`,
+        );
 
         try {
             await this.familyService.inviteMember(accountId, phoneName);

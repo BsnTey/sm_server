@@ -6,9 +6,9 @@ import { ProfileFamilyResponse, StatusFamilyMember } from '../../../account/inte
 import { InviteMemberFamily, MemberFamily } from '../../../account/interfaces/family-invite.interface';
 import {
     defaultFamilyStatusKeyboard,
+    deleteYourselfFamilyStatusKeyboard,
     invitedFamilyStatusKeyboard,
     leaveFamilyKeyboard,
-    memberFamilyStatusKeyboard,
     ownerFamilyStatusKeyboard,
     refreshFamilyStatusKeyboard,
 } from '../../keyboards/family.keyboard';
@@ -40,15 +40,22 @@ export class FamilyService {
             case undefined: {
                 const profileResponse = await this.accountService.getProfile(accountId);
                 const text = `📱 Аккаунт найден. Баланс: ${familyResponse.bonusInfo.personalAmount} баллов.\nДанные аккаунта для привязки:\n- Номер телефона: ${profileResponse.profile.phone.nationalNumber}\n- Имя: ${profileResponse.profile.anketa.firstName} (или любое другое)`;
-                return { text, keyboard: refreshFamilyStatusKeyboard, familyResponse };
+                return { text, keyboard: refreshFamilyStatusKeyboard };
             }
             case StatusFamilyMember.INVITED: {
                 const text = `📱 Аккаунт найден и приглашен в семью.\nПерсональный баланс: ${familyResponse.bonusInfo.personalAmount}.\nСемейный баланс: ${familyResponse.bonusInfo.totalAmount}.\n`;
                 return { text, keyboard: invitedFamilyStatusKeyboard };
             }
+            case StatusFamilyMember.MEMBER: {
+                const text = `📱 Аккаунт найден. Персональный баланс: ${familyResponse.bonusInfo.personalAmount}.\nСемейный баланс: ${familyResponse.bonusInfo.totalAmount}.\nПокиньте семью, прежде чем вступить в новую`;
+                return {
+                    text,
+                    keyboard: deleteYourselfFamilyStatusKeyboard(familyResponse.family!.id, familyResponse.family!.currentMember.id),
+                };
+            }
             default: {
                 const text = `📱 Аккаунт найден. Персональный баланс: ${familyResponse.bonusInfo.personalAmount}.\nСемейный баланс: ${familyResponse.bonusInfo.totalAmount}.\nПокиньте семью, прежде чем вступить в новую`;
-                return { text, keyboard: leaveFamilyKeyboard, familyResponse };
+                return { text, keyboard: leaveFamilyKeyboard };
             }
         }
     }
@@ -61,7 +68,10 @@ export class FamilyService {
             }
             case StatusFamilyMember.MEMBER: {
                 const text = `📱 Аккаунт найден и является участником семьи.\nПерсональный баланс: ${familyResponse.bonusInfo.personalAmount}.\nСемейный баланс: ${familyResponse.bonusInfo.totalAmount}.\n`;
-                return { text, keyboard: memberFamilyStatusKeyboard };
+                return {
+                    text,
+                    keyboard: deleteYourselfFamilyStatusKeyboard(familyResponse.family!.id, familyResponse.family!.currentMember.id),
+                };
             }
             case StatusFamilyMember.INVITED: {
                 const text = `📱 Аккаунт найден и приглашен в семью.\nПерсональный баланс: ${familyResponse.bonusInfo.personalAmount}.\nСемейный баланс: ${familyResponse.bonusInfo.totalAmount}.\n`;

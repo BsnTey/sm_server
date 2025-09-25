@@ -24,7 +24,9 @@ export const ownerFamilyStatusKeyboard = (family: Family) => {
     return Markup.inlineKeyboard(keyboard);
 };
 
-export const memberFamilyStatusKeyboard = Markup.inlineKeyboard([[Markup.button.callback('Покинуть семью', 'leave_family')]]);
+export const deleteYourselfFamilyStatusKeyboard = (familyId: string, memberId: string) => {
+    return Markup.inlineKeyboard([[Markup.button.callback('Покинуть семью', `exclude_${familyId}_${memberId}`)]]);
+};
 
 export const invitedFamilyStatusKeyboard = Markup.inlineKeyboard([
     [Markup.button.callback('Принять приглашение', 'accept_family')],
