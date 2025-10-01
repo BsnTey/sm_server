@@ -27,4 +27,55 @@ export class ZennoRepository {
     async getCourses(): Promise<Course[]> {
         return this.prisma.course.findMany();
     }
+
+    async setActiveTodoById(activeTodoId?: string): Promise<void> {
+        const ops = [];
+        ops.push(
+            this.prisma.todo.updateMany({
+                where: {},
+                data: { active: false },
+            }),
+        );
+
+        if (activeTodoId) {
+            ops.push(
+                this.prisma.todo.updateMany({
+                    where: { todo: activeTodoId },
+                    data: { active: true },
+                }),
+            );
+        }
+
+        await this.prisma.$transaction(ops);
+    }
+
+    async updateCoursesActiveBulk(courses: { name: string; active: boolean }[]): Promise<void> {
+        if (!courses || courses.length === 0) return;
+
+        const namesTrue = courses.filter(c => c.active).map(c => c.name);
+        const namesFalse = courses.filter(c => !c.active).map(c => c.name);
+
+        const ops = [];
+
+        if (namesTrue.length > 0) {
+            ops.push(
+                this.prisma.course.updateMany({
+                    where: { name: { in: namesTrue } },
+                    data: { active: true },
+                }),
+            );
+        }
+
+        if (namesFalse.length > 0) {
+            ops.push(
+                this.prisma.course.updateMany({
+                    where: { name: { in: namesFalse } },
+                    data: { active: false },
+                }),
+            );
+        }
+        if (ops.length === 0) return;
+
+        await this.prisma.$transaction(ops);
+    }
 }
