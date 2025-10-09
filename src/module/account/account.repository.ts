@@ -4,7 +4,6 @@ import { PrismaService } from '@common/database/prisma.service';
 import { AccountEntity } from './entities/account.entity';
 import { IAccountWithProxy, ICourseTokens, IEmailFromDb, IRefreshDataAccount, IUpdateAccount } from './interfaces/account.interface';
 import { CitySMEntity } from './entities/citySM.entity';
-import { IAccountCourseWLesson } from './interfaces/course.interface';
 
 @Injectable()
 export class AccountRepository {
@@ -452,6 +451,13 @@ export class AccountRepository {
                 accountId: true,
                 expiresInRefresh: true,
             },
+        });
+    }
+
+    async updateOwner(accountId: string, ownerTelegramId: string): Promise<void> {
+        await this.prisma.account.update({
+            where: { accountId },
+            data: { ownerTelegramId },
         });
     }
 }

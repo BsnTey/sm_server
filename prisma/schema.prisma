@@ -21,20 +21,21 @@ model User {
 }
 
 model UserTelegram {
-  telegramId     String          @id @unique @map("telegram_id")
-  telegramName   String          @map("telegram_name")
-  countBonuses   Int             @default(0) @map("count_bonuses")
-  isBan          Boolean         @default(false) @map("is_ban")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  role           UserRole        @default(User)
-  accounts       Account[]
-  paymentOrders  PaymentOrder[]
-  user           User?
-  fortuneCoupons FortuneCoupon[]
-  userStatusPref OrderStatus[]   @map("user_status_pref")
-  userCities     UserCitySM[]
-  UserTemplate   UserTemplate[]
+  telegramId      String            @id @unique @map("telegram_id")
+  telegramName    String            @map("telegram_name")
+  countBonuses    Int               @default(0) @map("count_bonuses")
+  isBan           Boolean           @default(false) @map("is_ban")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  role            UserRole          @default(User)
+  accounts        Account[]
+  paymentOrders   PaymentOrder[]
+  user            User?
+  fortuneCoupons  FortuneCoupon[]
+  userStatusPref  OrderStatus[]     @map("user_status_pref")
+  userCities      UserCitySM[]
+  UserTemplate    UserTemplate[]
+  AccountPurchase AccountPurchase[]
 
   @@map("user_telegram")
 }
@@ -92,6 +93,7 @@ model Account {
   orders                   Order[]
   courses                  OriginalCourse[]
   deviceInfo               DeviceInfo?
+  AccountPurchase          AccountPurchase[]
 
   @@map("account")
 }
@@ -302,6 +304,58 @@ model FortuneCoupon {
   payments     PaymentOrder[]
 
   @@map("fortune_surprise")
+}
+
+// model DiscountCategory {
+//   /// Нормализованный код категории (например: MEN_SHOES, WOMEN_CLOTHING, SPORT_GEAR)
+//   code String @id
+//   name String
+//
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+//
+//   accountLinks AccountDiscount[]
+// }
+//
+// model AccountDiscount {
+//   accountId    String
+//   categoryCode String
+//
+//   telegramId String
+//
+//   validTo DateTime
+//
+//   account  Account          @relation(fields: [accountId], references: [accountId], onDelete: Cascade)
+//   category DiscountCategory @relation(fields: [categoryCode], references: [code], onDelete: Cascade)
+//
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+//
+//   @@id([accountId, categoryCode])
+//   @@index([telegramId, categoryCode])
+//   @@index([accountId])
+// }
+
+model AccountPurchase {
+  id          String @id
+  orderNumber String @map("order_number")
+  lineIndex   Int    @default(1) @map("line_index")
+
+  accountId       String   @map("account_id")
+  buyerTelegramId String   @map("buyer_telegram_id")
+  amount          Int
+  purchasedAt     DateTime @default(now()) @map("purchased_at")
+  rawPayload      Json     @map("raw_payload")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  account Account      @relation(fields: [accountId], references: [accountId])
+  buyer   UserTelegram @relation(fields: [buyerTelegramId], references: [telegramId])
+
+  @@unique([orderNumber, lineIndex])
+  @@index([accountId])
+  @@index([orderNumber])
+  @@map("account_purchase")
 }
 
 enum FortuneSurpriseType {

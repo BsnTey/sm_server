@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, HttpCode, Inject, Injectable, Logger, Post, UseInterceptors } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '../http/http.service';
 import { BotTHeadersService } from './headers.service';
@@ -251,7 +251,6 @@ export class BottService {
         const url = this.urlBotT + `lk/common/shop/coupon/replenish`;
         const response = await this.httpService.post(url, payload, { headers, params });
         if (response.status === 200 || response.status === 201) {
-            this.logger.log(`Удалил данные промокодов на страницах`);
             await Promise.all(
                 Array.from({ length: 9 }, (_, index) => {
                     const page = index + 1;

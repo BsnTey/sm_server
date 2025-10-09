@@ -140,6 +140,11 @@ export class AccountService {
         return account;
     }
 
+    async changeOwner(accountId: string, ownerTelegramId: string): Promise<void> {
+        await this.accountRep.updateOwner(accountId, ownerTelegramId);
+        this.logger.log(`owner changed: account=${accountId} -> ${ownerTelegramId}`);
+    }
+
     async initializeAccountProgress(accountId: string): Promise<void> {
         const courses = await this.courseService.getCoursesWithLessons();
 
