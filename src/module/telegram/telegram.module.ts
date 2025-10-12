@@ -46,13 +46,14 @@ import {
     TemplateNameScene,
     TemplateTextScene,
 } from './updates/calculate/calculate-settings.update';
-import { CalculateService } from './updates/calculate/calculate.service';
 import { CalculateRepository } from './updates/calculate/calculate.repository';
 import { FamilyInputAccountUpdate, FamilyInviteUpdate, FamilyUpdate } from './updates/family/family.update';
 import { FamilyService } from './updates/family/family.service';
+import { CalculateModule } from '../calculate/calculate.module';
+import { CalculateServiceTelegram } from './updates/calculate/calculate.service';
 
 @Module({
-    imports: [AccountModule, ProxyModule, SharedModule, HttpModule, UserModule, PaymentModule, MirrorModule, CouponModule],
+    imports: [AccountModule, ProxyModule, SharedModule, HttpModule, UserModule, PaymentModule, MirrorModule, CouponModule, CalculateModule],
     providers: [
         TelegramService,
         MakeOrderService,
@@ -87,7 +88,7 @@ import { FamilyService } from './updates/family/family.service';
         PaymentUpdate,
         PaymentPromocodeUpdate,
         FortuneUpdate,
-        CalculateService,
+        CalculateServiceTelegram,
         CalculateRepository,
         CalculateSettingsScene,
         TemplateNameScene,

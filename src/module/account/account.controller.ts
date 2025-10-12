@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, NotFoundException, Param, Patch, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Patch, Post, Put } from '@nestjs/common';
 import { AccountService } from './account.service';
 import { HasZenno } from '@common/decorators/zenno.decorator';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
@@ -27,6 +27,12 @@ import {
     UpdateAccountCredentialsResponseDto,
 } from './dto/account-credentials.dto';
 import { StatusCourseParamsDto } from './dto/status-course-param.dto';
+import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discount.dto';
+import { TelegramIdParamsDto } from './dto/telegramId.dto';
+import { AccountTelegramParamsDto } from './dto/account-telegram-ids.dto';
+import { CheckProductRequestDto } from './dto/check-product.dto';
+import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
+import { CheckProductResultItem } from './interfaces/product.interface';
 
 @Controller('account')
 export class AccountController {
@@ -215,6 +221,48 @@ export class AccountController {
         } catch (err: any) {
             return this.handleError(err);
         }
+    }
+
+    @Post('checking/personal-discount/product/prepare')
+    @HttpCode(200)
+    async prepareAccountsForProductCheck(@Body() data: PrepareProductCheckRequestDto): Promise<{ accountIds: string[] }> {
+        return this.accountService.prepareAccountsForProductCheck(data);
+    }
+
+    @Post('checking/personal-discount/product/check-batch')
+    @HttpCode(200)
+    async checkProductBatchForPersonalDiscount(@Body() data: CheckProductBatchRequestDto): Promise<{
+        ok: boolean;
+        productId: string;
+        processed: number;
+        results: CheckProductResultItem[];
+        errors: CheckProductResultItem[];
+    }> {
+        return this.accountService.checkProductBatchForPersonalDiscount(data);
+    }
+
+    @Post('set/personal-discount')
+    @HttpCode(200)
+    async setAccountsForPersonalDiscount(@Body() data: SetPersonalDiscountAccountRequestDto): Promise<any> {
+        return this.accountService.setAccountsForPersonalDiscount(data);
+    }
+
+    @Get('personal-discount/nodes/:telegramId')
+    @HttpCode(200)
+    async getDistinctNodePairsByTelegram(@Param() params: TelegramIdParamsDto): Promise<any> {
+        return this.accountService.getDistinctNodePairsByTelegram(params.telegramId);
+    }
+
+    @Get('personal-discount/accounts/:telegramId')
+    @HttpCode(200)
+    async getDistinctAccountsByTelegram(@Param() params: TelegramIdParamsDto): Promise<any> {
+        return this.accountService.getUserAccountIds(params.telegramId);
+    }
+
+    @Delete('personal-discount/telegramId/:telegramId/accountId/:accountId')
+    @HttpCode(200)
+    async delDistinctNodePairsByAccountId(@Param() params: AccountTelegramParamsDto): Promise<any> {
+        return this.accountService.removeDiscountsByAccountId(params);
     }
 
     private handleError(err: any): { error: string } {

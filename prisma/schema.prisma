@@ -306,35 +306,23 @@ model FortuneCoupon {
   @@map("fortune_surprise")
 }
 
-// model DiscountCategory {
-//   /// Нормализованный код категории (например: MEN_SHOES, WOMEN_CLOTHING, SPORT_GEAR)
-//   code String @id
-//   name String
-//
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-//
-//   accountLinks AccountDiscount[]
-// }
-//
-// model AccountDiscount {
-//   accountId    String
-//   categoryCode String
-//
-//   telegramId String
-//
-//   validTo DateTime
-//
-//   account  Account          @relation(fields: [accountId], references: [accountId], onDelete: Cascade)
-//   category DiscountCategory @relation(fields: [categoryCode], references: [code], onDelete: Cascade)
-//
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-//
-//   @@id([accountId, categoryCode])
-//   @@index([telegramId, categoryCode])
-//   @@index([accountId])
-// }
+model AccountDiscount {
+  id         String   @id @default(cuid())
+  accountId  String   @map("account_id")
+  telegramId String   @map("telegram_id")
+  nodeId     String   @map("node_id")
+  nodeName   String   @map("node_name")
+  dateEnd    DateTime @map("date_end")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([accountId, nodeId])
+  @@index([telegramId, accountId])
+  @@index([telegramId, nodeId])
+  @@index([nodeId, accountId])
+  @@map("account_discount")
+}
 
 model AccountPurchase {
   id          String @id

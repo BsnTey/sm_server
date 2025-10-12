@@ -65,6 +65,15 @@ import { PersonalDiscount, PersonalDiscountResponse } from './interfaces/persona
 import { ProfileFamilyResponse } from './interfaces/profile-family.interface';
 import { FamilyInviteResponse, InviteMemberFamily, MemberFamily } from './interfaces/family-invite.interface';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { CheckProductResultItem, ProductApiResponse } from './interfaces/product.interface';
+import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discount.dto';
+import { AccountDiscountRepository } from './account-discount.repository';
+import { parseDateFlexible } from './utils/parse-data';
+import { NodePair } from './interfaces/account-discount.interface';
+import { AccountTelegramParamsDto } from './dto/account-telegram-ids.dto';
+import { keyDiscountAccount, keyDiscountNodes } from './cache-key/key';
+import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
+import { CalculateService } from '../calculate/calculate.service';
 
 @Injectable()
 export class AccountService {
@@ -75,16 +84,20 @@ export class AccountService {
     private durationTimeProxyBlock = this.configService.getOrThrow('TIME_DURATION_PROXY_BLOCK_IN_MIN');
 
     private TTL_CASH_ACCOUNT = 20_000;
+    private TTL_CASH_DISCOUNT = 10_800_000;
+    private readonly MAX_CONCURRENCY = 5;
 
     constructor(
         private configService: ConfigService,
         private accountRep: AccountRepository,
+        private accountDiscountRepo: AccountDiscountRepository,
         private proxyService: ProxyService,
         private readonly tlsForwarder: TlsProxyService,
         private httpService: HttpService,
         private courseService: CourseService,
         private deviceInfoService: DeviceInfoService,
         private sportmasterHeaders: SportmasterHeadersService,
+        private calculateService: CalculateService,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) {}
 
@@ -570,6 +583,7 @@ export class AccountService {
 
         if (account.cityId !== city.cityId) {
             await this.setCityToAccount(accountId, city.cityId);
+            await this.cacheManager.del(accountId);
         }
 
         return city;
@@ -577,6 +591,271 @@ export class AccountService {
 
     async setCityToAccount(accountId: string, cityId: string) {
         await this.accountRep.setCityToAccount(accountId, cityId);
+    }
+
+    async setAccountsForPersonalDiscount(data: SetPersonalDiscountAccountRequestDto): Promise<{
+        ok: boolean;
+        results: Array<{ accountId: string; saved: number }>;
+        errors: Array<{ accountId: string; message: string }>;
+    }> {
+        const { telegramId, personalDiscounts } = data;
+
+        const keyNodes = keyDiscountNodes(telegramId);
+        const keyAccounts = keyDiscountAccount(telegramId);
+
+        await Promise.allSettled([this.cacheManager.del(keyNodes), this.cacheManager.del(keyAccounts)]);
+
+        const results: Array<{ accountId: string; saved: number }> = [];
+        const errors: Array<{ accountId: string; message: string }> = [];
+
+        // воркер для одного accountId
+        const worker = async (accountId: string) => {
+            const pd = await this.personalDiscount(accountId);
+
+            const items =
+                pd?.list?.map(l => {
+                    const raw = l?.dateEnd ?? '';
+                    const parsed = parseDateFlexible(raw);
+
+                    return {
+                        nodeId: l?.base?.nodeId ?? '',
+                        nodeName: l?.nodeName ?? '',
+                        dateEnd: parsed,
+                    };
+                }) ?? [];
+
+            const valid = items.filter(x => x.nodeId && x.nodeName && !isNaN(x.dateEnd.getTime()));
+
+            if (valid.length) {
+                await this.accountDiscountRepo.upsertMany(accountId, telegramId, valid);
+            }
+
+            return { accountId, saved: valid.length };
+        };
+
+        for (let i = 0; i < personalDiscounts.length; i += this.MAX_CONCURRENCY) {
+            const slice = personalDiscounts.slice(i, i + this.MAX_CONCURRENCY);
+            const settled = await Promise.allSettled(slice.map(a => worker(a)));
+
+            settled.forEach((r, idx) => {
+                const accountId = slice[idx];
+                if (r.status === 'fulfilled') {
+                    results.push({ accountId, saved: r.value.saved });
+                } else {
+                    errors.push({
+                        accountId,
+                        message: r.reason?.message ?? 'Unknown error',
+                    });
+                }
+            });
+        }
+
+        return { ok: errors.length === 0, results, errors };
+    }
+
+    private computeCalculateProductFromProduct(
+        p: ProductApiResponse['product'],
+        isInventory: boolean,
+    ): { price: number; bonus: number } | null {
+        const catalog = Number(p?.price?.catalog?.value);
+        const retail = Number(p?.price?.retail?.value);
+        if (!isFinite(catalog) || !isFinite(retail) || catalog <= 0 || retail <= 0) {
+            return null;
+        }
+
+        const basePrice = catalog / 100;
+        const myDiscount = 0.85;
+        const retailPrice = retail / 100;
+        const potentialPrice = retailPrice * myDiscount;
+
+        let discountShop = Math.round((1 - retailPrice / basePrice) * 100);
+        if (!isFinite(discountShop) || discountShop < 0) discountShop = 0;
+        if (discountShop > 100) discountShop = 100;
+
+        const bonus = this.calculateService.computeBonus(basePrice, potentialPrice, discountShop, isInventory);
+
+        const priceOnKassa = potentialPrice - bonus;
+
+        return { price: Math.floor(priceOnKassa), bonus: Math.floor(bonus) };
+    }
+
+    async getDistinctNodePairsByTelegram(telegramId: string): Promise<{ nodes: NodePair[] }> {
+        const key = keyDiscountNodes(telegramId);
+
+        const nodesCache = await this.cacheManager.get<NodePair[]>(key);
+
+        if (nodesCache) return { nodes: nodesCache };
+
+        const nodes = await this.accountDiscountRepo.findDistinctNodePairsByTelegram(telegramId);
+
+        await this.cacheManager.set(key, nodes, this.TTL_CASH_DISCOUNT);
+
+        return { nodes };
+    }
+
+    async removeDiscountsByAccountId({ telegramId, accountId }: AccountTelegramParamsDto): Promise<{ deleted: number }> {
+        const keyNodes = keyDiscountNodes(telegramId);
+        const keyAccounts = keyDiscountAccount(telegramId);
+
+        const [, , dbDelete] = await Promise.allSettled([
+            this.cacheManager.del(keyNodes),
+            this.cacheManager.del(keyAccounts),
+            this.accountDiscountRepo.deleteByAccountId(accountId),
+        ]);
+
+        if (dbDelete.status === 'rejected') {
+            throw dbDelete.reason ?? new Error('Failed to delete discounts');
+        }
+
+        return { deleted: dbDelete.value ?? 0 };
+    }
+
+    async getUserAccountIds(telegramId: string): Promise<{ accountIds: string[] }> {
+        const key = keyDiscountAccount(telegramId);
+        const accountsCache = await this.cacheManager.get<string[]>(key);
+
+        if (accountsCache) return { accountIds: accountsCache };
+
+        const accountIds = await this.accountDiscountRepo.findDistinctAccountIdsByTelegram(telegramId);
+        await this.cacheManager.set(key, accountIds, this.TTL_CASH_DISCOUNT);
+
+        return { accountIds };
+    }
+
+    private hasMyDiscountInDiscountList(p: ProductApiResponse['product']): boolean {
+        const list = p?.personalPrice?.discountList ?? [];
+        return list.some(x => x?.actionName?.toLowerCase() === 'моя скидка');
+    }
+
+    private mapBonuses(p: ProductApiResponse['product']): number {
+        const list = p?.personalPrice?.discountList ?? [];
+        const item = list.find(x => x?.actionName?.toLowerCase() === 'оплата бонусами');
+        const raw = item?.summa?.value ?? 0;
+        return Number(raw) / 100;
+    }
+
+    private mapPrice(p: ProductApiResponse['product']): number {
+        const raw = p?.personalPrice?.price?.value ?? 0;
+        return Number(raw) / 100;
+    }
+
+    private buildResult(
+        product: ProductApiResponse['product'],
+        accountId: string,
+        bonusCount?: number,
+        calculateProduct?: { price: number; bonus: number },
+    ): CheckProductResultItem | null {
+        if (!this.hasMyDiscountInDiscountList(product)) return null;
+        return {
+            accountId,
+            discountRate: product?.price?.discountRate ?? null,
+            price: this.mapPrice(product),
+            bonuses: this.mapBonuses(product),
+            bonusCount,
+            calculateProduct,
+        };
+    }
+
+    private isProductNotFoundError(e: any): boolean {
+        const status = e?.status ?? e?.response?.status;
+        if (status === 404 || status === 400) return true;
+        const msg = e?.response?.data?.message ?? e?.response?.data?.error ?? e?.message ?? '';
+        return /PRODUCT_NOT_FOUND|not\s*found|invalid\s*product/i.test(String(msg));
+    }
+
+    async prepareAccountsForProductCheck({ telegramId, nodeId }: PrepareProductCheckRequestDto): Promise<{ accountIds: string[] }> {
+        const accountIds = await this.accountDiscountRepo.findAccountIdsByTelegramAndNodes(telegramId, nodeId);
+        return { accountIds };
+    }
+
+    async checkProductBatchForPersonalDiscount({ telegramId, isInventory, productId, accountIds }: CheckProductBatchRequestDto): Promise<{
+        ok: boolean;
+        productId: string;
+        processed: number;
+        results: CheckProductResultItem[];
+        errors: CheckProductResultItem[];
+    }> {
+        if (!accountIds?.length) {
+            return { ok: true, productId, processed: 0, results: [], errors: [] };
+        }
+
+        const results: CheckProductResultItem[] = [];
+        const errors: CheckProductResultItem[] = [];
+
+        const [probeId, ...restIds] = accountIds;
+
+        try {
+            const probeRes = await this.getProductById(probeId, productId);
+            const product = probeRes?.product;
+            if (!product?.id) throw new NotFoundException('PRODUCT_NOT_FOUND');
+
+            let bonusCount: number | undefined;
+            if (this.hasMyDiscountInDiscountList(product)) {
+                try {
+                    const short = await this.shortInfo(probeId);
+                    bonusCount = short?.bonusCount;
+                } catch {
+                    // ignore
+                }
+            }
+
+            const calc = this.computeCalculateProductFromProduct(product, isInventory);
+
+            const mapped = this.buildResult(product, probeId, bonusCount, calc || undefined);
+            if (mapped) results.push(mapped);
+        } catch (e: any) {
+            if (this.isProductNotFoundError(e)) {
+                throw new NotFoundException('PRODUCT_NOT_FOUND');
+            }
+            errors.push({
+                accountId: probeId,
+                error: e?.response?.data?.message ?? e?.message ?? 'UNKNOWN_ERROR',
+            });
+        }
+
+        const worker = async (accountId: string): Promise<void> => {
+            try {
+                const res = await this.getProductById(accountId, productId);
+                const product = res?.product;
+                if (!product?.id) {
+                    errors.push({ accountId, error: 'NO_PRODUCT' });
+                    return;
+                }
+
+                let bonusCount: number | undefined;
+                if (this.hasMyDiscountInDiscountList(product)) {
+                    try {
+                        const short = await this.shortInfo(accountId);
+                        bonusCount = short?.bonusCount;
+                    } catch {
+                        // ignore
+                    }
+                }
+
+                const calc = this.computeCalculateProductFromProduct(product, isInventory);
+
+                const mapped = this.buildResult(product, accountId, bonusCount, calc || undefined);
+                if (mapped) results.push(mapped);
+            } catch (err: any) {
+                const errorText = this.isProductNotFoundError(err)
+                    ? 'NO_PRODUCT'
+                    : err?.response?.data?.message ?? err?.message ?? 'UNKNOWN_ERROR';
+                errors.push({ accountId, error: errorText });
+            }
+        };
+
+        for (let i = 0; i < restIds.length; i += this.MAX_CONCURRENCY) {
+            const slice = restIds.slice(i, i + this.MAX_CONCURRENCY);
+            await Promise.all(slice.map(id => worker(id)));
+        }
+
+        return {
+            ok: true,
+            productId,
+            processed: accountIds.length,
+            results,
+            errors,
+        };
     }
 
     @RetryOn401()
@@ -870,6 +1149,19 @@ export class AccountService {
         const response = await this.httpService.post(url, payload, httpOptions);
 
         return response.data;
+    }
+
+    @RetryOn401()
+    async getProductById(accountId: string, productId: string): Promise<ProductApiResponse> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const url = this.url + `v2/products/${productId}`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+
+        const payload = {};
+
+        const response = await this.httpService.post(url, payload, httpOptions);
+
+        return response.data.data;
     }
 
     @RetryOn401()

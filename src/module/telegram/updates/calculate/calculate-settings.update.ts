@@ -2,7 +2,6 @@ import { Action, Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nest
 import { ALL_KEYS_MENU_BUTTON_NAME, CALCULATE_BONUS } from '../base-command/base-command.constants';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { TelegramService } from '../../telegram.service';
-import { CalculateService } from './calculate.service';
 import { Markup } from 'telegraf';
 import { calculateTemplatesKeyboard } from '../../keyboards/calculate.keyboard';
 import {
@@ -19,12 +18,13 @@ import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { NotFoundException } from '@nestjs/common';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { UserService } from '../../../user/user.service';
+import { CalculateServiceTelegram } from './calculate.service';
 
 @Scene(CALCULATE_SETTINGS_SCENE)
 export class CalculateSettingsScene {
     constructor(
         private telegramService: TelegramService,
-        private calculateService: CalculateService,
+        private calculateService: CalculateServiceTelegram,
     ) {}
 
     @SceneEnter()
@@ -277,7 +277,7 @@ export class CommissionRateScene {
 export class RoundToScene {
     constructor(
         private telegramService: TelegramService,
-        private calculateService: CalculateService,
+        private calculateService: CalculateServiceTelegram,
         private userService: UserService,
     ) {}
 
@@ -361,7 +361,7 @@ export class RoundToScene {
 export class CustomRoundScene {
     constructor(
         private telegramService: TelegramService,
-        private calculateService: CalculateService,
+        private calculateService: CalculateServiceTelegram,
         private userService: UserService,
     ) {}
 

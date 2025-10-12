@@ -4,7 +4,7 @@ import { UserTemplate } from '@prisma/client';
 import { CommissionType } from '../../scenes/calculate.scene-constant';
 
 @Injectable()
-export class CalculateService {
+export class CalculateServiceTelegram {
     constructor(private readonly calculateRepository: CalculateRepository) {}
 
     async getUserTemplates(userTelegramId: string): Promise<UserTemplate[]> {
@@ -53,10 +53,8 @@ export class CalculateService {
                 break;
         }
 
-        // Рассчитываем комиссию
         let commission = baseAmount * (commissionRate / 100);
 
-        // Округляем до указанного порога (roundTo)
         if (commission % roundTo !== 0) {
             commission = Math.ceil(commission / roundTo) * roundTo;
         }

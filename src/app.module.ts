@@ -21,6 +21,7 @@ import { WebappModule } from './module/webapp/webapp.module';
 import { CouponModule } from './module/coupon/coupon.module';
 import { BrokerModule } from '@common/broker/broker.module';
 import { NotificationModule } from './module/notification/notification.module';
+import { CalculateModule } from './module/calculate/calculate.module';
 
 @Module({
     imports: [
@@ -51,6 +52,7 @@ import { NotificationModule } from './module/notification/notification.module';
         WebappModule,
         CouponModule,
         NotificationModule,
+        CalculateModule,
     ],
 })
 export class AppModule {}

@@ -3,15 +3,17 @@ import { ALL_KEYS_MENU_BUTTON_NAME, CALCULATE_BONUS } from '../base-command/base
 import { WizardContext } from 'telegraf/typings/scenes';
 import { TelegramService } from '../../telegram.service';
 import { calculateInfoKeyboard } from '../../keyboards/calculate.keyboard';
-import { CalculateService } from './calculate.service';
+import { CalculateServiceTelegram } from './calculate.service';
 import { Markup } from 'telegraf';
 import { CALCULATE_SETTINGS_SCENE } from '../../scenes/calculate.scene-constant';
 import { ICalculateCash } from '../../interfaces/calculate.interface';
+import { CalculateService } from '../../../calculate/calculate.service';
 
 @Scene(CALCULATE_BONUS.scene)
 export class CalculateUpdate {
     constructor(
         private telegramService: TelegramService,
+        private calculateServiceTelegram: CalculateServiceTelegram,
         private calculateService: CalculateService,
     ) {}
 
@@ -28,7 +30,18 @@ export class CalculateUpdate {
     @Action('go_to_calculate_info')
     async goToCalculateInfo(@Ctx() ctx: WizardContext) {
         await ctx.reply(
-            `Цены на вещи вводим каждую с новой строки.\nВводим изначальную цену, БЕЗ УЧЕТА СКИДКИ.\nЕсли товар - инвентарь, велосипед, палатка, то к цене без пробела делаем приписку буквы - и.\nЕсли на товар установлена скидка от магазина, то через пробел указываем какая.\nЕсли товар по лучшей/финальной/желтой цене, то через пробел пишем букву л (или любую другую)\nНапример:\n7299 35\n8999\n6499 70\n7499 л\n2400и 20\n10000и`,
+            `Цены на вещи вводим каждую с новой строки.
+    Вводим изначальную цену, БЕЗ УЧЕТА СКИДКИ.
+    Если товар - инвентарь, велосипед, палатка, то к цене без пробела делаем приписку буквы - и.
+    Если на товар установлена скидка от магазина, то через пробел указываем какая.
+    Если товар по лучшей/финальной/желтой цене, то через пробел пишем букву л (или любую другую)
+    Например:
+    7299 35
+    8999
+    6499 70
+    7499 л
+    2400и 20
+    10000и`,
         );
     }
 
@@ -42,6 +55,9 @@ export class CalculateUpdate {
         try {
             const prices: string[] = inputPrices.split(/\r?\n/);
 
+            // Процент промо вводим как аргумент (здесь 10%, потом можно менять на 15 или брать из внешнего сервиса)
+            const promoPercent = 10;
+
             let totalDiscountPromo = 0;
             let totalPricePromo = 0;
 
@@ -50,14 +66,21 @@ export class CalculateUpdate {
 
             let priceWithoutDiscount = 0;
 
-            const outputPrices = [];
+            const outputPrices: Array<{
+                price: string;
+                priceDiscount: number;
+                currentBonus: number;
+                currentBonusPromo: number;
+                priceDiscountPromo: number;
+            }> = [];
 
-            for (let value of prices) {
+            for (const raw of prices) {
                 let isInventory = false;
 
                 let discountShop = 0;
-                value = value.trim();
+                const value = raw.trim();
                 const parts = value.split(' ');
+
                 if (parts.length > 1) {
                     discountShop = /^\d+$/.test(parts[1]) ? parseInt(parts[1]) : 228;
                 }
@@ -67,22 +90,26 @@ export class CalculateUpdate {
                     parts[0] = parts[0].split('и')[0];
                 }
 
-                const priceItem = parseInt(parts[0]);
+                const priceItem = parseInt(parts[0], 10);
 
-                const currentPriceItem = this.calculateCurrentPrice(priceItem, discountShop);
-                const currentBonus = this.calculateBonus(priceItem, currentPriceItem, discountShop, isInventory);
+                const currentPriceItem = this.calculateService.computeCurrentPrice(priceItem, discountShop);
+
+                // Бонусы без промокода
+                const currentBonus = this.calculateService.computeBonus(priceItem, currentPriceItem, discountShop, isInventory);
+
                 const priceDiscount = currentPriceItem - currentBonus;
-
                 priceWithoutDiscount += currentPriceItem;
 
-                const currentPriceItemPromo = this.calculatePriceWithPromoWithoutBonus(
+                const currentPriceItemPromo = this.calculateService.computePriceWithPromoWithoutBonus(
                     priceItem,
                     currentPriceItem,
                     discountShop,
                     isInventory,
+                    promoPercent,
                 );
 
-                const currentBonusPromo = this.calculateBonus(priceItem, currentPriceItemPromo, discountShop, isInventory);
+                const currentBonusPromo = this.calculateService.computeBonus(priceItem, currentPriceItemPromo, discountShop, isInventory);
+
                 const priceDiscountPromo = currentPriceItemPromo - currentBonusPromo;
 
                 totalPrice += priceDiscount;
@@ -104,7 +131,6 @@ export class CalculateUpdate {
 
             const totalFullDiscountTmp = priceWithoutDiscount - totalPricePromo;
 
-            // Сохраняем результаты расчетов в кеш
             const calculationResult: ICalculateCash = {
                 outputPrices,
                 totalPrice,
@@ -117,12 +143,10 @@ export class CalculateUpdate {
 
             await this.telegramService.setDataCache<ICalculateCash>(String(telegramId), calculationResult);
 
-            // Получаем шаблоны пользователя для отображения в клавиатуре
-            const templates = await this.calculateService.getUserTemplates(String(telegramId));
+            const templates = await this.calculateServiceTelegram.getUserTemplates(String(telegramId));
 
             const keyboardButtons = [[Markup.button.callback(`Показать расчет индивидуально`, `go_to_calculate_show`)]];
 
-            // Если есть шаблоны, добавляем их в клавиатуру
             if (templates.length > 0) {
                 const templateButtons = templates.map((template: { name: any; id: any }) =>
                     Markup.button.callback(`Шаблон: ${template.name}`, `use_template_${template.id}`),
@@ -135,7 +159,7 @@ export class CalculateUpdate {
 Цена на кассу: ${totalPrice}
 Количество возможно примененных бонусов: ${totalDiscount}
                         
-Расчет с промо:
+Расчет с промо (${promoPercent}%):
 Цена на кассу: ${totalPricePromo}
 Количество возможно примененных бонусов: ${totalDiscountPromo}
 Общая скидка (бонусы + промо): ${priceWithoutDiscount - totalPricePromo}`,
@@ -157,7 +181,11 @@ export class CalculateUpdate {
 
         let message = '';
         calculationResult.outputPrices.forEach((value: { [x: string]: any }) => {
-            message += `Изначальная цена: ${value['price']}\nТекущая цена со скидкой: ${value['priceDiscount']}\nКоличество возможно примененных бонусов: ${value['currentBonus']}\n\n`;
+            message += `Изначальная цена: ${value['price']}
+Текущая цена со скидкой: ${value['priceDiscount']}
+Количество возможно примененных бонусов: ${value['currentBonus']}
+
+`;
         });
         await ctx.reply(message);
     }
@@ -165,9 +193,9 @@ export class CalculateUpdate {
     @Action(/^use_template_(.+)$/)
     async useTemplate(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        //@ts-ignore
+        // @ts-expect-error
         const templateId = ctx.match[1];
-        const template = await this.calculateService.getTemplateById(templateId);
+        const template = await this.calculateServiceTelegram.getTemplateById(templateId);
 
         if (!template) {
             await ctx.reply('Шаблон не найден.');
@@ -181,8 +209,7 @@ export class CalculateUpdate {
             return;
         }
 
-        // Рассчитываем комиссию в зависимости от настроек шаблона
-        const commission = this.calculateService.calculateCommission(
+        const commission = this.calculateServiceTelegram.calculateCommission(
             template.commissionType,
             template.commissionRate,
             template.roundTo,
@@ -191,69 +218,10 @@ export class CalculateUpdate {
             calculationResult.totalFullDiscount,
         );
 
-        // Применяем шаблон
-        const message = this.calculateService.applyTemplate(template.template, calculationResult.totalSumOnKassa, commission);
+        const message = this.calculateServiceTelegram.applyTemplate(template.template, calculationResult.totalSumOnKassa, commission);
 
         await ctx.reply(`<code>${message}</code>`, {
             parse_mode: 'HTML',
         });
-    }
-
-    private calculateCurrentPrice(price: number, discountShop: number) {
-        if (discountShop === 228) {
-            return price;
-        }
-
-        let currentPriceItem = (1 - discountShop / 100) * price;
-        if (discountShop % 5 !== 0) {
-            const lastNumberPrice = currentPriceItem % 100;
-            const roundPrice = Math.floor(currentPriceItem / 100) * 100;
-            currentPriceItem = lastNumberPrice < 50 ? roundPrice - 1 : roundPrice + 99;
-        }
-
-        return Math.floor(currentPriceItem);
-    }
-
-    private calculateBonus(price: number, currentPriceItem: number, discountShop: number, isInventory: boolean = false) {
-        let currentBonus = 0;
-
-        if (0 <= discountShop && discountShop < 50) {
-            // Используем 20% вместо 30% для инвентаря
-            const bonusPercentage = isInventory ? 0.2 : 0.3;
-            currentBonus = currentPriceItem * bonusPercentage;
-
-            // Максимальная скидка 30% для инвентаря, 50% для обычных товаров
-            const maxDiscountFactor = isInventory ? 0.3 : 0.5;
-            const maxDiscountItem = price * maxDiscountFactor;
-
-            if (currentPriceItem - currentBonus < price - maxDiscountItem) {
-                currentBonus = currentPriceItem - (price - maxDiscountItem);
-            }
-        }
-        return Math.floor(currentBonus);
-    }
-
-    private calculatePriceWithPromoWithoutBonus(
-        price: number,
-        currentPriceItem: number,
-        discountShop: number,
-        isInventory: boolean = false,
-    ) {
-        let calcPrice = currentPriceItem;
-
-        if (0 <= discountShop && discountShop < 50) {
-            const priceWithPromo = currentPriceItem * 0.9;
-
-            // Максимальная скидка 30% для инвентаря, 50% для обычных товаров
-            const maxDiscountFactor = isInventory ? 0.3 : 0.5;
-            const maxDiscountItem = price * maxDiscountFactor;
-
-            if (price - priceWithPromo > maxDiscountItem) {
-                calcPrice = price - maxDiscountItem;
-            } else {
-                calcPrice = priceWithPromo;
-            }
-        }
-        return Math.floor(calcPrice);
     }
 }
