@@ -30,7 +30,6 @@ import { StatusCourseParamsDto } from './dto/status-course-param.dto';
 import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discount.dto';
 import { TelegramIdParamsDto } from './dto/telegramId.dto';
 import { AccountTelegramParamsDto } from './dto/account-telegram-ids.dto';
-import { CheckProductRequestDto } from './dto/check-product.dto';
 import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
 import { CheckProductResultItem } from './interfaces/product.interface';
 
@@ -255,13 +254,13 @@ export class AccountController {
 
     @Get('personal-discount/accounts/:telegramId')
     @HttpCode(200)
-    async getDistinctAccountsByTelegram(@Param() params: TelegramIdParamsDto): Promise<any> {
+    async getUserAccountIds(@Param() params: TelegramIdParamsDto): Promise<any> {
         return this.accountService.getUserAccountIds(params.telegramId);
     }
 
     @Delete('personal-discount/telegramId/:telegramId/accountId/:accountId')
     @HttpCode(200)
-    async delDistinctNodePairsByAccountId(@Param() params: AccountTelegramParamsDto): Promise<any> {
+    async delDiscountsByAccountId(@Param() params: AccountTelegramParamsDto): Promise<any> {
         return this.accountService.removeDiscountsByAccountId(params);
     }
 

@@ -664,19 +664,26 @@ export class AccountService {
         }
 
         const basePrice = catalog / 100;
-        const myDiscount = 0.85;
         const retailPrice = retail / 100;
-        const potentialPrice = retailPrice * myDiscount;
 
-        let discountShop = Math.round((1 - retailPrice / basePrice) * 100);
+        let discountShop = Math.floor((1 - retailPrice / basePrice) * 100);
         if (!isFinite(discountShop) || discountShop < 0) discountShop = 0;
         if (discountShop > 100) discountShop = 100;
 
-        const bonus = this.calculateService.computeBonus(basePrice, potentialPrice, discountShop, isInventory);
+        const promoPercent = 15;
+        const priceAfterPromo =
+            discountShop < 50
+                ? this.calculateService.computePriceWithPromoWithoutBonus(basePrice, retailPrice, discountShop, isInventory, promoPercent)
+                : retailPrice;
 
-        const priceOnKassa = potentialPrice - bonus;
+        const bonus = this.calculateService.computeBonus(basePrice, priceAfterPromo, discountShop, isInventory);
 
-        return { price: Math.floor(priceOnKassa), bonus: Math.floor(bonus) };
+        const priceOnKassa = priceAfterPromo - bonus;
+
+        return {
+            price: Math.floor(priceOnKassa),
+            bonus: Math.floor(bonus),
+        };
     }
 
     async getDistinctNodePairsByTelegram(telegramId: string): Promise<{ nodes: NodePair[] }> {
