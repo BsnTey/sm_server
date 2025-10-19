@@ -13,6 +13,7 @@ export class BotTHeadersService implements OnModuleInit {
     private urlBotT: string = this.configService.getOrThrow('HOST_BOTT_W_PROTOCOL');
     private sellerTradeBotId: string = this.configService.getOrThrow('SELLER_TRADE_BOT_ID');
     private hostBot: string = this.configService.getOrThrow('HOST_BOTT');
+    private nodeEnv: string = this.configService.getOrThrow('NODE_ENV');
 
     private userAgentWeb: string =
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
@@ -34,6 +35,7 @@ export class BotTHeadersService implements OnModuleInit {
     constructor(private configService: ConfigService) {}
 
     async onModuleInit() {
+        if (this.nodeEnv == 'developer') return;
         await this.updateTokenClaudeFlare();
     }
 

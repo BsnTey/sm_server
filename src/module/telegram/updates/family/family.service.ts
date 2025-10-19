@@ -30,9 +30,17 @@ export class FamilyService {
         switch (userRole) {
             case UserRole.Admin:
                 return this.getViewForAdmin(accountId, familyResponse, status);
+            case UserRole.Seller:
+                return this.getViewForSeller(familyResponse, status);
             default:
-                return this.getViewDefault(accountId, familyResponse, status);
+                throw new BadRequestException('Недостаточно прав для просмотра информации о семье');
         }
+    }
+
+    async getFamilyViewUser(accountId: string) {
+        const familyResponse = await this.accountService.getProfileFamily(accountId);
+        const status = familyResponse.family?.currentMember?.status;
+        return this.getViewDefault(accountId, familyResponse, status);
     }
 
     private async getViewDefault(accountId: string, familyResponse: ProfileFamilyResponse, status?: StatusFamilyMember) {
@@ -58,6 +66,36 @@ export class FamilyService {
                 return { text, keyboard: leaveFamilyKeyboard };
             }
         }
+    }
+
+    private async getViewForSeller(familyResponse: ProfileFamilyResponse, status?: StatusFamilyMember) {
+        let text;
+        let keyboard;
+        switch (status) {
+            case StatusFamilyMember.OWNER: {
+                text = `📱 Аккаунт найден и является владельцем семьи.\nПерсональный баланс: ${familyResponse.bonusInfo.personalAmount}.\nСемейный баланс: ${familyResponse.bonusInfo.totalAmount}.\nПригласить можно аккаунт, если после покупки прошло не более 24ч, либо стоимость составит 50р.`;
+                keyboard = ownerFamilyStatusKeyboard(familyResponse.family!);
+                break;
+            }
+            case StatusFamilyMember.MEMBER: {
+                text = `📱 Аккаунт найден и является участником семьи.\nПерсональный баланс: ${familyResponse.bonusInfo.personalAmount}.\nСемейный баланс: ${familyResponse.bonusInfo.totalAmount}.\n`;
+                keyboard = deleteYourselfFamilyStatusKeyboard(familyResponse.family!.id, familyResponse.family!.currentMember.id);
+                break;
+            }
+            case StatusFamilyMember.INVITED: {
+                text = `📱 Аккаунт найден и приглашен в семью.\nПерсональный баланс: ${familyResponse.bonusInfo.personalAmount}.\nСемейный баланс: ${familyResponse.bonusInfo.totalAmount}.\n`;
+                keyboard = invitedFamilyStatusKeyboard;
+                break;
+            }
+            default: {
+                text = `📱 Аккаунт найден. Баланс: ${familyResponse.bonusInfo.personalAmount} баллов. Не состоит в семье\nПригласить можно аккаунт, если после покупки прошло не более 24ч, либо стоимость составит 50р.`;
+                keyboard = defaultFamilyStatusKeyboard;
+            }
+        }
+        return {
+            text,
+            keyboard,
+        };
     }
 
     private async getViewForAdmin(accountId: string, familyResponse: ProfileFamilyResponse, status?: StatusFamilyMember) {
