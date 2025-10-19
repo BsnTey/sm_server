@@ -378,3 +378,22 @@ body {
 .current-link {
     filter: invert(24%) sepia(95%) saturate(4207%) hue-rotate(224deg) brightness(88%) contrast(86%);
 }
+
+.auth-code { margin-top: 14px; }
+
+.pickup-code {
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: #f5f5f5;
+}
+
+.pickup-code-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0 4px;
+}
+
+.pickup-code-value {
+    letter-spacing: 2px;
+}

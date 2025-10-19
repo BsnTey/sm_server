@@ -28,6 +28,20 @@
         </a>
     </div>
 
+    <div class="auth-code">
+        {{#if order.authCode}}
+            <div class="pickup-code">
+                <p class="text16-black">Код выдачи</p>
+
+                <div class="pickup-code-row">
+                    <span class="pickup-code-value text17-black">{{order.authCode}}</span>
+                </div>
+
+                <p class="text12-grey">Покажите код сотруднику для получения заказа</p>
+            </div>
+        {{/if}}
+    </div>
+
     <div class="about-address">
         <div class="about-address-info" id="about-address-info-id">
             <p class="type-order text16-black">
