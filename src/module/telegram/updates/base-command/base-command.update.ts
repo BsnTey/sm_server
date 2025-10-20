@@ -23,6 +23,7 @@ import { AdminGuard } from '../admin/admin.guard';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { TelegramService } from '../../telegram.service';
 import { ConfigService } from '@nestjs/config';
+import { FAMILY_PRIVELEGIE, FAMILY_USER } from '../../scenes/family.scene';
 
 @Update()
 @UseFilters(TelegrafExceptionFilter)
@@ -90,12 +91,12 @@ export class BaseUpdate {
 
     @Hears([FAMILY.name])
     async onFamily(@Ctx() ctx: WizardContext) {
-        await ctx.scene.enter(FAMILY.scene);
+        await ctx.scene.enter(FAMILY_USER);
     }
 
     @Hears([FAMILY_ALIAS.name])
     async onFamilyAlias(@Ctx() ctx: WizardContext) {
-        await ctx.scene.enter(FAMILY.scene);
+        await ctx.scene.enter(FAMILY_PRIVELEGIE);
     }
 
     @On('text')

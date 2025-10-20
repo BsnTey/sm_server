@@ -12,6 +12,7 @@ import { Telegraf } from 'telegraf';
 export class TelegramService {
     private readonly logger = new Logger(TelegramService.name);
     private TTL_CASH = this.configService.getOrThrow('TTL_CASH', 86000000);
+    private adminsId: string[] = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
 
     constructor(
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -59,6 +60,16 @@ export class TelegramService {
     async sendMessage(chatId: number, text: string) {
         try {
             await this.bot.telegram.sendMessage(chatId, text);
+        } catch (error) {
+            this.logger.error('Ошибка при отправке сообщения:', error);
+        }
+    }
+
+    async sendAdminMessage(text: string) {
+        const adminId = this.adminsId[0];
+
+        try {
+            await this.bot.telegram.sendMessage(adminId, text);
         } catch (error) {
             this.logger.error('Ошибка при отправке сообщения:', error);
         }

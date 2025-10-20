@@ -24,6 +24,17 @@ export const extractUserBotId = (html: string) => {
     return match[1];
 };
 
+export const extractBalance = (html: string) => {
+    const match = html.match(/data-bs-original-title="Изменить баланс">(\d+)₽/);
+    const balance = match ? match[1] : null;
+
+    if (!balance) {
+        throw new Error('Баланс не найден');
+    }
+
+    return +balance;
+};
+
 export const extractAmountFTransferedPay = (payments: PaymentOrderEntity[]) => {
     if (payments.length == 0) return '';
     let text = 'Суммы не подтверждены админом:\n';

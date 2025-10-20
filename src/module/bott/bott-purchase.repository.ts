@@ -1,21 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@common/database/prisma.service';
-import { Prisma } from '@prisma/client';
+import { CreatePurchaseAccount, PurchaseByAccountIdResult } from './interfaces/purchase-repository';
 
 @Injectable()
 export class BottPurchaseRepository {
     constructor(private prisma: PrismaService) {}
 
-    async create(data: {
-        id: string;
-        orderNumber: string;
-        lineIndex: number;
-        accountId: string;
-        buyerTelegramId: string;
-        amount: number;
-        purchasedAt?: Date;
-        rawPayload: Prisma.InputJsonValue;
-    }): Promise<void> {
+    async create(data: CreatePurchaseAccount): Promise<void> {
         await this.prisma.accountPurchase.create({ data });
+    }
+
+    async getByAccountId(accountId: string): Promise<PurchaseByAccountIdResult[]> {
+        return this.prisma.accountPurchase.findMany({
+            where: { accountId },
+            select: {
+                buyerTelegramId: true,
+                purchasedAt: true,
+            },
+        });
     }
 }

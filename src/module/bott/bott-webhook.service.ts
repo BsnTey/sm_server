@@ -1,17 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { OrderApiWebhook } from './interfaces/order-webhook.interface';
 import { AccountService } from '../account/account.service';
-import { BottPurchaseRepository } from './bott-purchase.repository';
-import { Prisma } from '@prisma/client';
+import { BottPurchaseService } from './bott-purchase.service';
 
 @Injectable()
 export class BottWebhookService {
-    private readonly logger = new Logger(BottWebhookService.name);
-    private readonly WEBHOOK_TIME_OFFSET_HOURS = 3;
-
     constructor(
         private readonly accountService: AccountService,
-        private readonly purchaseRepo: BottPurchaseRepository,
+        private readonly bottPurchaseService: BottPurchaseService,
     ) {}
 
     async create(dto: OrderApiWebhook): Promise<string> {
@@ -39,7 +35,7 @@ export class BottWebhookService {
             const rawPayload = JSON.parse(JSON.stringify({ ...dto, _lineIndex: lineIndex }));
 
             try {
-                await this.purchaseRepo.create({
+                await this.bottPurchaseService.createPurchase({
                     id,
                     orderNumber,
                     lineIndex,

@@ -195,10 +195,6 @@ export class FamilyService {
         return { accepted: accept };
     }
 
-    async getUserByTelegramId(telegramId: string) {
-        return this.userService.getUserByTelegramId(telegramId);
-    }
-
     async getAccountIdByTelegram(telegramId: string) {
         const account = await this.telegramService.getFromCache(telegramId);
         if (!account?.accountId) throw new NotFoundException('Информация устарела. Попробуйте заново');

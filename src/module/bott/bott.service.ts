@@ -1,4 +1,4 @@
-import { BadRequestException, Body, HttpCode, Inject, Injectable, Logger, Post, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, UseInterceptors } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '../http/http.service';
 import { BotTHeadersService } from './headers.service';
@@ -95,13 +95,13 @@ export class BottService {
 
     @WrapWithLoading()
     @CacheKey('bott:getUserBotId')
-    @CacheTTL(86_400_1000)
-    async getUserBotId(searchId: string): Promise<string> {
+    @CacheTTL(10_1000)
+    async pageSearchUserByTelegramId(telegramId: string): Promise<string> {
         const headers = this.botTHeaders.getHeaders();
 
         const params = {
             bot_id: this.sellerTradeBotId,
-            'BotUserSearch[user_id]': searchId,
+            'BotUserSearch[id]': telegramId,
         };
         const url = this.urlBotT + `lk/common/users/users/index`;
         const response = await this.httpService.get(url, { headers, params });
@@ -109,7 +109,7 @@ export class BottService {
     }
 
     @WrapWithLoading()
-    async userBalanceEdit(userBotId: string, csrfToken: string, amount: string, isPositive: boolean): Promise<string> {
+    async userBalanceEdit(userBotId: string, amount: string, isPositive: boolean): Promise<string> {
         const headers = this.botTHeaders.getHeaders();
 
         const params = {

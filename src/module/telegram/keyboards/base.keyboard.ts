@@ -19,8 +19,8 @@ export function getMainMenuKeyboard(role?: UserRole) {
     const secondRow = [CALCULATE_BONUS.name, CHECK.name];
     const thirdRow = [COOKIE.name, QR_CODE.name, CASH_RECEIPT.name];
     const fourthRow = [PROFILE.name, HELP.name];
-    if (role == 'Admin') firstRow.unshift(AUTH_MIRROR.name);
-    if (role == 'Admin') fourthRow.unshift(FAMILY_ALIAS.name);
+    if (role == UserRole.Admin) firstRow.unshift(AUTH_MIRROR.name);
+    if (role == UserRole.Admin || role == UserRole.Seller) fourthRow.unshift(FAMILY_ALIAS.name);
     const keyboard = [firstRow, secondRow, thirdRow, fourthRow];
 
     return Markup.keyboard(keyboard).resize();
