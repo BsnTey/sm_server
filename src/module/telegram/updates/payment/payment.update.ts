@@ -144,28 +144,34 @@ export class PaymentUpdate {
 
     @On('document')
     async inputReceiptDoc(@Sender() { id: telegramId }: any, @Ctx() ctx: WizardContext) {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        //@ts-ignore
+        const document = ctx.message!.document!;
+        let fileName;
         try {
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            //@ts-ignore
-            const document = ctx.message!.document!;
-
             if (document?.mime_type === 'application/pdf') {
                 const fileLink = await ctx.telegram.getFileLink(document.file_id);
                 const pdfBuffer = await this.fileService.downloadFile(fileLink.href);
-                const fileName = getFileNameForReceipt(String(telegramId), 'jpg');
+                fileName = getFileNameForReceipt(String(telegramId), 'jpg');
                 const jpgBuffer = await this.fileService.convertPdfToJpg(pdfBuffer, fileName);
-
                 await this.fileService.saveFile(fileName, jpgBuffer);
-
-                const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
-                const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
-                await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
-                await ctx.scene.leave();
             } else {
                 await ctx.reply('Пожалуйста, отправьте файл в формате PDF.');
+                return;
             }
+        } catch (e) {
+            this.logger.error('Error saving receipt document:', e);
+            await ctx.reply('Ошибка при сохранении документа квитанции');
+            return;
+        }
+
+        try {
+            const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
+            const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
+            await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
+            await ctx.scene.leave();
         } catch (error) {
-            await ctx.reply('Ошибка при обработке документа квитанции');
+            await ctx.reply('Ошибка при зачислении средств по квитанции.');
         }
     }
 
