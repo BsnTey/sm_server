@@ -266,7 +266,11 @@ export class FamilyInviteUpdate extends BaseUpdate {
                 );
 
                 if (access == null) {
-                    await ctx.reply('❌ Нет информации о дате покупки');
+                    //await ctx.reply('❌ Нет информации о дате покупки');
+                    await ctx.reply(
+                        `❓ Вышел срок бесплатного обьединения. Стоимость ${this.defaultDebitMoneyForFamily}р`,
+                        wantToBuyAcessKeyboard(accountIdInvited),
+                    );
                     return;
                 }
                 if (!access) {
