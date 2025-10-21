@@ -37,18 +37,17 @@ export class PaymentService {
         } catch (err) {
             throw new NotFoundException(ERROR_GET_SEARCH_ID);
         }
-        let response;
         try {
-            response = await this.bottService.pageSearchUserByTelegramId(searchId);
+            const response = await this.bottService.pageSearchUserByTelegramId(searchId);
+            const balance = extractBalance(response);
+            const userBotId = extractUserBotId(response);
+            return {
+                balance,
+                userBotId,
+            };
         } catch (err) {
             throw new NotFoundException(ERROR_USER_SEARCH_PAGE);
         }
-        const balance = extractBalance(response);
-        const userBotId = extractUserBotId(response);
-        return {
-            balance,
-            userBotId,
-        };
     }
 
     async userBalanceEdit(userBotId: string, amount: string, isPositive: boolean) {
