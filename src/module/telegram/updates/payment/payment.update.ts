@@ -121,8 +121,9 @@ export class PaymentUpdate {
 
     @On('photo')
     async inputReceipt(@Sender() { id: telegramId }: any, @Ctx() ctx: WizardContext) {
+        const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
+        let fileName;
         try {
-            const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             //@ts-ignore
             const photos = ctx!.message!.photo;
@@ -130,16 +131,17 @@ export class PaymentUpdate {
             const fileLink = await ctx.telegram.getFileLink(fileId);
 
             const fileExtension = fileLink.href.split('.').pop() || 'jpg';
-            const fileName = getFileNameForReceipt(String(telegramId), fileExtension);
+            fileName = getFileNameForReceipt(String(telegramId), fileExtension);
             await this.fileService.saveFileFromTg(fileName, fileLink);
-
-            const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
-            await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
-            await ctx.scene.leave();
         } catch (error) {
             this.logger.error('Error processing receipt:', error);
-            await ctx.reply('Произошла ошибка при обработке квитанции.');
+            await ctx.reply('Произошла ошибка при сохранении квитанции.');
+            return;
         }
+
+        const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
+        await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
+        await ctx.scene.leave();
     }
 
     @On('document')
@@ -147,6 +149,7 @@ export class PaymentUpdate {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const document = ctx.message!.document!;
+        const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
         let fileName;
         try {
             if (document?.mime_type === 'application/pdf') {
@@ -164,15 +167,9 @@ export class PaymentUpdate {
             await ctx.reply('Ошибка при сохранении документа квитанции');
             return;
         }
-
-        try {
-            const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
-            const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
-            await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
-            await ctx.scene.leave();
-        } catch (error) {
-            await ctx.reply('Ошибка при зачислении средств по квитанции.');
-        }
+        const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
+        await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
+        await ctx.scene.leave();
     }
 
     @On('text')
