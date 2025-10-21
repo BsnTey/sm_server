@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { OrderApiWebhook } from './interfaces/order-webhook.interface';
 import { AccountService } from '../account/account.service';
 import { BottPurchaseService } from './bott-purchase.service';
@@ -12,12 +12,12 @@ export class BottWebhookService {
 
     async create(dto: OrderApiWebhook): Promise<string> {
         const buyerTelegramId = dto?.user?.telegram_id;
-        if (!buyerTelegramId) throw new Error('buyer telegram id is required');
+        if (!buyerTelegramId) throw new BadRequestException('buyer telegram id is required');
 
         const expectedCount = Number(dto?.count ?? 1) || 1;
         const dataStr = dto?.product?.data || '';
         const accountIds = this.extractAccountIds(dataStr, expectedCount);
-        if (!accountIds.length) throw new Error('accountIds not found');
+        if (!accountIds.length) throw new BadRequestException('accountIds not found');
 
         const unitAmount =
             Number(dto?.category?.price?.amount ?? 0) || Math.floor((Number(dto?.amount ?? 0) || 0) / Math.max(1, accountIds.length));

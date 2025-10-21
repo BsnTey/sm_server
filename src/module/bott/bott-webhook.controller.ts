@@ -9,6 +9,7 @@ export class BottWebhookController {
     @Post('webhook/order')
     @HttpCode(200)
     async orderWebhook(@Body() dto: OrderApiWebhook): Promise<any> {
+        console.log(dto);
         return this.bottWebhookService.create(dto);
     }
 }
