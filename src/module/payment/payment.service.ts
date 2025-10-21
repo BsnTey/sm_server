@@ -36,7 +36,7 @@ export class PaymentService {
         try {
             response = await this.bottService.searchSearchIdByTelegramId(telegramId);
         } catch (err) {
-            throw new NotFoundException('Ошибк получения страницы пользователя от сервера');
+            throw new NotFoundException('Ошибка получения страницы пользователя от сервера');
         }
 
         const result = response.results?.[0];
