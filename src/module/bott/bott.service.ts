@@ -96,12 +96,12 @@ export class BottService {
     @WrapWithLoading()
     @CacheKey('bott:getUserBotId')
     @CacheTTL(10_1000)
-    async pageSearchUserByTelegramId(telegramId: string): Promise<string> {
+    async pageSearchUserByTelegramId(searchId: string): Promise<string> {
         const headers = this.botTHeaders.getHeaders();
 
         const params = {
             bot_id: this.sellerTradeBotId,
-            'BotUserSearch[id]': telegramId,
+            'BotUserSearch[user_id]': searchId,
         };
         const url = this.urlBotT + `lk/common/users/users/index`;
         const response = await this.httpService.get(url, { headers, params });

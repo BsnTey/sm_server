@@ -6,6 +6,7 @@ import { PaymentRepository } from './payment.repository';
 import { BottService } from '../bott/bott.service';
 import {
     ERROR_CHANGE_BALANCE,
+    ERROR_GET_SEARCH_ID,
     ERROR_GET_TRANSACTIONS,
     ERROR_NOT_FOUND_TRANSACTION,
     ERROR_USER_SEARCH_PAGE,
@@ -29,16 +30,16 @@ export class PaymentService {
     ) {}
 
     async getUserByTelegramId(telegramId: string) {
-        // let searchId;
-        // try {
-        //     const response = await this.bottService.searchSearchIdByTelegramId(telegramId);
-        //     searchId = response.results[0].id;
-        // } catch (err) {
-        //     // throw new NotFoundException(ERROR_GET_SEARCH_ID);
-        // }
+        let searchId;
+        try {
+            const response = await this.bottService.searchSearchIdByTelegramId(telegramId);
+            searchId = response.results[0].id;
+        } catch (err) {
+            throw new NotFoundException(ERROR_GET_SEARCH_ID);
+        }
         let response;
         try {
-            response = await this.bottService.pageSearchUserByTelegramId(telegramId);
+            response = await this.bottService.pageSearchUserByTelegramId(searchId);
         } catch (err) {
             throw new NotFoundException(ERROR_USER_SEARCH_PAGE);
         }
