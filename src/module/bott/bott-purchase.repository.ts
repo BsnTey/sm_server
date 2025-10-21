@@ -16,6 +16,7 @@ export class BottPurchaseRepository {
             select: {
                 buyerTelegramId: true,
                 purchasedAt: true,
+                hasPromoCode: true,
             },
         });
     }

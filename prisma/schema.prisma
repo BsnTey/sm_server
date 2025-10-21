@@ -334,6 +334,7 @@ model AccountPurchase {
   amount          Int
   purchasedAt     DateTime @default(now()) @map("purchased_at")
   rawPayload      Json     @map("raw_payload")
+  hasPromoCode    Boolean  @default(false)
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 

@@ -12,8 +12,6 @@ import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { ERROR_ACCESS, ERROR_FOUND_USER } from '../../constants/error.constant';
 import { UserRole } from '@prisma/client';
 import { BottPurchaseService } from '../../../bott/bott-purchase.service';
-import { wantToBuyAcessKeyboard } from '../../keyboards/family.keyboard';
-import { PaymentService } from '../../../payment/payment.service';
 
 @Scene(FAMILY_PRIVELEGIE)
 @UseFilters(TelegrafExceptionFilter)
@@ -223,12 +221,9 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
 export class FamilyInviteUpdate extends BaseUpdate {
     private readonly logger = new Logger(FamilyInviteUpdate.name);
 
-    private defaultDebitMoneyForFamily = 50;
-
     constructor(
         private readonly familyService: FamilyService,
         private readonly bottPurchaseService: BottPurchaseService,
-        private readonly paymentService: PaymentService,
     ) {
         super();
     }
@@ -259,7 +254,7 @@ export class FamilyInviteUpdate extends BaseUpdate {
                 await this.doInvited(ctx, sender, accountIdInvited, user.role);
             }
             if (user.role == UserRole.Seller) {
-                const access = await this.checkingAccessOrPay(accountIdInvited);
+                const access = await this.checkingAccess(accountIdInvited);
 
                 await this.telegramService.sendAdminMessage(
                     `${user.role} ${sender.first_name || sender.username} пытается склеить с ${accountIdInvited} его уровень доступа ${access}`,
@@ -270,10 +265,7 @@ export class FamilyInviteUpdate extends BaseUpdate {
                     return;
                 }
                 if (!access) {
-                    await ctx.reply(
-                        `❓ Вышел срок бесплатного обьединения. Стоимость ${this.defaultDebitMoneyForFamily}р`,
-                        wantToBuyAcessKeyboard(accountIdInvited),
-                    );
+                    await ctx.reply('❌ Доступ к аккаунту был приобретен более 24 часов назад или с промокодом. Приглашение невозможно.');
                 } else {
                     await this.doInvited(ctx, sender, accountIdInvited, user.role);
                 }
@@ -284,62 +276,25 @@ export class FamilyInviteUpdate extends BaseUpdate {
         }
     }
 
-    @Action(/^buy_access_([0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12})$/)
-    async buyAccess(@Ctx() ctx: Context, @Sender() sender: SenderTelegram) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        //@ts-ignore
-        const accountIdInvited = ctx.match?.[1];
-        const telegramId = String(sender.id);
-        const user = await this.userService.getUserByTelegramId(telegramId);
-        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
+    private async checkingAccess(accountId: string): Promise<boolean | null> {
+        const lastPurchase = await this.bottPurchaseService.getLastPurchaseByAccountId(accountId);
 
-        await this.telegramService.sendAdminMessage(
-            `Пользователь ${sender.first_name || sender.username} согласился купить доступ в семью для ${accountIdInvited}`,
-        );
-
-        let userBott;
-        try {
-            userBott = await this.paymentService.getUserByTelegramId(telegramId);
-        } catch (e) {
-            throw e;
-        }
-        if (userBott.balance < this.defaultDebitMoneyForFamily) {
-            await ctx.reply('❌ Пополните баланс');
-            return;
-        }
-
-        let success = false;
-        try {
-            success = await this.doInvited(ctx, sender, accountIdInvited, user.role);
-        } catch (e) {
-            throw e;
-        }
-        try {
-            if (success) {
-                await this.paymentService.userBalanceEdit(userBott.userBotId, String(this.defaultDebitMoneyForFamily), false);
-                await ctx.reply(`С баланса вычтено ${this.defaultDebitMoneyForFamily}р`);
-            }
-        } catch (e) {
-            await this.telegramService.sendAdminMessage(
-                `Ошибка изменения баланса за семью. Вычти у ${telegramId} ${this.defaultDebitMoneyForFamily}р`,
-            );
-        }
-    }
-
-    private async checkingAccessOrPay(accountId: string): Promise<boolean | null> {
-        const lastPurchaseAccountIdInvited = await this.bottPurchaseService.getLastPurchaseByAccountId(accountId);
-
-        if (!lastPurchaseAccountIdInvited) {
+        if (!lastPurchase) {
             return null;
         }
 
-        const purchaseDate = new Date(lastPurchaseAccountIdInvited.purchasedAt);
+        const { purchasedAt, hasPromoCode } = lastPurchase;
+        if (!purchasedAt) return null;
+
+        const purchaseDate = new Date(purchasedAt);
         const now = new Date();
 
         const diffMs = now.getTime() - purchaseDate.getTime();
         const oneDayMs = 24 * 60 * 60 * 1000;
+        const isWithin24h = diffMs <= oneDayMs;
+        const noPromo = !hasPromoCode;
 
-        return diffMs <= oneDayMs;
+        return isWithin24h && noPromo;
     }
 
     private async doInvited(ctx: Context, sender: SenderTelegram, accountIdInvited: string, userRole: UserRole) {

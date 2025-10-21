@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 export interface PurchaseByAccountIdResult {
     buyerTelegramId: string;
     purchasedAt: Date;
+    hasPromoCode: boolean;
 }
 
 export interface CreatePurchaseAccount {
@@ -14,4 +15,5 @@ export interface CreatePurchaseAccount {
     amount: number;
     purchasedAt?: Date;
     rawPayload: Prisma.InputJsonValue;
+    hasPromoCode: boolean;
 }

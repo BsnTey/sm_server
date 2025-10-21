@@ -1,14 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { AccountService } from '../account/account.service';
 import { BottPurchaseRepository } from './bott-purchase.repository';
 import { CreatePurchaseAccount } from './interfaces/purchase-repository';
 
 @Injectable()
 export class BottPurchaseService {
-    constructor(
-        private readonly accountService: AccountService,
-        private readonly purchaseRepo: BottPurchaseRepository,
-    ) {}
+    constructor(private readonly purchaseRepo: BottPurchaseRepository) {}
 
     async createPurchase(data: CreatePurchaseAccount) {
         return this.purchaseRepo.create(data);
