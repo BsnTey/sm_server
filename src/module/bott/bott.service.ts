@@ -94,7 +94,6 @@ export class BottService {
     }
 
     @WrapWithLoading()
-    @CacheKey('bott:getUserBotId')
     @CacheTTL(10_1000)
     async pageSearchUserByTelegramId(searchId: string): Promise<string> {
         const headers = this.botTHeaders.getHeaders();

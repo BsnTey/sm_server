@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PaymentOrderEntity } from './entities/payment.entities';
 import { PaymentOrder as PaymentOrderModel } from '.prisma/client';
 import { StatusPayment } from '@prisma/client';
@@ -20,6 +20,8 @@ import { FilterStatusPayment, Pagination } from './dto/queryFilter.dto';
 
 @Injectable()
 export class PaymentService {
+    private readonly logger = new Logger(PaymentService.name);
+
     private tgNamesExceptionStatistic: string[] = this.configService.getOrThrow('TELEGRAM_NAMES_EXCEPTION_STATISTIC').split(',');
     private domain: string = this.configService.getOrThrow('DOMAIN');
 
@@ -30,13 +32,19 @@ export class PaymentService {
     ) {}
 
     async getUserByTelegramId(telegramId: string) {
-        let searchId;
+        let response;
         try {
-            const response = await this.bottService.searchSearchIdByTelegramId(telegramId);
-            searchId = response.results[0].id;
+            response = await this.bottService.searchSearchIdByTelegramId(telegramId);
         } catch (err) {
+            throw new NotFoundException('Ошибк получения страницы пользователя от сервера');
+        }
+
+        const result = response.results?.[0];
+        if (!result?.id) {
+            this.logger.error(response);
             throw new NotFoundException(ERROR_GET_SEARCH_ID);
         }
+        const searchId = result.id;
         try {
             const response = await this.bottService.pageSearchUserByTelegramId(searchId);
             const balance = extractBalance(response);
@@ -45,7 +53,8 @@ export class PaymentService {
                 balance,
                 userBotId,
             };
-        } catch (err) {
+        } catch (err: any) {
+            this.logger.error(err.message);
             throw new NotFoundException(ERROR_USER_SEARCH_PAGE);
         }
     }
