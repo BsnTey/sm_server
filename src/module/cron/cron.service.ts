@@ -20,150 +20,119 @@ export class CronService {
         if (this.isRunning) return;
         this.isRunning = true;
 
-        // агрегированные счетчики за весь прогон
-        let taken = 0; // сколько аккаунтов взято в обработку
-        let watched = 0; // сколько аккаунтов реально посмотрели 1 урок
-        let errors = 0; // количество ошибок
+        // ✅ общий счётчик просмотренных уроков за весь цикл
+        let totalWatchedInCycle = 0;
 
         try {
             const accounts = await this.accountService.getActiveCourseAccount();
             if (accounts.length === 0) {
-                this.logger.log('Крон: аккаунтов взято=0, просмотрено=0, ошибки=нет (0)');
                 return;
             }
 
-            taken = accounts.length;
+            accountsLoop: for (const accountId of accounts) {
+                this.logger.log('In accountsLoop by', accountId);
+                const accountActiveCourses = await this.courseService.getCoursesByAccountAndStatus(accountId, CourseStatus.ACTIVE);
 
-            for (const accountId of accounts) {
-                try {
-                    // 1) берем активные курсы аккаунта
-                    const activeCourses = await this.courseService.getCoursesByAccountAndStatus(accountId, CourseStatus.ACTIVE);
+                const allCoursesFinished = accountActiveCourses.every(course => course.status === CourseStatus.FINISHED);
+                if (allCoursesFinished) {
+                    await this.accountService.updateStatusAccountCourse(accountId, CourseStatus.FINISHED);
+                    continue;
+                }
 
-                    // если все курсы уже FINISHED — отмечаем аккаунт как FINISHED и идем дальше
-                    if (activeCourses.length > 0 && activeCourses.every(c => c.status === CourseStatus.FINISHED)) {
-                        await this.accountService.updateStatusAccountCourse(accountId, CourseStatus.FINISHED);
+                for (let i = 0; i < accountActiveCourses.length; i++) {
+                    const accountCourse = accountActiveCourses[i];
+                    const lessonsWithProgress = await this.courseService.getLessonsWithProgressByAccountAndCourse(
+                        accountId,
+                        accountCourse.courseId,
+                    );
+
+                    const allLessonsFinished = lessonsWithProgress.every(lesson =>
+                        lesson.AccountLessonProgress.some(progress => progress.status === LessonStatus.VIEWED),
+                    );
+
+                    if (allLessonsFinished) {
+                        await this.courseService.changeStatusCourse(accountCourse.accountId, accountCourse.courseId, CourseStatus.FINISHED);
                         continue;
                     }
 
-                    // 2) ищем первую подходящую лекцию для просмотра (не просмотрена и уже доступна по времени)
-                    const nowIso = new Date().toISOString();
+                    for (let j = 0; j < lessonsWithProgress.length; j++) {
+                        const lesson = lessonsWithProgress[j];
+                        if (lesson.progress.status === LessonStatus.VIEWED) continue;
 
-                    let chosen: {
-                        courseIndex: number;
-                        lessonIndex: number;
-                        lesson: any;
-                        courseId: string;
-                        mnemocode: string;
-                    } | null = null;
+                        const canViewNow =
+                            !lesson.progress.nextViewAt || new Date(lesson.progress.nextViewAt).toISOString() <= new Date().toISOString();
 
-                    for (let i = 0; i < activeCourses.length; i++) {
-                        const course = activeCourses[i];
+                        if (!canViewNow) continue accountsLoop;
 
-                        const lessons = await this.courseService.getLessonsWithProgressByAccountAndCourse(accountId, course.courseId);
+                        const accIdFromProgress = lesson.progress.accountId;
+                        const progressId = lesson.progress.progressId;
 
-                        // если все уроки курса уже просмотрены — помечаем курс как FINISHED и переходим к следующему курсу
-                        const allLessonsFinished = lessons.every(l => l.AccountLessonProgress.some(p => p.status === LessonStatus.VIEWED));
-                        if (allLessonsFinished) {
-                            await this.courseService.changeStatusCourse(course.accountId, course.courseId, CourseStatus.FINISHED);
-                            continue;
+                        let mnemocode = this.courseService.getMnemocode(accountCourse.courseId);
+                        if (!mnemocode) {
+                            await this.courseService.initializeCache();
+                            mnemocode = this.courseService.getMnemocode(accountCourse.courseId);
                         }
+                        const lessonView = this.mapLesson(lesson, mnemocode!);
 
-                        // ищем первый доступный к просмотру урок
-                        for (let j = 0; j < lessons.length; j++) {
-                            const lesson = lessons[j];
-                            if (lesson.progress.status === LessonStatus.VIEWED) continue;
-
-                            const nextIso = lesson.progress.nextViewAt ? new Date(lesson.progress.nextViewAt).toISOString() : null;
-
-                            if (!nextIso || nextIso <= nowIso) {
-                                let mnemocode = this.courseService.getMnemocode(course.courseId);
-                                if (!mnemocode) {
-                                    await this.courseService.initializeCache();
-                                    mnemocode = this.courseService.getMnemocode(course.courseId);
-                                }
-
-                                chosen = {
-                                    courseIndex: i,
-                                    lessonIndex: j,
-                                    lesson,
-                                    courseId: course.courseId,
-                                    mnemocode: mnemocode!,
-                                };
-                                break;
+                        try {
+                            const isWatched = await this.viewLesson(lessonView, progressId, accIdFromProgress);
+                            if (!isWatched) {
+                                // не считаем, переходим к следующему аккаунту
+                                continue accountsLoop;
                             }
+
+                            // ✅ тут урок реально просмотрен — учитываем в общем счётчике
+                            totalWatchedInCycle += 1;
+
+                            lesson.progress.status = LessonStatus.VIEWED;
+                            this.logger.log('просмотрел', lessonView.mnemocode, lesson.position);
+                        } catch (err: any) {
+                            await this.accountService.promblemCourses(accountCourse.accountId);
+                            this.logger.error('Проблема с курсом isWatched', accountCourse.accountId);
                         }
 
-                        if (chosen) break;
-                    }
+                        if (j === lessonsWithProgress.length - 1) {
+                            const allLessonsFinishedNow = lessonsWithProgress.every(lesson =>
+                                lesson.AccountLessonProgress.some(progress => progress.status === LessonStatus.VIEWED),
+                            );
 
-                    // 3) если не нашли подходящий урок — идем к следующему аккаунту
-                    if (!chosen) continue;
+                            if (allLessonsFinishedNow) {
+                                await this.courseService.changeStatusCourse(
+                                    accountCourse.accountId,
+                                    accountCourse.courseId,
+                                    CourseStatus.FINISHED,
+                                );
+                            }
 
-                    // 4) пытаемся посмотреть один урок
-                    const progressId = chosen.lesson.progress.progressId;
-                    const progressAccId = chosen.lesson.progress.accountId;
-
-                    const isWatched = await this.viewLesson(this.mapLesson(chosen.lesson, chosen.mnemocode), progressId, progressAccId);
-
-                    if (isWatched) {
-                        chosen.lesson.progress.status = LessonStatus.VIEWED;
-                        watched++;
-
-                        // пост-обработка: если это была последняя лекция курса — закрываем курс,
-                        // и, если есть следующий курс, разблокируем первую лекцию.
-                        const lessonsNow = await this.courseService.getLessonsWithProgressByAccountAndCourse(accountId, chosen.courseId);
-                        const allFinishedNow = lessonsNow.every(l => l.AccountLessonProgress.some(p => p.status === LessonStatus.VIEWED));
-
-                        if (allFinishedNow) {
-                            await this.courseService.changeStatusCourse(accountId, chosen.courseId, CourseStatus.FINISHED);
-
-                            // если есть следующий курс — разблокируем его первую лекцию
-                            if (chosen.courseIndex + 1 < activeCourses.length) {
-                                const nextCourse = activeCourses[chosen.courseIndex + 1];
-                                const nextLessons = await this.courseService.getLessonsWithProgressByAccountAndCourse(
-                                    accountId,
+                            if (i < accountActiveCourses.length - 1) {
+                                const nextCourse = accountActiveCourses[i + 1];
+                                const lessonsWithProgressNextCourse = await this.courseService.getLessonsWithProgressByAccountAndCourse(
+                                    accIdFromProgress,
                                     nextCourse.courseId,
                                 );
-                                const first = nextLessons[0];
-                                if (first) {
-                                    const timeUnblock = this.getTimeUnblock(first.duration);
-                                    await this.courseService.updateUnblockLesson(first.progress.progressId, timeUnblock);
+                                const firstLessonProgress = lessonsWithProgressNextCourse[0];
+                                if (firstLessonProgress) {
+                                    const timeUnblock = this.getTimeUnblock(firstLessonProgress.duration);
+                                    await this.courseService.updateUnblockLesson(firstLessonProgress.progress.progressId, timeUnblock);
                                 }
                             } else {
-                                // иначе все курсы аккаунта потенц. закрыты — обновим статус аккаунта
-                                await this.accountService.updateStatusAccountCourse(accountId, CourseStatus.FINISHED);
+                                await this.accountService.updateStatusAccountCourse(accIdFromProgress, CourseStatus.FINISHED);
                             }
+                            continue accountsLoop;
                         } else {
-                            // если курс не закрыт — разблокируем следующую лекцию внутри курса (если есть)
-                            const nextIndex = chosen.lessonIndex + 1;
-                            if (nextIndex < lessonsNow.length) {
-                                const nextLesson = lessonsNow[nextIndex];
-                                const timeUnblock = this.getTimeUnblock(nextLesson.duration);
-                                await this.courseService.updateUnblockLesson(nextLesson.progress.progressId, timeUnblock);
-                            }
+                            const nextLesson = lessonsWithProgress[j + 1];
+                            const timeUnblock = this.getTimeUnblock(nextLesson.duration);
+                            await this.courseService.updateUnblockLesson(nextLesson.progress.progressId, timeUnblock);
+                            continue accountsLoop;
                         }
-                    } else {
-                        // не посмотрели — обработка уже внутри viewLesson (переотложили)
                     }
-                } catch (err: any) {
-                    errors++;
-                    // отметим проблемный аккаунт/курс, если можем
-                    try {
-                        await this.accountService.promblemCourses(accountId);
-                    } catch {}
-                    this.logger.error(`Ошибка при обработке аккаунта ${accountId}: ${err?.message ?? err}`);
                 }
             }
 
-            // финальный сводный лог
-            this.logger.log(`Крон: аккаунтов взято=${taken}, просмотрено=${watched}, ошибки=${errors > 0 ? 'да' : 'нет'} (${errors})`);
+            // ✅ единый финальный лог за весь цикл крона
+            this.logger.log(`Итог за цикл: просмотрено ${totalWatchedInCycle} уроков`);
         } catch (err: any) {
-            // системная ошибка крона
-            this.logger.error(`Критическая ошибка крона: ${err?.message ?? err}`);
-            // всё равно выведем сводный лог по тому, что успели
-            this.logger.log(
-                `Крон (с ошибкой): аккаунтов взято=${taken}, просмотрено=${watched}, ошибки=${errors > 0 ? 'да' : 'нет'} (${errors})`,
-            );
+            this.logger.error(err);
         } finally {
             this.isRunning = false;
         }
@@ -177,7 +146,7 @@ export class CronService {
         try {
             isWatching = await Promise.race([isWatchingPromise, timeout]);
         } catch (error) {
-            this.logger.error(`ОШИБКА В ПРОСМОТРЕ ${accountId}: ${String(error)}`);
+            this.logger.error('ОШИБКА В ПРОСМОТРЕ', accountId, error);
             isWatching = false;
         }
 
@@ -202,5 +171,9 @@ export class CronService {
             lessonId: lesson.lessonId,
             duration: lesson.duration,
         };
+    }
+
+    private logAccountSummary(accountId: string, watched: number) {
+        this.logger.log(`Итог за аккаунт ${accountId}: просмотрено уроков за цикл — ${watched}`);
     }
 }
