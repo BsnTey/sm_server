@@ -20,7 +20,6 @@ export class CronService {
         if (this.isRunning) return;
         this.isRunning = true;
 
-        // ✅ общий счётчик просмотренных уроков за весь цикл
         let totalWatchedInCycle = 0;
 
         try {
