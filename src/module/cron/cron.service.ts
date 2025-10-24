@@ -29,7 +29,6 @@ export class CronService {
             }
 
             accountsLoop: for (const accountId of accounts) {
-                this.logger.log('In accountsLoop by', accountId);
                 const accountActiveCourses = await this.courseService.getCoursesByAccountAndStatus(accountId, CourseStatus.ACTIVE);
 
                 const allCoursesFinished = accountActiveCourses.every(course => course.status === CourseStatus.FINISHED);
@@ -170,9 +169,5 @@ export class CronService {
             lessonId: lesson.lessonId,
             duration: lesson.duration,
         };
-    }
-
-    private logAccountSummary(accountId: string, watched: number) {
-        this.logger.log(`Итог за аккаунт ${accountId}: просмотрено уроков за цикл — ${watched}`);
     }
 }
