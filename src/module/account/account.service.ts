@@ -763,16 +763,23 @@ export class AccountService {
         };
     }
 
-    private isProductNotFoundError(e: any): boolean {
-        const status = e?.status ?? e?.response?.status;
-        if (status === 404 || status === 400) return true;
-        const msg = e?.response?.data?.message ?? e?.response?.data?.error ?? e?.message ?? '';
-        return /PRODUCT_NOT_FOUND|not\s*found|invalid\s*product/i.test(String(msg));
-    }
-
     async prepareAccountsForProductCheck({ telegramId, nodeId }: PrepareProductCheckRequestDto): Promise<{ accountIds: string[] }> {
         const accountIds = await this.accountDiscountRepo.findAccountIdsByTelegramAndNodes(telegramId, nodeId);
         return { accountIds };
+    }
+
+    private getHttpStatus(err: any): number | undefined {
+        return err?.response?.status ?? err?.response?.data?.statusCode;
+    }
+
+    private isBadRequest400(err: any): boolean {
+        return this.getHttpStatus(err) === 400;
+    }
+
+    private isNotFound404(err: any): boolean {
+        const status = this.getHttpStatus(err);
+        const msg = err?.response?.data?.message ?? err?.message;
+        return status === 404 || msg === 'PRODUCT_NOT_FOUND';
     }
 
     async checkProductBatchForPersonalDiscount({ telegramId, isInventory, productId, accountIds }: CheckProductBatchRequestDto): Promise<{
@@ -794,32 +801,36 @@ export class AccountService {
         try {
             const probeRes = await this.getProductById(probeId, productId);
             const product = probeRes?.product;
-            if (!product?.id) throw new NotFoundException('PRODUCT_NOT_FOUND');
-
-            let bonusCount: number | undefined;
-            if (this.hasMyDiscountInDiscountList(product)) {
-                try {
-                    const short = await this.shortInfo(probeId);
-                    bonusCount = short?.bonusCount;
-                } catch {
-                    // ignore
+            if (!product?.id) {
+                // защитный вариант: нет id продукта в 200-ответе — считаем локальной проблемой
+                errors.push({ accountId: probeId, error: 'NO_PRODUCT' });
+            } else {
+                let bonusCount: number | undefined;
+                if (this.hasMyDiscountInDiscountList(product)) {
+                    try {
+                        const short = await this.shortInfo(probeId);
+                        bonusCount = short?.bonusCount;
+                    } catch {
+                        /* не критично */
+                    }
                 }
+                const calc = this.computeCalculateProductFromProduct(product, isInventory);
+                const mapped = this.buildResult(product, probeId, bonusCount, calc || undefined);
+                if (mapped) results.push(mapped);
             }
-
-            const calc = this.computeCalculateProductFromProduct(product, isInventory);
-
-            const mapped = this.buildResult(product, probeId, bonusCount, calc || undefined);
-            if (mapped) results.push(mapped);
         } catch (e: any) {
-            if (this.isProductNotFoundError(e)) {
+            if (this.isNotFound404(e)) {
+                // 404 на пробном — глобально для всех
                 throw new NotFoundException('PRODUCT_NOT_FOUND');
             }
-            errors.push({
-                accountId: probeId,
-                error: e?.response?.data?.message ?? e?.message ?? 'UNKNOWN_ERROR',
-            });
+            // 400 на пробном — локальная ошибка этого аккаунта, остальные продолжаем
+            const errorText = this.isBadRequest400(e)
+                ? e?.response?.data?.message ?? 'BAD_REQUEST'
+                : e?.response?.data?.message ?? e?.message ?? 'UNKNOWN_ERROR';
+            errors.push({ accountId: probeId, error: errorText });
         }
 
+        // --- ОСТАЛЬНЫЕ АККАУНТЫ ---
         const worker = async (accountId: string): Promise<void> => {
             try {
                 const res = await this.getProductById(accountId, productId);
@@ -835,18 +846,16 @@ export class AccountService {
                         const short = await this.shortInfo(accountId);
                         bonusCount = short?.bonusCount;
                     } catch {
-                        // ignore
+                        /* ignore */
                     }
                 }
 
                 const calc = this.computeCalculateProductFromProduct(product, isInventory);
-
                 const mapped = this.buildResult(product, accountId, bonusCount, calc || undefined);
                 if (mapped) results.push(mapped);
             } catch (err: any) {
-                const errorText = this.isProductNotFoundError(err)
-                    ? 'NO_PRODUCT'
-                    : err?.response?.data?.message ?? err?.message ?? 'UNKNOWN_ERROR';
+                // для остальных — любые 4xx/5xx считаем локальными
+                const errorText = err?.response?.data?.message ?? err?.message ?? 'UNKNOWN_ERROR';
                 errors.push({ accountId, error: errorText });
             }
         };
