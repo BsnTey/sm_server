@@ -32,6 +32,12 @@ export class TrackingStarterService {
 
         // первая проверка—через 5 секунд
         await this.publisher.publish(RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE, job, 5_000);
+        try {
+            this.accounts.orderHistory(dto.accountId);
+        } catch (e: any) {
+            //ignore
+        }
+
         return { accepted: true };
     }
 }
