@@ -303,6 +303,17 @@ export class FamilyInviteUpdate extends BaseUpdate {
 
         this.logger.log(`Пользователь ${sender.first_name} - ${sender.id} запросил принять его в семью по accountId ${accountIdOwner}`);
 
+        let profileFamily;
+        try {
+            profileFamily = await this.familyService.getFamilyProfile(accountIdInvited);
+        } catch (e) {
+            throw new Error('❌ Что то пошло не так при поиске приглашаемого участника');
+        }
+
+        if (!this.familyService.isValidForInvite(profileFamily)) {
+            throw new Error('❌ Участник уже состоит в семье. Покиньте перед новым приглашением');
+        }
+
         let namePhoneInvited;
         try {
             namePhoneInvited = await this.familyService.getProfileNamePhone(accountIdInvited);
@@ -310,7 +321,7 @@ export class FamilyInviteUpdate extends BaseUpdate {
             if (e instanceof NotFoundException || e instanceof HttpException) {
                 throw e;
             }
-            throw new Error('Что то пошло не так при поиске приглашаемого участника');
+            throw new Error('❌ Что то пошло не так при поиске приглашаемого участника');
         }
         try {
             await this.familyService.inviteMember(accountIdOwner, namePhoneInvited);

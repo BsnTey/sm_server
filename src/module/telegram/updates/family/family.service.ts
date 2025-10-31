@@ -154,8 +154,23 @@ export class FamilyService {
         };
     }
 
+    async getFamilyProfile(accountId: string) {
+        return this.accountService.getProfileFamily(accountId);
+    }
+
+    isValidForInvite(profile: ProfileFamilyResponse): boolean {
+        const status = profile.family?.currentMember?.status;
+        const isOwner = StatusFamilyMember.OWNER === status;
+        const isInvited = StatusFamilyMember.INVITED === status;
+        const isMember = StatusFamilyMember.MEMBER === status;
+        const statusIsNull = status == null;
+        const familyIsNull = profile.family == null;
+
+        return (!isOwner && !isInvited && !isMember) || statusIsNull || familyIsNull;
+    }
+
     async inviteMember(accountId: string, phoneName: PhoneName) {
-        const profileFamilyResponse = await this.accountService.getProfileFamily(accountId);
+        const profileFamilyResponse = await this.getFamilyProfile(accountId);
         const status = profileFamilyResponse.family?.currentMember?.status;
         const isOwner = StatusFamilyMember.OWNER === status;
         const statusIsNull = status == null;
