@@ -74,6 +74,7 @@ import { AccountTelegramParamsDto } from './dto/account-telegram-ids.dto';
 import { keyDiscountAccount, keyDiscountNodes } from './cache-key/key';
 import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
 import { CalculateService } from '../calculate/calculate.service';
+import { Cookie } from './interfaces/cookie.interface';
 
 @Injectable()
 export class AccountService {
@@ -450,6 +451,47 @@ export class AccountService {
         const httpsAgent = new SocksProxyAgent(proxy);
 
         return { headers, httpsAgent };
+    }
+
+    //Используется в декораторе 403
+    async swapAccessToken(accountWithProxy: AccountWithProxyEntity) {
+        const raw = accountWithProxy.cookie as unknown;
+        let cookies: Cookie[];
+
+        try {
+            if (typeof raw === 'string') {
+                cookies = JSON.parse(raw);
+            } else if (Array.isArray(raw)) {
+                cookies = raw as Cookie[];
+            } else if (raw && typeof raw === 'object') {
+                // На случай, если поле — JSON (Prisma JSONB)
+                // и там лежит массив, но тип пришёл как object
+                cookies = Array.isArray(raw as any) ? (raw as any) : Object.values(raw as any);
+            } else {
+                throw new Error('cookie field is empty');
+            }
+        } catch (e) {
+            throw new Error(`Failed to parse cookies for ${accountWithProxy.accountId}: ${(e as Error).message}`);
+        }
+
+        if (!Array.isArray(cookies) || cookies.length === 0) {
+            throw new Error(`Cookies are empty for ${accountWithProxy.accountId}`);
+        }
+
+        const isSmid = (c: Cookie) => (c.name || '').toLowerCase() === 'smid';
+
+        const smid = cookies.find(c => isSmid(c) && c.domain === 'www.sportmaster.ru') ?? cookies.find(c => isSmid(c));
+
+        if (!smid) {
+            throw new Error(`Not Found SMID for ${accountWithProxy.accountId}`);
+        }
+
+        const token = (smid.value || '').trim();
+        if (!token) {
+            throw new Error(`SMID has empty value for ${accountWithProxy.accountId}`);
+        }
+
+        await this.accountRep.updateCredentials(accountWithProxy.accountId, { accessToken: token });
     }
 
     private async refreshPrivate(accountWithProxy: AccountWithProxyEntity) {
