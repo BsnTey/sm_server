@@ -67,7 +67,7 @@ export function RetryOn401(): MethodDecorator {
                         try {
                             await self.swapAccessToken(accountWithProxy);
                             await self.refreshPrivate(accountWithProxy);
-                            logger.log(`[RetryOn401] swapAccessToken() done for ${accountId}. Retrying '${methodName}'...`);
+                            logger.log(`[RetryOn401] swapAccessToken done for ${accountId}. Retrying '${methodName}'...`);
                             return await originalMethod.apply(self, args);
                         } catch (retryAfterSwapErr: unknown) {
                             logger.error(
