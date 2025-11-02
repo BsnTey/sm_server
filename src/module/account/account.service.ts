@@ -562,11 +562,17 @@ export class AccountService {
         return accountWithProxyEntity;
     }
 
+    private async rawLoadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
+        const accountWithProxy = await this.accountRep.getAccountWithProxy(accountId);
+        if (!accountWithProxy) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+        await this.cacheManager.del(accountId);
+        return this.getAndValidateOrSetProxyAccount(accountWithProxy);
+    }
+
     private async loadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
         const accountWithProxy = await this.accountRep.getAccountWithProxy(accountId);
 
         if (!accountWithProxy) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
-        if (!accountWithProxy.isAccessMp) throw new HttpException(ERROR_LOGOUT_MP, HttpStatus.FORBIDDEN);
 
         const entity = await this.getAndValidateOrSetProxyAccount(accountWithProxy);
         await this.validationToken(entity);

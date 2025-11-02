@@ -9,7 +9,7 @@ import { AccountWithProxyEntity } from '../entities/accountWithProxy.entity';
  */
 interface IRetryableService {
     logger: Logger;
-    getAccountEntity(accountId: string): Promise<AccountWithProxyEntity>;
+    rawLoadAccountCore(accountId: string): Promise<AccountWithProxyEntity>;
     refreshPrivate(account: AccountWithProxyEntity): Promise<any>;
     swapAccessToken(account: AccountWithProxyEntity): Promise<any>;
 }
@@ -53,7 +53,7 @@ export function RetryOn401(): MethodDecorator {
                         throw error;
                     }
 
-                    const accountWithProxy = await self.getAccountEntity(accountId);
+                    const accountWithProxy = await self.rawLoadAccountCore(accountId);
 
                     // --- Попытка №1: refreshPrivate + повтор ---
                     try {
@@ -66,7 +66,8 @@ export function RetryOn401(): MethodDecorator {
                         // --- Попытка №2: swapAccessToken + повтор ---
                         try {
                             await self.swapAccessToken(accountWithProxy);
-                            await self.refreshPrivate(accountWithProxy);
+                            const swapAccountWithProxy = await self.rawLoadAccountCore(accountId);
+                            await self.refreshPrivate(swapAccountWithProxy);
                             logger.log(`[RetryOn401] swapAccessToken done for ${accountId}. Retrying '${methodName}'...`);
                             return await originalMethod.apply(self, args);
                         } catch (retryAfterSwapErr: unknown) {

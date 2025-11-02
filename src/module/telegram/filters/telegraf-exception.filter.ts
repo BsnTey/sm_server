@@ -27,9 +27,7 @@ export class TelegrafExceptionFilter implements ExceptionFilter {
                             }
                         case 'Bad Request':
                             if (exception.response!.data?.error?.code == 'WRONG_TOKEN') {
-                                exception.message = ERROR_LOGOUT_MP;
-                                const accountId = exception.config!.headers['Account-Id'];
-                                await this.accountService.setBanMp(accountId);
+                                exception.message = exception.response!.data.error.message;
                             }
                             if (exception.response!.data?.error?.code == 'TOO_MANY_INCORRECT_CODE_INPUTS') {
                                 exception.message = exception.response!.data.error.message;
