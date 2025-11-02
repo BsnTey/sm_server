@@ -565,6 +565,7 @@ export class AccountService {
     private async rawLoadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
         const accountWithProxy = await this.accountRep.getAccountWithProxy(accountId);
         if (!accountWithProxy) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+
         await this.cacheManager.del(accountId);
         return this.getAndValidateOrSetProxyAccount(accountWithProxy);
     }
