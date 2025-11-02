@@ -10,7 +10,8 @@ import { AccountWithProxyEntity } from '../entities/accountWithProxy.entity';
 interface IRetryableService {
     logger: Logger;
     getAccountEntity(accountId: string): Promise<AccountWithProxyEntity>;
-    refreshPrivate(account: AccountWithProxyEntity): Promise<any>; // Можно уточнить тип, если refreshPrivate что-то возвращает
+    refreshPrivate(account: AccountWithProxyEntity): Promise<any>;
+    swapAccessToken(account: AccountWithProxyEntity): Promise<any>;
 }
 
 /**
@@ -39,35 +40,41 @@ export function RetryOn401(): MethodDecorator {
             const logger = self.logger || new Logger(`${target.constructor.name}:${methodName}`);
 
             try {
-                // 1. Первая попытка вызова оригинального метода
+                // Первая (обычная) попытка
                 return await originalMethod.apply(self, args);
             } catch (error: unknown) {
-                // 2. Проверяем, является ли ошибка той, которую мы ожидаем
-                if (isAxiosError(error) && error.response?.status === 401 && error.response?.data.error.code === 'UNAUTHORIZED') {
-                    logger.warn(`[RetryOn401] Received 401 on method '${methodName}'. Attempting to refresh token and retry...`);
+                // Реагируем только на ожидаемую 401-ошибку Axios
+                if (isAxiosError(error) && error.response?.status === 401 && error.response?.data?.error?.code === 'UNAUTHORIZED') {
+                    logger.warn(`[RetryOn401] 401 on '${methodName}'. Will try to refresh and retry.`);
+
                     const accountId = args[0];
                     if (typeof accountId !== 'string') {
-                        logger.error(`[RetryOn401] The first argument of '${methodName}' must be 'accountId' (string). Aborting retry.`);
-                        throw error; // Прерываем, если не можем получить accountId
+                        logger.error(`[RetryOn401] First argument of '${methodName}' must be accountId (string). Aborting retry.`);
+                        throw error;
                     }
 
-                    const accountWithProxyEntity = await self.getAccountEntity(accountId);
+                    const accountWithProxy = await self.getAccountEntity(accountId);
 
+                    // --- Попытка №1: refreshPrivate + повтор ---
                     try {
-                        await self.refreshPrivate(accountWithProxyEntity);
-
-                        logger.log(`[RetryOn401] Token refreshed for account ${accountId}. Retrying method '${methodName}'...`);
-
-                        // 4. Вторая (и последняя) попытка вызвать оригинальный метод
+                        await self.refreshPrivate(accountWithProxy);
+                        logger.log(`[RetryOn401] Token refreshed for account ${accountId}. Retrying '${methodName}'...`);
                         return await originalMethod.apply(self, args);
-                    } catch (retryError: unknown) {
-                        // Безопасно получаем сообщение об ошибке для логирования
-                        const errorMessage = retryError instanceof Error ? retryError.stack : String(retryError);
-                        logger.error(
-                            `[RetryOn401] Retry failed for accountId ${accountWithProxyEntity.accountId} for method '${methodName}' after token refresh.`,
-                            errorMessage,
-                        );
-                        throw retryError;
+                    } catch (refreshErr: unknown) {
+                        logger.warn(`[RetryOn401] refreshPrivate() failed for ${accountId}. Trying swapAccessToken()...`);
+
+                        // --- Попытка №2: swapAccessToken + повтор ---
+                        try {
+                            await self.swapAccessToken(accountWithProxy);
+                            await self.refreshPrivate(accountWithProxy);
+                            logger.log(`[RetryOn401] swapAccessToken() done for ${accountId}. Retrying '${methodName}'...`);
+                            return await originalMethod.apply(self, args);
+                        } catch (retryAfterSwapErr: unknown) {
+                            logger.error(
+                                `[RetryOn401] Retry failed for accountId ${accountWithProxy.accountId} on '${methodName}' after swapAccessToken.`,
+                            );
+                            throw retryAfterSwapErr;
+                        }
                     }
                 }
                 // 5. Если это не ошибка 401 от Axios, просто пробрасываем ее дальше
