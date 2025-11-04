@@ -340,10 +340,11 @@ export class AccountRepository {
         });
     }
 
-    async addOrderNumber(accountId: string, orderNumber: string): Promise<Order> {
+    async addOrderNumber(accountId: string, orderNumber: string, date: Date): Promise<Order> {
         return this.prisma.order.create({
             data: {
                 orderNumber,
+                date,
                 accountId,
             },
         });

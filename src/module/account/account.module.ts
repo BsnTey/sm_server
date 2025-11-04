@@ -11,6 +11,7 @@ import { DeviceInfoService } from './deviceInfo.service';
 import { DeviceInfoRepository } from './deviceInfo.repository';
 import { AccountDiscountRepository } from './account-discount.repository';
 import { CalculateModule } from '../calculate/calculate.module';
+import { OrderRepository } from './order.repository';
 
 @Module({
     controllers: [AccountController],
@@ -21,6 +22,7 @@ import { CalculateModule } from '../calculate/calculate.module';
         SportmasterHeadersService,
         CourseService,
         CourseRepository,
+        OrderRepository,
         DeviceInfoService,
         DeviceInfoRepository,
     ],

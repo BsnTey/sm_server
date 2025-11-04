@@ -167,6 +167,7 @@ export type CheckProductResultItem = {
     price?: number;
     bonuses?: number;
     bonusCount?: number;
+    ordersToday?: number;
     calculateProduct?: {
         price: number;
         bonus: number;

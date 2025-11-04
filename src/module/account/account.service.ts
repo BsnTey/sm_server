@@ -75,6 +75,7 @@ import { keyDiscountAccount, keyDiscountNodes } from './cache-key/key';
 import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
 import { CalculateService } from '../calculate/calculate.service';
 import { Cookie } from './interfaces/cookie.interface';
+import { OrderRepository } from './order.repository';
 
 @Injectable()
 export class AccountService {
@@ -92,6 +93,7 @@ export class AccountService {
         private configService: ConfigService,
         private accountRep: AccountRepository,
         private accountDiscountRepo: AccountDiscountRepository,
+        private orderRepository: OrderRepository,
         private proxyService: ProxyService,
         private readonly tlsForwarder: TlsProxyService,
         private httpService: HttpService,
@@ -410,8 +412,8 @@ export class AccountService {
         return `${part1}:${part2}:${part3}`;
     }
 
-    async addOrder(accountId: string, orderNumber: string): Promise<Order> {
-        return this.accountRep.addOrderNumber(accountId, orderNumber);
+    async addOrder(accountId: string, orderNumber: string, date: Date = new Date()): Promise<Order> {
+        return this.accountRep.addOrderNumber(accountId, orderNumber, date);
     }
 
     async openForceRefresh(accountId: string) {
@@ -800,6 +802,7 @@ export class AccountService {
         accountId: string,
         bonusCount?: number,
         calculateProduct?: { price: number; bonus: number },
+        ordersToday: number = 0,
     ): CheckProductResultItem | null {
         if (!this.hasMyDiscountInDiscountList(product)) return null;
         return {
@@ -808,6 +811,7 @@ export class AccountService {
             price: this.mapPrice(product),
             bonuses: this.mapBonuses(product),
             bonusCount,
+            ordersToday,
             calculateProduct,
         };
     }
@@ -842,6 +846,8 @@ export class AccountService {
             return { ok: true, productId, processed: 0, results: [], errors: [] };
         }
 
+        const ordersTodayMap = await this.orderRepository.countTodayByAccountIds(accountIds);
+
         const results: CheckProductResultItem[] = [];
         const errors: CheckProductResultItem[] = [];
 
@@ -864,7 +870,7 @@ export class AccountService {
                     }
                 }
                 const calc = this.computeCalculateProductFromProduct(product, isInventory);
-                const mapped = this.buildResult(product, probeId, bonusCount, calc || undefined);
+                const mapped = this.buildResult(product, probeId, bonusCount, calc || undefined, ordersTodayMap[probeId] ?? 0);
                 if (mapped) results.push(mapped);
             }
         } catch (e: any) {
@@ -900,7 +906,7 @@ export class AccountService {
                 }
 
                 const calc = this.computeCalculateProductFromProduct(product, isInventory);
-                const mapped = this.buildResult(product, accountId, bonusCount, calc || undefined);
+                const mapped = this.buildResult(product, accountId, bonusCount, calc || undefined, ordersTodayMap[accountId] ?? 0);
                 if (mapped) results.push(mapped);
             } catch (err: any) {
                 // для остальных — любые 4xx/5xx считаем локальными
@@ -1295,11 +1301,35 @@ export class AccountService {
 
     async orderHistory(accountId: string) {
         const data = await this.orderHistoryPrivate(accountId);
-        for (const order of data.data.orders) {
-            try {
-                await this.addOrder(accountId, order.number);
-            } catch (err) {}
+        const orders = data?.data?.orders ?? [];
+        if (!Array.isArray(orders) || orders.length === 0) return data;
+
+        const byNumber = new Map<string, any>();
+        for (const o of orders) {
+            if (o?.number) byNumber.set(o.number, o);
         }
+
+        // Парсер ISO-даты из API -> Date | undefined
+        const parseOrderDate = (raw: unknown): Date | undefined => {
+            if (typeof raw !== 'string') return undefined;
+            const d = new Date(raw);
+            return isNaN(d.getTime()) ? undefined : d;
+        };
+
+        const tasks = Array.from(byNumber.values()).map(async (order: any) => {
+            const orderNumber = order?.number as string | undefined;
+            if (!orderNumber) return;
+
+            const orderDate = parseOrderDate(order?.date);
+
+            try {
+                await this.addOrder(accountId, orderNumber, orderDate);
+            } catch (err) {
+                //ignore
+            }
+        });
+
+        await Promise.allSettled(tasks);
         return data;
     }
 
