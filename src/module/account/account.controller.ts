@@ -223,11 +223,11 @@ export class AccountController {
         }
     }
 
-    @Post('checking/personal-discount/product/prepare')
-    @HttpCode(200)
-    async prepareAccountsForProductCheck(@Body() data: PrepareProductCheckRequestDto): Promise<{ accountIds: string[] }> {
-        return this.accountService.prepareAccountsForProductCheck(data);
-    }
+    // @Post('checking/personal-discount/product/prepare')
+    // @HttpCode(200)
+    // async prepareAccountsForProductCheck(@Body() data: PrepareProductCheckRequestDto): Promise<{ accountIds: string[] }> {
+    //     return this.accountService.prepareAccountsForProductCheck(data);
+    // }
 
     @Post('v1/checking/personal-discount/product/prepare')
     @HttpCode(200)

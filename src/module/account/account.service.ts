@@ -819,10 +819,10 @@ export class AccountService {
         };
     }
 
-    async prepareAccountsForProductCheck({ telegramId, nodeId }: PrepareProductCheckRequestDto): Promise<{ accountIds: string[] }> {
-        const accountIds = await this.accountDiscountRepo.findAccountIdsByTelegramAndNodes(telegramId, nodeId);
-        return { accountIds };
-    }
+    // async prepareAccountsForProductCheck({ telegramId, nodeId }: PrepareProductCheckRequestDto): Promise<{ accountIds: string[] }> {
+    //     const accountIds = await this.accountDiscountRepo.findAccountIdsByTelegramAndNodes(telegramId, nodeId);
+    //     return { accountIds };
+    // }
 
     async prepareAccountsForProductCheckV1({ telegramId, nodeId }: PrepareProductCheckRequestDto): Promise<{
         accounts: PreparedAccountInfo[];
