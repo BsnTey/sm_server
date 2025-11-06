@@ -32,6 +32,7 @@ import { TelegramIdParamsDto } from './dto/telegramId.dto';
 import { AccountTelegramParamsDto } from './dto/account-telegram-ids.dto';
 import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
 import { CheckProductResultItem } from './interfaces/product.interface';
+import { PreparedAccountInfo } from './interfaces/extend-chrome.interface';
 
 @Controller('account')
 export class AccountController {
@@ -226,6 +227,12 @@ export class AccountController {
     @HttpCode(200)
     async prepareAccountsForProductCheck(@Body() data: PrepareProductCheckRequestDto): Promise<{ accountIds: string[] }> {
         return this.accountService.prepareAccountsForProductCheck(data);
+    }
+
+    @Post('v1/checking/personal-discount/product/prepare')
+    @HttpCode(200)
+    async prepareAccountsForProductCheckV1(@Body() data: PrepareProductCheckRequestDto): Promise<{ accounts: PreparedAccountInfo[] }> {
+        return this.accountService.prepareAccountsForProductCheckV1(data);
     }
 
     @Post('checking/personal-discount/product/check-batch')

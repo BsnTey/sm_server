@@ -76,6 +76,7 @@ import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dt
 import { CalculateService } from '../calculate/calculate.service';
 import { Cookie } from './interfaces/cookie.interface';
 import { OrderRepository } from './order.repository';
+import { PreparedAccountInfo } from './interfaces/extend-chrome.interface';
 
 @Injectable()
 export class AccountService {
@@ -751,7 +752,9 @@ export class AccountService {
         return { nodes };
     }
 
-    async removeDiscountsByAccountId({ telegramId, accountId }: AccountTelegramParamsDto): Promise<{ deleted: number }> {
+    async removeDiscountsByAccountId({ telegramId, accountId }: AccountTelegramParamsDto): Promise<{
+        deleted: number;
+    }> {
         const keyNodes = keyDiscountNodes(telegramId);
         const keyAccounts = keyDiscountAccount(telegramId);
 
@@ -819,6 +822,32 @@ export class AccountService {
     async prepareAccountsForProductCheck({ telegramId, nodeId }: PrepareProductCheckRequestDto): Promise<{ accountIds: string[] }> {
         const accountIds = await this.accountDiscountRepo.findAccountIdsByTelegramAndNodes(telegramId, nodeId);
         return { accountIds };
+    }
+
+    async prepareAccountsForProductCheckV1({ telegramId, nodeId }: PrepareProductCheckRequestDto): Promise<{
+        accounts: PreparedAccountInfo[];
+    }> {
+        // 1. аккаунты по телеграму и ноде
+        const accountIds = await this.accountDiscountRepo.findAccountIdsByTelegramAndNodes(telegramId, nodeId);
+
+        if (!accountIds?.length) {
+            return { accounts: [] };
+        }
+
+        // 2. заказы за сегодня (map accountId -> count)
+        const ordersTodayMap = await this.orderRepository.countTodayByAccountIds(accountIds);
+
+        // 3. бонусы (map accountId -> bonusCount)
+        const bonusMap = await this.accountRep.getBonusCountByAccountIds(accountIds);
+
+        // 4. собрать итоговый список
+        const accounts: PreparedAccountInfo[] = accountIds.map(accountId => ({
+            accountId,
+            bonus: bonusMap[accountId] ?? 0,
+            ordersNumber: ordersTodayMap[accountId] ?? 0,
+        }));
+
+        return { accounts };
     }
 
     private getHttpStatus(err: any): number | undefined {

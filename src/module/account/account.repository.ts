@@ -465,4 +465,19 @@ export class AccountRepository {
             data: { ownerTelegramId },
         });
     }
+
+    async getBonusCountByAccountIds(accountIds: string[]): Promise<Record<string, number>> {
+        if (!accountIds?.length) return {};
+
+        const rows = await this.prisma.account.findMany({
+            where: { accountId: { in: accountIds } },
+            select: { accountId: true, bonusCount: true },
+        });
+
+        const map: Record<string, number> = {};
+        for (const r of rows) {
+            map[r.accountId] = r.bonusCount ?? 0;
+        }
+        return map;
+    }
 }
