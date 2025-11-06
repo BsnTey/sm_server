@@ -429,6 +429,13 @@ export class AccountService {
         return { headers, httpsAgent };
     }
 
+    private async getHttpOptionsRefresh(url: string, accountWithProxy: AccountWithProxyEntity): Promise<any> {
+        const headers = this.sportmasterHeaders.getHeadersRefreshMobile(url, accountWithProxy);
+        const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
+
+        return { headers, httpsAgent };
+    }
+
     private async getHttpOptionsSiteUserGate(accountWithProxy: AccountWithProxyEntity): Promise<any> {
         const headers = this.sportmasterHeaders.getHeadersUserGate(accountWithProxy.userGateToken!);
         const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
@@ -518,7 +525,7 @@ export class AccountService {
 
     private async refreshForValidation(accountWithProxyEntity: AccountWithProxyEntity): Promise<IRefreshAccount> {
         const url = this.url + 'v1/auth/refresh';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = await this.getHttpOptionsRefresh(url, accountWithProxyEntity);
 
         const payload = {
             refreshToken: accountWithProxyEntity.refreshToken,

@@ -6,9 +6,9 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class SportmasterHeadersService {
     private prefixHash = 'eb1a3e30291bc971c4da0e86375961a4';
-    private userAgentMobile: string = 'android-4.70.0-google(56380)';
+    private userAgentMobile: string = 'android-4.85.0-google(60723)';
     private userAgentMobileWeb: string =
-        'Mozilla/5.0 (Linux; Android 7.1.2; ASUS_Z01QD Build/N2G48H; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/68.0.3440.70 Mobile Safari/537.36 android-4.52.0-google(48799)';
+        'Mozilla/5.0 (Linux; Android 7.1.2; ASUS_Z01QD Build/N2G48H; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/68.0.3440.70 Mobile Safari/537.36 android-4.85.0-google(60723)';
     private locale: string = 'ru';
     private country: string = 'RU';
     private eutc: string = 'UTC+3';
@@ -44,6 +44,28 @@ export class SportmasterHeadersService {
             'x-user-id': acc.xUserId,
             'X-Location': acc.citySM.xLocation,
             Authorization: acc.accessToken,
+            'Accept-Encoding': this.acceptEncoding,
+            'Content-Type': this.contentType,
+            Timestamp: timestamp,
+            'Aplaut-Id': this.generateHash(url, acc.xUserId, timestamp),
+            'Aplaut-Build': this.aplautBuild,
+        };
+    }
+
+    getHeadersRefreshMobile(url: string, acc: any): ISportmasterRequestHeaders {
+        const timestamp = String(Math.floor(Date.now() / 1000));
+        return {
+            'User-Agent': this.userAgentMobile,
+            Host: this.host,
+            Locale: this.locale,
+            Country: this.country,
+            'Device-Id': acc.deviceId,
+            'Account-Id': acc.accountId,
+            'Installation-Id': acc.installationId,
+            'City-Id': acc.cityId,
+            Eutc: this.eutc,
+            'x-user-id': acc.xUserId,
+            'X-Location': acc.citySM.xLocation,
             'Accept-Encoding': this.acceptEncoding,
             'Content-Type': this.contentType,
             Timestamp: timestamp,
