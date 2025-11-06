@@ -22,6 +22,7 @@ import { CouponModule } from './module/coupon/coupon.module';
 import { BrokerModule } from '@common/broker/broker.module';
 import { NotificationModule } from './module/notification/notification.module';
 import { CalculateModule } from './module/calculate/calculate.module';
+import { ConfigAppModule } from './module/config/config.module';
 
 @Module({
     imports: [
@@ -53,6 +54,8 @@ import { CalculateModule } from './module/calculate/calculate.module';
         CouponModule,
         NotificationModule,
         CalculateModule,
+        ConfigModule,
+        ConfigAppModule,
     ],
 })
 export class AppModule {}
