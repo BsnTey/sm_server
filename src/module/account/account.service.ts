@@ -768,7 +768,7 @@ export class AccountService {
         const [, , dbDelete] = await Promise.allSettled([
             this.cacheManager.del(keyNodes),
             this.cacheManager.del(keyAccounts),
-            this.accountDiscountRepo.deleteByAccountId(accountId),
+            this.accountDiscountRepo.deleteByAccountAndTelegram(accountId, telegramId),
         ]);
 
         if (dbDelete.status === 'rejected') {

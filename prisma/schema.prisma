@@ -319,7 +319,7 @@ model AccountDiscount {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@unique([accountId, nodeId])
+  @@unique([accountId, nodeId, telegramId], name: "account_node_telegram_unique")
   @@index([telegramId, accountId])
   @@index([telegramId, nodeId])
   @@index([nodeId, accountId])

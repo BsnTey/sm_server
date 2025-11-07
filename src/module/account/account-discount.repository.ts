@@ -6,6 +6,10 @@ import { NodePair, UpsertPersonalDiscountInput } from './interfaces/account-disc
 export class AccountDiscountRepository {
     constructor(private readonly prisma: PrismaService) {}
 
+    /**
+     * Для каждого (accountId,nodeId,telegramId) — upsert.
+     * В update НЕ трогаем telegramId, чтобы не «переезжал» владелец.
+     */
     async upsertMany(
         accountId: string,
         telegramId: string,
@@ -16,7 +20,13 @@ export class AccountDiscountRepository {
         await this.prisma.$transaction(
             items.map(i =>
                 this.prisma.accountDiscount.upsert({
-                    where: { accountId_nodeId: { accountId, nodeId: i.nodeId } },
+                    where: {
+                        account_node_telegram_unique: {
+                            accountId,
+                            nodeId: i.nodeId,
+                            telegramId,
+                        },
+                    },
                     create: {
                         accountId,
                         telegramId,
@@ -25,7 +35,6 @@ export class AccountDiscountRepository {
                         dateEnd: i.dateEnd,
                     },
                     update: {
-                        telegramId,
                         nodeName: i.nodeName,
                         dateEnd: i.dateEnd,
                     },
@@ -42,9 +51,13 @@ export class AccountDiscountRepository {
         });
     }
 
-    async deleteByAccountId(accountId: string): Promise<number> {
+    /**
+     * Удаление теперь по (accountId, telegramId), чтобы не снести чужие данные.
+     * Если надо старое поведение — оставьте отдельный метод.
+     */
+    async deleteByAccountAndTelegram(accountId: string, telegramId: string): Promise<number> {
         const res = await this.prisma.accountDiscount.deleteMany({
-            where: { accountId },
+            where: { accountId, telegramId },
         });
         return res.count;
     }
@@ -61,14 +74,12 @@ export class AccountDiscountRepository {
 
     async findAccountIdsByTelegramAndNodes(telegramId: string, nodeIds: string[]): Promise<string[]> {
         if (!nodeIds?.length) return [];
-
         const rows = await this.prisma.accountDiscount.findMany({
             where: { telegramId, nodeId: { in: nodeIds } },
             select: { accountId: true },
             distinct: ['accountId'],
             orderBy: { accountId: 'asc' },
         });
-
         return rows.map(r => r.accountId);
     }
 }
