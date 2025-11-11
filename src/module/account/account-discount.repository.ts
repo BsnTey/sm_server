@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@common/database/prisma.service';
-import { NodePair, UpsertPersonalDiscountInput } from './interfaces/account-discount.interface';
+import { NodePair, UpsertPersonalDiscountInput, UpsertPersonalDiscountProductsInput } from './interfaces/account-discount.interface';
 
 @Injectable()
 export class AccountDiscountRepository {
@@ -51,10 +51,6 @@ export class AccountDiscountRepository {
         });
     }
 
-    /**
-     * Удаление теперь по (accountId, telegramId), чтобы не снести чужие данные.
-     * Если надо старое поведение — оставьте отдельный метод.
-     */
     async deleteByAccountAndTelegram(accountId: string, telegramId: string): Promise<number> {
         const res = await this.prisma.accountDiscount.deleteMany({
             where: { accountId, telegramId },
@@ -67,7 +63,6 @@ export class AccountDiscountRepository {
             where: { telegramId },
             select: { accountId: true },
             distinct: ['accountId'],
-            orderBy: { accountId: 'asc' },
         });
         return rows.map(r => r.accountId);
     }
@@ -78,8 +73,65 @@ export class AccountDiscountRepository {
             where: { telegramId, nodeId: { in: nodeIds } },
             select: { accountId: true },
             distinct: ['accountId'],
-            orderBy: { accountId: 'asc' },
         });
         return rows.map(r => r.accountId);
+    }
+
+    //функции для нового поиска
+    async findAccountsByTelegramUser(telegramId: string) {
+        const records = await this.prisma.accountDiscountProduct.findMany({
+            where: {
+                telegramId,
+            },
+            select: {
+                accountId: true,
+            },
+            distinct: ['accountId'],
+        });
+        return records.map(r => r.accountId);
+    }
+
+    async deleteDataForAccount(accountId: string, telegramId: string) {
+        const { count } = await this.prisma.accountDiscountProduct.deleteMany({
+            where: {
+                accountId,
+                telegramId,
+            },
+        });
+        return count;
+    }
+
+    async findAccountsForProduct(telegramId: string, productId: string) {
+        const records = await this.prisma.accountDiscountProduct.findMany({
+            where: {
+                productId,
+                telegramId,
+            },
+            select: {
+                accountId: true,
+            },
+        });
+        return records.map(r => r.accountId);
+    }
+
+    async upsertManyDiscountProducts(items: UpsertPersonalDiscountProductsInput[]): Promise<void> {
+        if (!items.length) return;
+
+        await this.prisma.$transaction(
+            items.map(i =>
+                this.prisma.accountDiscountProduct.upsert({
+                    where: { productId_telegramId_accountId: { productId: i.productId, telegramId: i.telegramId, accountId: i.accountId } },
+                    create: {
+                        productId: i.productId,
+                        accountId: i.accountId,
+                        telegramId: i.telegramId,
+                        dateEnd: i.dateEnd,
+                    },
+                    update: {
+                        dateEnd: i.dateEnd,
+                    },
+                }),
+            ),
+        );
     }
 }

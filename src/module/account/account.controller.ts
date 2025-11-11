@@ -247,6 +247,12 @@ export class AccountController {
         return this.accountService.checkProductBatchForPersonalDiscount(data);
     }
 
+    @Post('v1/set/personal-discount')
+    @HttpCode(200)
+    async setAccountsForPersonalDiscountV1(@Body() data: SetPersonalDiscountAccountRequestDto): Promise<any> {
+        return this.accountService.setAccountsForPersonalDiscountV1(data);
+    }
+
     @Post('set/personal-discount')
     @HttpCode(200)
     async setAccountsForPersonalDiscount(@Body() data: SetPersonalDiscountAccountRequestDto): Promise<any> {

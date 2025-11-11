@@ -326,6 +326,23 @@ model AccountDiscount {
   @@map("account_discount")
 }
 
+model AccountDiscountProduct {
+  id         Int      @id @default(autoincrement())
+  productId  String   @map("product_id") @db.VarChar(32)
+  telegramId String   @map("telegram_id") @db.VarChar(32)
+  accountId  String   @map("account_id")
+  dateEnd    DateTime @map("date_end")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([productId, telegramId, accountId], name: "productId_telegramId_accountId")
+  @@index([productId, telegramId])
+  @@index([accountId])
+  @@index([telegramId])
+  @@map("account_discount_product")
+}
+
 model AccountPurchase {
   id          String @id
   orderNumber String @map("order_number")

@@ -17,7 +17,6 @@ import {
     ERROR_ACCOUNT_NOT_FOUND,
     ERROR_COURSE_NOT_FOUND,
     ERROR_GET_ACCESS_TOKEN_COURSE,
-    ERROR_LOGOUT_MP,
     ERROR_PROGRESS_ID,
 } from './constants/error.constant';
 import { ConfigService } from '@nestjs/config';
@@ -69,7 +68,7 @@ import { CheckProductResultItem, ProductApiResponse } from './interfaces/product
 import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discount.dto';
 import { AccountDiscountRepository } from './account-discount.repository';
 import { parseDateFlexible } from './utils/parse-data';
-import { NodePair } from './interfaces/account-discount.interface';
+import { NodePair, UpsertPersonalDiscountProductsInput } from './interfaces/account-discount.interface';
 import { AccountTelegramParamsDto } from './dto/account-telegram-ids.dto';
 import { keyDiscountAccount, keyDiscountNodes } from './cache-key/key';
 import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
@@ -77,6 +76,8 @@ import { CalculateService } from '../calculate/calculate.service';
 import { Cookie } from './interfaces/cookie.interface';
 import { OrderRepository } from './order.repository';
 import { PreparedAccountInfo } from './interfaces/extend-chrome.interface';
+import { List, Products } from './interfaces/products.interface';
+import { chunk, requestWithBackoff, startOfNextDayUTC } from './utils/set-products.utils';
 
 @Injectable()
 export class AccountService {
@@ -89,6 +90,8 @@ export class AccountService {
     private TTL_CASH_ACCOUNT = 20_000;
     private TTL_CASH_DISCOUNT = 10_800_000;
     private readonly MAX_CONCURRENCY = 5;
+    private readonly PAGE_SIZE = 100;
+    private readonly DB_CHUNK = 800;
 
     constructor(
         private configService: ConfigService,
@@ -650,6 +653,134 @@ export class AccountService {
 
     async setCityToAccount(accountId: string, cityId: string) {
         await this.accountRep.setCityToAccount(accountId, cityId);
+    }
+
+    async pickProxyForAccount(accountId: string): Promise<string> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        return accountWithProxyEntity.proxy!.proxy;
+    }
+
+    async *paginateProducts(
+        proxyId: string,
+        accountId: string,
+        nodeUrl: string,
+        pageSize = 100,
+        maxPagesCap = 20,
+        findProductsBySearch: (accountId: string, url: string, limit: number, offset: number) => Promise<Products>,
+    ) {
+        let offset = 0;
+        let total: number | null = null;
+        let pages = 0;
+
+        while (pages < maxPagesCap) {
+            const res = await requestWithBackoff(proxyId, () => findProductsBySearch(accountId, nodeUrl, pageSize, offset));
+            const items = res.list ?? [];
+            console.log(`Сделана попытка добавления. ${items.length} получено, время ${new Date()}`);
+            pages++;
+
+            // Если total ещё неизвестен и meta пришла — зафиксируем total один раз
+            if (total === null && res.meta?.count != null) {
+                total = res.meta.count;
+                if (total <= 0) break;
+            }
+
+            // Пустая страница — стоп
+            if (items.length === 0) break;
+
+            // Отдаём текущие элементы
+            yield items;
+
+            // Если знаем общий total — контролируем окончание по нему
+            if (total !== null) {
+                offset += pageSize; // классический limit/offset
+                if (offset >= total) break; // всё прочитали
+            } else {
+                // total неизвестен: ориентируемся по «неполной» странице
+                if (items.length < pageSize) break; // последняя страница
+                offset += pageSize;
+            }
+        }
+    }
+
+    async setAccountsForPersonalDiscountV1(data: SetPersonalDiscountAccountRequestDto): Promise<{
+        ok: boolean;
+        results: Array<{ accountId: string; saved: number }>;
+        errors: Array<{ accountId: string; message: string }>;
+    }> {
+        const { telegramId, personalDiscounts } = data;
+        const results: Array<{ accountId: string; saved: number }> = [];
+        const errors: Array<{ accountId: string; message: string }> = [];
+
+        const worker = async (accountId: string) => {
+            const proxyId = await this.pickProxyForAccount(accountId);
+
+            const pd = await this.personalDiscount(accountId);
+            const urlNodes = (pd?.list ?? []).map(n => ({
+                url: n.url,
+                dateEnd: startOfNextDayUTC(n.dateEnd),
+            }));
+
+            let savedTotal = 0;
+
+            for (const node of urlNodes) {
+                const buffer: UpsertPersonalDiscountProductsInput[] = [];
+
+                for await (const page of this.paginateProducts(
+                    proxyId,
+                    accountId,
+                    node.url,
+                    this.PAGE_SIZE,
+                    50,
+                    this.findProductsBySearch.bind(this),
+                )) {
+                    for (const it of page) {
+                        buffer.push({
+                            productId: String(it.id),
+                            telegramId: String(telegramId),
+                            accountId,
+                            dateEnd: node.dateEnd,
+                        });
+                    }
+
+                    // периодически пишем в БД, чтобы не раздувать память
+                    if (buffer.length >= this.DB_CHUNK) {
+                        const unique = Array.from(new Map(buffer.map(x => [`${x.productId}|${x.telegramId}|${x.accountId}`, x])).values());
+                        for (const part of chunk(unique, this.DB_CHUNK)) {
+                            await this.accountDiscountRepo.upsertManyDiscountProducts(part);
+                            savedTotal += part.length;
+                        }
+                        buffer.length = 0;
+                    }
+                }
+
+                if (buffer.length) {
+                    const unique = Array.from(new Map(buffer.map(x => [`${x.productId}|${x.telegramId}|${x.accountId}`, x])).values());
+                    for (const part of chunk(unique, this.DB_CHUNK)) {
+                        await this.accountDiscountRepo.upsertManyDiscountProducts(part);
+                        savedTotal += part.length;
+                    }
+                }
+            }
+
+            return { accountId, saved: savedTotal };
+        };
+
+        // глобальный параллелизм: по 5 аккаунтов
+        for (let i = 0; i < personalDiscounts.length; i += this.MAX_CONCURRENCY) {
+            const slice = personalDiscounts.slice(i, i + this.MAX_CONCURRENCY);
+            const settled = await Promise.allSettled(slice.map(a => worker(a)));
+
+            settled.forEach((r, idx) => {
+                const accountId = slice[idx];
+                if (r.status === 'fulfilled') {
+                    results.push({ accountId, saved: r.value.saved });
+                } else {
+                    errors.push({ accountId, message: r.reason?.message ?? 'Unknown error' });
+                }
+            });
+        }
+
+        return { ok: errors.length === 0, results, errors };
     }
 
     async setAccountsForPersonalDiscount(data: SetPersonalDiscountAccountRequestDto): Promise<{
@@ -1537,6 +1668,25 @@ export class AccountService {
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {};
+
+        const response = await this.httpService.post(url, payload, httpOptions);
+        return response.data.data;
+    }
+
+    @RetryOn401()
+    async findProductsBySearch(accountId: string, subquery: string, limit = 100, offset = 0): Promise<Products> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const url = this.url + `v2/products/search?limit=${limit}&offset=${offset}`;
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+
+        const payload = {
+            facetAvailabilityApply: false,
+            obtainment: { delivery: false, shopNames: [] },
+            pageType: 'DiscountsCatalog',
+            subquery,
+            userInteraction: false,
+            woQueryTextCorrection: false,
+        };
 
         const response = await this.httpService.post(url, payload, httpOptions);
         return response.data.data;

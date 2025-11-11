@@ -20,7 +20,7 @@ export class TrackingStarterService {
         const user = await this.users.getUserByTelegramId(dto.telegramId);
         if (!user) throw new NotFoundException('User not found');
 
-        await this.accounts.orderHistory(dto.accountId);
+        await this.accounts.shortInfo(dto.accountId);
         this.logger.log(`Старт отслеживания для заказа ${dto.orderNumber}, у ${user.telegramName} - ${dto.telegramId}`);
 
         const job: TrackOrderJob = {
@@ -32,6 +32,7 @@ export class TrackingStarterService {
 
         // первая проверка—через 5 секунд
         await this.publisher.publish(RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE, job, 5_000);
+        await this.accounts.orderHistory(dto.accountId);
 
         return { accepted: true };
     }
