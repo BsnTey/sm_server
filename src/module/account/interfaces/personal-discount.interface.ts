@@ -34,3 +34,5 @@ export interface PersonalDiscountResponse {
     dateEnd: string;
     nodeName: string;
 }
+
+export type ErrorItem = { accountId: string; error: string };

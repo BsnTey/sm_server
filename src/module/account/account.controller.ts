@@ -33,6 +33,7 @@ import { AccountTelegramParamsDto } from './dto/account-telegram-ids.dto';
 import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
 import { CheckProductResultItem } from './interfaces/product.interface';
 import { PreparedAccountInfo } from './interfaces/extend-chrome.interface';
+import { ProductCheckingRequestDto } from './dto/product-checking.dto';
 
 @Controller('account')
 export class AccountController {
@@ -247,11 +248,32 @@ export class AccountController {
         return this.accountService.checkProductBatchForPersonalDiscount(data);
     }
 
+    //роуты версии через очередь
     @Post('v1/set/personal-discount')
     @HttpCode(200)
     async setAccountsForPersonalDiscountV1(@Body() data: SetPersonalDiscountAccountRequestDto): Promise<any> {
         return this.accountService.queueAccountsForPersonalDiscountV1(data);
     }
+
+    @Post('v2/personal-discount/accounts/discount/:telegramId')
+    @HttpCode(200)
+    async getAccountsForPersonalDiscountV2(@Param() params: TelegramIdParamsDto, @Body() data: ProductCheckingRequestDto): Promise<any> {
+        return this.accountService.getAccountsForPersonalDiscountV2(params.telegramId, data.productId);
+    }
+
+    @Get('v2/personal-discount/accounts/all/:telegramId')
+    @HttpCode(200)
+    async getUserAccountIdsV2(@Param() params: TelegramIdParamsDto): Promise<any> {
+        return this.accountService.getUserAccountIdsV2(params.telegramId);
+    }
+
+    @Delete('v1/personal-discount/telegramId/:telegramId/accountId/:accountId')
+    @HttpCode(200)
+    async delDiscountsByAccountIdV1(@Param() params: AccountTelegramParamsDto): Promise<any> {
+        return this.accountService.removeDiscountsByAccountIdV1(params);
+    }
+
+    //конец
 
     @Post('set/personal-discount')
     @HttpCode(200)
@@ -265,9 +287,17 @@ export class AccountController {
         return this.accountService.getDistinctNodePairsByTelegram(params.telegramId);
     }
 
+    //разницы нет между роутами
     @Get('personal-discount/accounts/:telegramId')
     @HttpCode(200)
     async getUserAccountIds(@Param() params: TelegramIdParamsDto): Promise<any> {
+        return this.accountService.getUserAccountIds(params.telegramId);
+    }
+
+    //разницы нет между роутами
+    @Get('v1/personal-discount/accounts/:telegramId')
+    @HttpCode(200)
+    async getUserAccountIdsV1(@Param() params: TelegramIdParamsDto): Promise<any> {
         return this.accountService.getUserAccountIds(params.telegramId);
     }
 

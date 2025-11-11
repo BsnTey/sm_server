@@ -60,7 +60,7 @@ import { encodeXlocation } from './utils/x-location.utils';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { RetryOn401 } from './decorators/retry-on-403.decorator';
-import { PersonalDiscount, PersonalDiscountResponse } from './interfaces/personal-discount.interface';
+import { ErrorItem, PersonalDiscount, PersonalDiscountResponse } from './interfaces/personal-discount.interface';
 import { ProfileFamilyResponse } from './interfaces/profile-family.interface';
 import { FamilyInviteResponse, InviteMemberFamily, MemberFamily } from './interfaces/family-invite.interface';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -77,7 +77,7 @@ import { Cookie } from './interfaces/cookie.interface';
 import { OrderRepository } from './order.repository';
 import { PreparedAccountInfo } from './interfaces/extend-chrome.interface';
 import { Products } from './interfaces/products.interface';
-import { chunk, requestWithBackoff, startOfNextDayUTC } from './utils/set-products.utils';
+import { chunk, cmp, requestWithBackoff, startOfNextDayUTC } from './utils/set-products.utils';
 import { DelayedPublisher } from '@common/broker/delayed.publisher';
 import { RABBIT_MQ_QUEUES } from '@common/broker/rabbitmq.queues';
 
@@ -951,6 +951,14 @@ export class AccountService {
         return { deleted: dbDelete.value ?? 0 };
     }
 
+    async removeDiscountsByAccountIdV1({ telegramId, accountId }: AccountTelegramParamsDto): Promise<{
+        deleted: number;
+    }> {
+        const countDelete = await this.accountDiscountRepo.deleteDataForAccount(accountId, telegramId);
+
+        return { deleted: countDelete ?? 0 };
+    }
+
     async getUserAccountIds(telegramId: string): Promise<{ accountIds: string[] }> {
         const key = keyDiscountAccount(telegramId);
         const accountsCache = await this.cacheManager.get<string[]>(key);
@@ -960,6 +968,11 @@ export class AccountService {
         const accountIds = await this.accountDiscountRepo.findDistinctAccountIdsByTelegram(telegramId);
         await this.cacheManager.set(key, accountIds, this.TTL_CASH_DISCOUNT);
 
+        return { accountIds };
+    }
+
+    async getUserAccountIdsV2(telegramId: string): Promise<{ accountIds: string[] }> {
+        const accountIds = await this.accountDiscountRepo.findAccountsByTelegramUser(telegramId);
         return { accountIds };
     }
 
@@ -1042,6 +1055,79 @@ export class AccountService {
         const status = this.getHttpStatus(err);
         const msg = err?.response?.data?.message ?? err?.message;
         return status === 404 || msg === 'PRODUCT_NOT_FOUND';
+    }
+
+    async getAccountsForPersonalDiscountV2(
+        telegramId: string,
+        productId: string,
+    ): Promise<{
+        ok: boolean;
+        productId: string;
+        processed: number;
+        results: PreparedAccountInfo[];
+        errors: ErrorItem[];
+    }> {
+        const accountIds = await this.accountDiscountRepo.findAccountsForProduct(telegramId, productId);
+        if (!accountIds.length) {
+            return { ok: true, productId, processed: 0, results: [], errors: [] };
+        }
+
+        const [ordersTodayMap, bonusMap] = await Promise.all([
+            this.orderRepository.countTodayByAccountIds(accountIds),
+            this.accountRep.getBonusCountByAccountIds(accountIds),
+        ]);
+
+        const accounts: PreparedAccountInfo[] = accountIds.map(accountId => ({
+            accountId,
+            bonus: bonusMap[accountId] ?? 0,
+            ordersNumber: ordersTodayMap[accountId] ?? 0,
+        }));
+
+        accounts.sort(cmp);
+
+        const errors: ErrorItem[] = [];
+        const MAX_ROUNDS = 3;
+
+        for (let round = 1; round <= MAX_ROUNDS; round++) {
+            const topN = Math.min(3, accounts.length);
+            if (topN === 0) break;
+
+            const topSlice = accounts.slice(0, topN);
+            const checks = await Promise.allSettled(topSlice.map(a => this.shortInfo(a.accountId)));
+
+            let mismatches = 0;
+
+            checks.forEach((res, idx) => {
+                const acc = topSlice[idx];
+                if (res.status === 'fulfilled') {
+                    const freshBonus = Number(res.value?.bonusCount ?? 0);
+                    if (Number.isFinite(freshBonus)) {
+                        if (freshBonus !== acc.bonus) mismatches++;
+                        const target = accounts.find(x => x.accountId === acc.accountId);
+                        if (target) target.bonus = freshBonus;
+                    }
+                } else {
+                    const msg = res.reason?.response?.data?.message ?? res.reason?.message ?? 'SHORTINFO_ERROR';
+                    errors.push({ accountId: acc.accountId, error: msg });
+                }
+            });
+
+            if (mismatches >= 2 && round < MAX_ROUNDS) {
+                accounts.sort(cmp);
+                continue;
+            }
+            break;
+        }
+
+        accounts.sort(cmp);
+
+        return {
+            ok: true,
+            productId,
+            processed: accountIds.length,
+            results: accounts,
+            errors,
+        };
     }
 
     async checkProductBatchForPersonalDiscount({ telegramId, isInventory, productId, accountIds }: CheckProductBatchRequestDto): Promise<{

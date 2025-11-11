@@ -1,3 +1,5 @@
+import { PreparedAccountInfo } from '../interfaces/extend-chrome.interface';
+
 const PROXY_MIN_INTERVAL_MS = 450; // ~2.2 RPS на прокси
 const PAGE_MICRO_DELAY_MS = 1000; // микро-пауза между страницами (с джиттером)
 const RETRY_MAX_ATTEMPTS = 5;
@@ -48,4 +50,14 @@ export function* chunk<T>(arr: T[], size: number): Generator<T[]> {
 export function startOfNextDayUTC(dateStrYYYYMMDD: string): Date {
     const [y, m, d] = dateStrYYYYMMDD.split('-').map(Number);
     return new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0, 0));
+}
+
+// сортировка: (<2 orders) первыми, затем по bonus ↓, затем по orders ↑
+export function cmp(a: PreparedAccountInfo, b: PreparedAccountInfo) {
+    const ap = a.ordersNumber >= 2 ? 1 : 0;
+    const bp = b.ordersNumber >= 2 ? 1 : 0;
+    if (ap !== bp) return ap - bp;
+    if (b.bonus !== a.bonus) return b.bonus - a.bonus;
+    if (a.ordersNumber !== b.ordersNumber) return a.ordersNumber - b.ordersNumber;
+    return a.accountId.localeCompare(b.accountId);
 }
