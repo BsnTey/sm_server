@@ -7,11 +7,12 @@ import { DelayedPublisher } from '@common/broker/delayed.publisher';
 import { NotificationModule } from '../../module/notification/notification.module';
 import { AccountModule } from '../../module/account/account.module';
 import { PersonalDiscountWorker } from './workers/personal-discount.worker';
+import { AccountShortInfoWorker } from './workers/account-short-info.worker';
 
 @Global()
 @Module({
     imports: [ConfigModule, forwardRef(() => NotificationModule), AccountModule],
-    providers: [brokerProvider, BrokerConsumer, DelayedPublisher, PersonalDiscountWorker],
+    providers: [brokerProvider, BrokerConsumer, DelayedPublisher, PersonalDiscountWorker, AccountShortInfoWorker],
     exports: [brokerProvider, DelayedPublisher],
 })
 export class BrokerModule implements OnApplicationShutdown {

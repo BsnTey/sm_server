@@ -5,6 +5,7 @@ import { RABBIT_MQ_QUEUES } from '@common/broker/rabbitmq.queues';
 import { ConfirmChannel, ConsumeMessage } from 'amqplib';
 import { OrderTrackingWorker } from '../../module/notification/tracking/tracking.worker';
 import { PersonalDiscountWorker } from './workers/personal-discount.worker';
+import { AccountShortInfoWorker } from './workers/account-short-info.worker';
 
 @Injectable()
 export class BrokerConsumer implements OnModuleInit {
@@ -14,6 +15,7 @@ export class BrokerConsumer implements OnModuleInit {
         @Inject(RABBIT_MQ) private readonly channel: ChannelWrapper,
         private readonly worker: OrderTrackingWorker,
         private readonly personalDiscountWorker: PersonalDiscountWorker,
+        private readonly accountShortInfoWorker: AccountShortInfoWorker,
     ) {}
 
     async onModuleInit() {
@@ -31,6 +33,12 @@ export class BrokerConsumer implements OnModuleInit {
             await raw.consume(
                 RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_QUEUE,
                 msg => this.safeHandle('PersonalDiscountWorker', msg, raw, payload => this.personalDiscountWorker.process(payload)),
+                { noAck: false },
+            );
+
+            await raw.consume(
+                RABBIT_MQ_QUEUES.ACCOUNT_SHORT_INFO_QUEUE,
+                msg => this.safeHandle('AccountShortInfoWorker', msg, raw, payload => this.accountShortInfoWorker.process(payload)),
                 { noAck: false },
             );
         });

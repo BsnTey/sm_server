@@ -112,6 +112,7 @@ export class OrderTrackingWorker {
         if (this.isTerminal(current)) {
             // завершаем: не репаблишим
             this.logger.log(`Order ${orderNumber} reached terminal status ${current}, stop tracking.`);
+            await this.scheduleAccountShortInfo(accountId);
             return;
         }
 
@@ -132,5 +133,19 @@ export class OrderTrackingWorker {
         };
 
         await this.publisher.publish(RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE, nextJob, nextMs);
+    }
+
+    private async scheduleAccountShortInfo(accountId: string) {
+        const delayMs = this.delayUntilNextDayAtThreeAM();
+        await this.publisher.publish(RABBIT_MQ_QUEUES.ACCOUNT_SHORT_INFO_QUEUE, { accountId }, delayMs);
+        this.logger.log(`Scheduled account short info for ${accountId} in ${(delayMs / 3600000).toFixed(2)}h`);
+    }
+
+    private delayUntilNextDayAtThreeAM(): number {
+        const now = new Date();
+        const target = new Date(now);
+        target.setDate(target.getDate() + 1);
+        target.setHours(4, 0, 0, 0);
+        return Math.max(0, target.getTime() - now.getTime());
     }
 }
