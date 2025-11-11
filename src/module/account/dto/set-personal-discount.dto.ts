@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 const SetPersonalDiscountAccountRequestSchema = z.object({
     telegramId: z.string(),
-    personalDiscounts: z.array(z.string()).min(1).max(10),
+    personalDiscounts: z.array(z.string()).min(1),
 });
 
 export namespace SetPersonalDiscountAccountCommand {

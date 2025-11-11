@@ -1,5 +1,5 @@
 const PROXY_MIN_INTERVAL_MS = 450; // ~2.2 RPS на прокси
-const PAGE_MICRO_DELAY_MS = 150; // микро-пауза между страницами (с джиттером)
+const PAGE_MICRO_DELAY_MS = 1000; // микро-пауза между страницами (с джиттером)
 const RETRY_MAX_ATTEMPTS = 5;
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));

@@ -5,11 +5,13 @@ import { brokerProvider, RABBIT_MQ } from './broker.provider';
 import { ConfigModule } from '@nestjs/config';
 import { DelayedPublisher } from '@common/broker/delayed.publisher';
 import { NotificationModule } from '../../module/notification/notification.module';
+import { AccountModule } from '../../module/account/account.module';
+import { PersonalDiscountWorker } from './workers/personal-discount.worker';
 
 @Global()
 @Module({
-    imports: [ConfigModule, forwardRef(() => NotificationModule)],
-    providers: [brokerProvider, BrokerConsumer, DelayedPublisher],
+    imports: [ConfigModule, forwardRef(() => NotificationModule), AccountModule],
+    providers: [brokerProvider, BrokerConsumer, DelayedPublisher, PersonalDiscountWorker],
     exports: [brokerProvider, DelayedPublisher],
 })
 export class BrokerModule implements OnApplicationShutdown {

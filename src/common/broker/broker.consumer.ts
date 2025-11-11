@@ -4,6 +4,7 @@ import { RABBIT_MQ } from './broker.provider';
 import { RABBIT_MQ_QUEUES } from '@common/broker/rabbitmq.queues';
 import { ConfirmChannel, ConsumeMessage } from 'amqplib';
 import { OrderTrackingWorker } from '../../module/notification/tracking/tracking.worker';
+import { PersonalDiscountWorker } from './workers/personal-discount.worker';
 
 @Injectable()
 export class BrokerConsumer implements OnModuleInit {
@@ -12,6 +13,7 @@ export class BrokerConsumer implements OnModuleInit {
     constructor(
         @Inject(RABBIT_MQ) private readonly channel: ChannelWrapper,
         private readonly worker: OrderTrackingWorker,
+        private readonly personalDiscountWorker: PersonalDiscountWorker,
     ) {}
 
     async onModuleInit() {
@@ -20,17 +22,27 @@ export class BrokerConsumer implements OnModuleInit {
 
     private async registerHandlers() {
         await this.channel.addSetup(async (raw: ConfirmChannel) => {
-            await raw.consume(RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE, msg => this.safeHandle(msg, raw), { noAck: false });
+            await raw.consume(
+                RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE,
+                msg => this.safeHandle('OrderTrackingWorker', msg, raw, payload => this.worker.process(payload)),
+                { noAck: false },
+            );
+
+            await raw.consume(
+                RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_QUEUE,
+                msg => this.safeHandle('PersonalDiscountWorker', msg, raw, payload => this.personalDiscountWorker.process(payload)),
+                { noAck: false },
+            );
         });
     }
 
-    private async safeHandle(msg: ConsumeMessage | null, raw: ConfirmChannel) {
+    private async safeHandle(label: string, msg: ConsumeMessage | null, raw: ConfirmChannel, handler: (payload: Buffer) => Promise<void>) {
         if (!msg) return;
         try {
-            await this.worker.process(msg.content);
+            await handler(msg.content);
             raw.ack(msg);
         } catch (e) {
-            this.logger.error('OrderTrackingWorker failed, ack anyway (no retries here):', e);
+            this.logger.error(`${label} failed, ack anyway (no retries here):`, e);
             raw.ack(msg);
         }
     }

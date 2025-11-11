@@ -250,7 +250,7 @@ export class AccountController {
     @Post('v1/set/personal-discount')
     @HttpCode(200)
     async setAccountsForPersonalDiscountV1(@Body() data: SetPersonalDiscountAccountRequestDto): Promise<any> {
-        return this.accountService.setAccountsForPersonalDiscountV1(data);
+        return this.accountService.queueAccountsForPersonalDiscountV1(data);
     }
 
     @Post('set/personal-discount')

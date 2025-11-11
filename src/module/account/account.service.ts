@@ -76,8 +76,10 @@ import { CalculateService } from '../calculate/calculate.service';
 import { Cookie } from './interfaces/cookie.interface';
 import { OrderRepository } from './order.repository';
 import { PreparedAccountInfo } from './interfaces/extend-chrome.interface';
-import { List, Products } from './interfaces/products.interface';
+import { Products } from './interfaces/products.interface';
 import { chunk, requestWithBackoff, startOfNextDayUTC } from './utils/set-products.utils';
+import { DelayedPublisher } from '@common/broker/delayed.publisher';
+import { RABBIT_MQ_QUEUES } from '@common/broker/rabbitmq.queues';
 
 @Injectable()
 export class AccountService {
@@ -92,6 +94,8 @@ export class AccountService {
     private readonly MAX_CONCURRENCY = 5;
     private readonly PAGE_SIZE = 100;
     private readonly DB_CHUNK = 800;
+    private readonly PERSONAL_DISCOUNT_BATCH_SIZE = 5;
+    private readonly PERSONAL_DISCOUNT_RATE_SECONDS = 80;
 
     constructor(
         private configService: ConfigService,
@@ -105,6 +109,7 @@ export class AccountService {
         private deviceInfoService: DeviceInfoService,
         private sportmasterHeaders: SportmasterHeadersService,
         private calculateService: CalculateService,
+        private readonly publisher: DelayedPublisher,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) {}
 
@@ -675,7 +680,6 @@ export class AccountService {
         while (pages < maxPagesCap) {
             const res = await requestWithBackoff(proxyId, () => findProductsBySearch(accountId, nodeUrl, pageSize, offset));
             const items = res.list ?? [];
-            console.log(`Сделана попытка добавления. ${items.length} получено, время ${new Date()}`);
             pages++;
 
             // Если total ещё неизвестен и meta пришла — зафиксируем total один раз
@@ -700,6 +704,44 @@ export class AccountService {
                 offset += pageSize;
             }
         }
+    }
+
+    async queueAccountsForPersonalDiscountV1(data: SetPersonalDiscountAccountRequestDto): Promise<{
+        ok: boolean;
+        estimatedSeconds: number;
+    }> {
+        const normalized = data.personalDiscounts.map(id => id.trim()).filter(Boolean);
+        const uniqueAccountIds = Array.from(new Set(normalized));
+
+        if (!uniqueAccountIds.length) {
+            throw new HttpException('No valid accounts provided', HttpStatus.BAD_REQUEST);
+        }
+
+        const batches = Array.from(chunk(uniqueAccountIds, this.PERSONAL_DISCOUNT_BATCH_SIZE));
+
+        await Promise.all(
+            batches.map(batch =>
+                this.publisher.publish(
+                    RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_QUEUE,
+                    {
+                        telegramId: data.telegramId,
+                        personalDiscounts: batch,
+                    },
+                    0,
+                ),
+            ),
+        );
+
+        const estimatedSeconds = batches.length * this.PERSONAL_DISCOUNT_RATE_SECONDS;
+
+        this.logger.log(
+            `Queued ${uniqueAccountIds.length} accounts for personal discount (telegramId=${data.telegramId}, batches=${batches.length})`,
+        );
+
+        return {
+            ok: true,
+            estimatedSeconds,
+        };
     }
 
     async setAccountsForPersonalDiscountV1(data: SetPersonalDiscountAccountRequestDto): Promise<{
@@ -730,7 +772,7 @@ export class AccountService {
                     accountId,
                     node.url,
                     this.PAGE_SIZE,
-                    50,
+                    20,
                     this.findProductsBySearch.bind(this),
                 )) {
                     for (const it of page) {
