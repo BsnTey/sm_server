@@ -46,7 +46,6 @@ import {
     TemplateNameScene,
     TemplateTextScene,
 } from './updates/calculate/calculate-settings.update';
-import { CalculateRepository } from './updates/calculate/calculate.repository';
 import {
     FamilyInputAccountUpdate,
     FamilyInviteUpdate,
@@ -56,8 +55,8 @@ import {
 } from './updates/family/family.update';
 import { FamilyService } from './updates/family/family.service';
 import { CalculateModule } from '../calculate/calculate.module';
-import { CalculateServiceTelegram } from './updates/calculate/calculate.service';
 import { BottModule } from '../bott/bott.module';
+import { TemplateModule } from '../template/template.module';
 
 @Module({
     imports: [
@@ -71,6 +70,7 @@ import { BottModule } from '../bott/bott.module';
         CouponModule,
         CalculateModule,
         BottModule,
+        TemplateModule,
     ],
     providers: [
         TelegramService,
@@ -106,8 +106,6 @@ import { BottModule } from '../bott/bott.module';
         PaymentUpdate,
         PaymentPromocodeUpdate,
         FortuneUpdate,
-        CalculateServiceTelegram,
-        CalculateRepository,
         CalculateSettingsScene,
         TemplateNameScene,
         TemplateTextScene,

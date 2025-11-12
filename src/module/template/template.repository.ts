@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@common/database/prisma.service';
+import { CommissionType, TypeCalculate } from '@prisma/client';
 
 @Injectable()
-export class CalculateRepository {
+export class TemplateRepository {
     constructor(private readonly prisma: PrismaService) {}
 
     async getUserTemplates(userTelegramId: string) {
@@ -13,10 +14,11 @@ export class CalculateRepository {
     }
 
     async createTemplate(
-        userTelegramId: string,
+        userTelegram: string,
         name: string,
         template: string,
-        commissionType: string,
+        commissionType: CommissionType | undefined,
+        calculateType: TypeCalculate | undefined,
         commissionRate: number,
         roundTo: number,
     ) {
@@ -25,10 +27,11 @@ export class CalculateRepository {
                 name,
                 template,
                 commissionType,
+                calculateType,
                 commissionRate,
                 roundTo,
                 userTelegram: {
-                    connect: { telegramId: userTelegramId },
+                    connect: { telegramId: userTelegram },
                 },
             },
         });
@@ -46,6 +49,12 @@ export class CalculateRepository {
     async getTemplateById(id: string) {
         return this.prisma.userTemplate.findUnique({
             where: { id },
+        });
+    }
+
+    async getTemplatesByTelegramId(telegramId: string) {
+        return this.prisma.userTemplate.findMany({
+            where: { userTelegramId: telegramId },
         });
     }
 }

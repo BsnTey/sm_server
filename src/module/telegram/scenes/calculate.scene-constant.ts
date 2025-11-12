@@ -1,9 +1,3 @@
-export enum CommissionType {
-    BONUS = 'BONUS',
-    PROMO = 'PROMO',
-    TOTAL = 'TOTAL',
-}
-
 export const CALCULATE_SETTINGS_SCENE = 'calculate_settings_scene';
 export const TEMPLATE_NAME_SCENE = 'template_name_scene';
 export const TEMPLATE_TEXT_SCENE = 'template_text_scene';

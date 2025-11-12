@@ -3,17 +3,18 @@ import { ALL_KEYS_MENU_BUTTON_NAME, CALCULATE_BONUS } from '../base-command/base
 import { WizardContext } from 'telegraf/typings/scenes';
 import { TelegramService } from '../../telegram.service';
 import { calculateInfoKeyboard } from '../../keyboards/calculate.keyboard';
-import { CalculateServiceTelegram } from './calculate.service';
 import { Markup } from 'telegraf';
 import { CALCULATE_SETTINGS_SCENE } from '../../scenes/calculate.scene-constant';
 import { ICalculateCash } from '../../interfaces/calculate.interface';
 import { CalculateService } from '../../../calculate/calculate.service';
+import { CommissionType } from '@prisma/client';
+import { TemplateService } from '../../../template/template.service';
 
 @Scene(CALCULATE_BONUS.scene)
 export class CalculateUpdate {
     constructor(
         private telegramService: TelegramService,
-        private calculateServiceTelegram: CalculateServiceTelegram,
+        private calculateServiceTelegram: TemplateService,
         private calculateService: CalculateService,
     ) {}
 
@@ -209,7 +210,7 @@ export class CalculateUpdate {
             return;
         }
 
-        const commission = this.calculateServiceTelegram.calculateCommission(
+        const commission = calculateCommission(
             template.commissionType,
             template.commissionRate,
             template.roundTo,
@@ -218,10 +219,49 @@ export class CalculateUpdate {
             calculationResult.totalFullDiscount,
         );
 
-        const message = this.calculateServiceTelegram.applyTemplate(template.template, calculationResult.totalSumOnKassa, commission);
+        const message = applyTemplate(template.template, calculationResult.totalSumOnKassa, commission);
 
         await ctx.reply(`<code>${message}</code>`, {
             parse_mode: 'HTML',
         });
     }
+}
+
+function calculateCommission(
+    commissionType: CommissionType,
+    commissionRate: number,
+    roundTo: number,
+    totalBonus: number,
+    totalPromo: number,
+    totalDiscount: number,
+): number {
+    let baseAmount = 0;
+
+    switch (commissionType) {
+        case CommissionType.BONUS:
+            baseAmount = totalBonus;
+            break;
+        case CommissionType.PROMO:
+            baseAmount = totalPromo;
+            break;
+        case CommissionType.TOTAL:
+        default:
+            baseAmount = totalDiscount;
+            break;
+    }
+
+    let commission = baseAmount * (commissionRate / 100);
+
+    if (commission % roundTo !== 0) {
+        commission = Math.ceil(commission / roundTo) * roundTo;
+    }
+
+    return Math.floor(commission);
+}
+
+function applyTemplate(template: string, totalPrice: number, commission: number): string {
+    return template
+        .replace(/{payment}/g, totalPrice.toString())
+        .replace(/{commission}/g, commission.toString())
+        .replace(/\/n/g, '\n');
 }

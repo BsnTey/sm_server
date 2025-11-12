@@ -8,7 +8,6 @@ import {
     CALCULATE_SETTINGS_SCENE,
     COMMISSION_RATE_SCENE,
     COMMISSION_TYPE_SCENE,
-    CommissionType,
     CUSTOM_ROUND_SCENE,
     ROUND_TO_SCENE,
     TEMPLATE_NAME_SCENE,
@@ -18,13 +17,14 @@ import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { NotFoundException } from '@nestjs/common';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { UserService } from '../../../user/user.service';
-import { CalculateServiceTelegram } from './calculate.service';
+import { TemplateService } from '../../../template/template.service';
+import { CommissionType } from '@prisma/client';
 
 @Scene(CALCULATE_SETTINGS_SCENE)
 export class CalculateSettingsScene {
     constructor(
         private telegramService: TelegramService,
-        private calculateService: CalculateServiceTelegram,
+        private calculateService: TemplateService,
     ) {}
 
     @SceneEnter()
@@ -277,7 +277,7 @@ export class CommissionRateScene {
 export class RoundToScene {
     constructor(
         private telegramService: TelegramService,
-        private calculateService: CalculateServiceTelegram,
+        private templateService: TemplateService,
         private userService: UserService,
     ) {}
 
@@ -329,14 +329,14 @@ export class RoundToScene {
             return;
         }
 
-        await this.calculateService.createTemplate(
-            telegramId,
-            templateData.name,
-            templateData.template,
-            templateData.commissionType,
-            templateData.commissionRate,
+        await this.templateService.createTemplate({
+            userTelegramId: telegramId,
+            name: templateData.name,
+            template: templateData.template,
+            commissionType: templateData.commissionType,
+            commissionRate: templateData.commissionRate,
             roundTo,
-        );
+        });
 
         // Очищаем данные о текущем создаваемом шаблоне
         await this.telegramService.setDataCache<any>(`template_${telegramId}`, null);
@@ -361,7 +361,7 @@ export class RoundToScene {
 export class CustomRoundScene {
     constructor(
         private telegramService: TelegramService,
-        private calculateService: CalculateServiceTelegram,
+        private templateService: TemplateService,
         private userService: UserService,
     ) {}
 
@@ -410,14 +410,14 @@ export class CustomRoundScene {
                 return;
             }
 
-            await this.calculateService.createTemplate(
-                telegramId,
-                templateData.name,
-                templateData.template,
-                templateData.commissionType,
-                templateData.commissionRate,
+            await this.templateService.createTemplate({
+                userTelegramId: telegramId,
+                name: templateData.name,
+                template: templateData.template,
+                commissionType: templateData.commissionType,
+                commissionRate: templateData.commissionRate,
                 roundTo,
-            );
+            });
 
             // Очищаем данные о текущем создаваемом шаблоне
             await this.telegramService.setDataCache<any>(`template_${telegramId}`, null);

@@ -41,16 +41,17 @@ model UserTelegram {
 }
 
 model UserTemplate {
-  id             String       @id @default(uuid()) @db.Uuid
+  id             String         @id @default(uuid()) @db.Uuid
   name           String
-  template       String       @db.Text
-  userTelegramId String       @map("user_telegram_id")
-  commissionType String       @default("TOTAL") @map("commission_type")
-  commissionRate Float        @default(10) @map("commission_rate")
-  roundTo        Int          @default(10) @map("round_to")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  userTelegram   UserTelegram @relation(fields: [userTelegramId], references: [telegramId])
+  template       String         @db.Text
+  userTelegramId String         @map("user_telegram_id")
+  commissionType CommissionType @default(TOTAL) @map("commission_type")
+  calculateType  TypeCalculate  @default(Promocode) @map("calculate_type")
+  commissionRate Float          @default(10) @map("commission_rate")
+  roundTo        Int            @default(10) @map("round_to")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  userTelegram   UserTelegram   @relation(fields: [userTelegramId], references: [telegramId])
 
   @@map("user_template")
 }
@@ -397,6 +398,18 @@ enum LessonStatus {
   NONE
   VIEWED
   BLOCKED
+}
+
+enum TypeCalculate {
+  Bonus
+  Promocode
+  MyDiscount
+}
+
+enum CommissionType {
+  BONUS
+  PROMO
+  TOTAL
 }
 
 enum OrderStatus {

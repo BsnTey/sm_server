@@ -3,7 +3,6 @@ import { TelegrafModule } from 'nestjs-telegraf';
 import { getTelegramConfig } from '@common/telegram/telegram.config';
 import { ConfigModule } from '@nestjs/config';
 import { TelegramModule } from './module/telegram/telegram.module';
-import { UserModule } from './module/user/user.module';
 import { AccountModule } from './module/account/account.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ProxyModule } from './module/proxy/proxy.module';
@@ -23,6 +22,8 @@ import { BrokerModule } from '@common/broker/broker.module';
 import { NotificationModule } from './module/notification/notification.module';
 import { CalculateModule } from './module/calculate/calculate.module';
 import { ConfigAppModule } from './module/config/config.module';
+import { TemplateModule } from './module/template/template.module';
+import { UserModule } from './module/user/user.module';
 
 @Module({
     imports: [
@@ -56,6 +57,7 @@ import { ConfigAppModule } from './module/config/config.module';
         CalculateModule,
         ConfigModule,
         ConfigAppModule,
+        TemplateModule,
     ],
 })
 export class AppModule {}
