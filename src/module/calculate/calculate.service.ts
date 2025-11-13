@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ProductApiResponse } from '../account/interfaces/product.interface';
 
 @Injectable()
 export class CalculateService {
@@ -66,5 +67,38 @@ export class CalculateService {
             }
         }
         return Math.floor(calcPrice);
+    }
+
+    computeCalculateProductFromProduct(
+        p: ProductApiResponse['product'],
+        isInventory: boolean,
+        promoPercent: number = 15,
+    ): { price: number; bonus: number } | null {
+        const catalog = Number(p?.price?.catalog?.value);
+        const retail = Number(p?.price?.retail?.value);
+        if (!isFinite(catalog) || !isFinite(retail) || catalog <= 0 || retail <= 0) {
+            return null;
+        }
+
+        const basePrice = catalog / 100;
+        const retailPrice = retail / 100;
+
+        let discountShop = Math.floor((1 - retailPrice / basePrice) * 100);
+        if (!isFinite(discountShop) || discountShop < 0) discountShop = 0;
+        if (discountShop > 100) discountShop = 100;
+
+        const priceAfterPromo =
+            discountShop < 50
+                ? this.computePriceWithPromoWithoutBonus(basePrice, retailPrice, discountShop, isInventory, promoPercent)
+                : retailPrice;
+
+        const bonus = this.computeBonus(basePrice, priceAfterPromo, discountShop, isInventory);
+
+        const priceOnKassa = priceAfterPromo - bonus;
+
+        return {
+            price: Math.floor(priceOnKassa),
+            bonus: Math.floor(bonus),
+        };
     }
 }

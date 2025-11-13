@@ -57,6 +57,8 @@ import { FamilyService } from './updates/family/family.service';
 import { CalculateModule } from '../calculate/calculate.module';
 import { BottModule } from '../bott/bott.module';
 import { TemplateModule } from '../template/template.module';
+import { MyDiscountUpdate } from './updates/myDiscount/myDiscount.update';
+import { ProductModule } from '../product/product.module';
 
 @Module({
     imports: [
@@ -71,6 +73,7 @@ import { TemplateModule } from '../template/template.module';
         CalculateModule,
         BottModule,
         TemplateModule,
+        ProductModule,
     ],
     providers: [
         TelegramService,
@@ -119,6 +122,7 @@ import { TemplateModule } from '../template/template.module';
         FamilyService,
         FamilyUserUpdate,
         FamilyPrivelegieUpdate,
+        MyDiscountUpdate,
     ],
     exports: [TelegramService],
 })

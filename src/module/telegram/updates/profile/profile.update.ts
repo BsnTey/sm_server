@@ -7,7 +7,7 @@ import { CheckingService } from '../checking/checking.service';
 import { profileKeyboard } from '../../keyboards/profile.keyboard';
 import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
-import { FORTUNE_BOT_SCENE, MAKE_DEPOSIT_SCENE, PROFILE_GET_INFO_ORDER } from '../../scenes/profile.scene-constant';
+import { FORTUNE_BOT_SCENE, MAKE_DEPOSIT_SCENE, MY_DISCOUNT_SCENE, PROFILE_GET_INFO_ORDER } from '../../scenes/profile.scene-constant';
 import { UserService } from '../../../user/user.service';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
@@ -55,6 +55,11 @@ export class ProfileUpdate {
     @Action('check_promo')
     async goToCheckerPromo(@Ctx() ctx: WizardContext) {
         await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки');
+    }
+
+    @Action('check_my_discount')
+    async goToCheckerMyDiscount(@Ctx() ctx: WizardContext) {
+        await ctx.scene.enter(MY_DISCOUNT_SCENE);
     }
 
     @Action('get_info_order')

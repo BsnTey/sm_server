@@ -24,6 +24,7 @@ import { CalculateModule } from './module/calculate/calculate.module';
 import { ConfigAppModule } from './module/config/config.module';
 import { TemplateModule } from './module/template/template.module';
 import { UserModule } from './module/user/user.module';
+import { ProductModule } from './module/product/product.module';
 
 @Module({
     imports: [
@@ -58,6 +59,7 @@ import { UserModule } from './module/user/user.module';
         ConfigModule,
         ConfigAppModule,
         TemplateModule,
+        ProductModule,
     ],
 })
 export class AppModule {}

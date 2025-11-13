@@ -76,10 +76,12 @@ import { CalculateService } from '../calculate/calculate.service';
 import { Cookie } from './interfaces/cookie.interface';
 import { OrderRepository } from './order.repository';
 import { PreparedAccountInfo } from './interfaces/extend-chrome.interface';
-import { Products } from './interfaces/products.interface';
+import { List, Products } from './interfaces/products.interface';
 import { chunk, cmp, requestWithBackoff, startOfNextDayUTC } from './utils/set-products.utils';
 import { DelayedPublisher } from '@common/broker/delayed.publisher';
 import { RABBIT_MQ_QUEUES } from '@common/broker/rabbitmq.queues';
+import { ProductService } from '../product/product.service';
+import { extractPercentFromNode } from './utils/extract.utils';
 
 @Injectable()
 export class AccountService {
@@ -110,6 +112,7 @@ export class AccountService {
         private sportmasterHeaders: SportmasterHeadersService,
         private calculateService: CalculateService,
         private readonly publisher: DelayedPublisher,
+        private readonly productService: ProductService,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) {}
 
@@ -679,7 +682,7 @@ export class AccountService {
 
         while (pages < maxPagesCap) {
             const res = await requestWithBackoff(proxyId, () => findProductsBySearch(accountId, nodeUrl, pageSize, offset));
-            const items = res.list ?? [];
+            const items: List[] = res.list ?? [];
             pages++;
 
             // Если total ещё неизвестен и meta пришла — зафиксируем total один раз
@@ -696,7 +699,7 @@ export class AccountService {
 
             // Если знаем общий total — контролируем окончание по нему
             if (total !== null) {
-                offset += pageSize; // классический limit/offset
+                offset += pageSize;
                 if (offset >= total) break; // всё прочитали
             } else {
                 // total неизвестен: ориентируемся по «неполной» странице
@@ -753,12 +756,17 @@ export class AccountService {
         const results: Array<{ accountId: string; saved: number }> = [];
         const errors: Array<{ accountId: string; message: string }> = [];
 
+        // Глобальный аккумулятор продуктов для ВСЕХ аккаунтов из этого вызова
+        // productId -> { node, infos: Map<key, {article, sku}> }
+        const productsAccumulator = new Map<string, { node: string; infos: Map<string, { article: string; sku?: string | null }> }>();
+
         const worker = async (accountId: string) => {
             const proxyId = await this.pickProxyForAccount(accountId);
 
             const pd = await this.personalDiscount(accountId);
             const urlNodes = (pd?.list ?? []).map(n => ({
                 url: n.url,
+                name: n.nodeName,
                 dateEnd: startOfNextDayUTC(n.dateEnd),
             }));
 
@@ -766,7 +774,7 @@ export class AccountService {
 
             for (const node of urlNodes) {
                 const buffer: UpsertPersonalDiscountProductsInput[] = [];
-
+                console.log('в ноде ', node.name);
                 for await (const page of this.paginateProducts(
                     proxyId,
                     accountId,
@@ -776,16 +784,50 @@ export class AccountService {
                     this.findProductsBySearch.bind(this),
                 )) {
                     for (const it of page) {
+                        const productId = String(it.id);
+
+                        // 1) Сохраняем скидочный продукт (привязка к аккаунту) — по productId
                         buffer.push({
-                            productId: String(it.id),
+                            productId,
                             telegramId: String(telegramId),
                             accountId,
                             dateEnd: node.dateEnd,
                         });
+
+                        // 2) Копим данные о товаре и всех его sku/article
+                        let acc = productsAccumulator.get(productId);
+                        if (!acc) {
+                            acc = {
+                                node: node.name, // человекочитаемое имя категории
+                                infos: new Map(),
+                            };
+                            productsAccumulator.set(productId, acc);
+                        }
+
+                        if (Array.isArray(it.skus) && it.skus.length) {
+                            // на каждый размер — свой sku и article
+                            for (const skuItem of it.skus) {
+                                const article = skuItem.code;
+                                const sku = skuItem.id;
+                                const key = `${article}|${sku}`;
+
+                                if (!acc.infos.has(key)) {
+                                    acc.infos.set(key, { article, sku });
+                                }
+                            }
+                        } else {
+                            // fallback: если skus нет, используем общий code как article
+                            const article = it.code;
+                            const key = `${article}|`;
+                            if (!acc.infos.has(key)) {
+                                acc.infos.set(key, { article, sku: null });
+                            }
+                        }
                     }
 
-                    // периодически пишем в БД, чтобы не раздувать память
+                    // периодически пишем в БД AccountDiscountProduct, чтобы не раздувать память
                     if (buffer.length >= this.DB_CHUNK) {
+                        console.log('пишу из буфера в upsertManyDiscountProducts буфер ', buffer.length);
                         const unique = Array.from(new Map(buffer.map(x => [`${x.productId}|${x.telegramId}|${x.accountId}`, x])).values());
                         for (const part of chunk(unique, this.DB_CHUNK)) {
                             await this.accountDiscountRepo.upsertManyDiscountProducts(part);
@@ -797,6 +839,7 @@ export class AccountService {
 
                 if (buffer.length) {
                     const unique = Array.from(new Map(buffer.map(x => [`${x.productId}|${x.telegramId}|${x.accountId}`, x])).values());
+                    console.log('пишу из буфера на остаток в upsertManyDiscountProducts');
                     for (const part of chunk(unique, this.DB_CHUNK)) {
                         await this.accountDiscountRepo.upsertManyDiscountProducts(part);
                         savedTotal += part.length;
@@ -809,6 +852,7 @@ export class AccountService {
 
         // глобальный параллелизм: по 5 аккаунтов
         for (let i = 0; i < personalDiscounts.length; i += this.MAX_CONCURRENCY) {
+            console.log('зашел в паралельность');
             const slice = personalDiscounts.slice(i, i + this.MAX_CONCURRENCY);
             const settled = await Promise.allSettled(slice.map(a => worker(a)));
 
@@ -820,6 +864,62 @@ export class AccountService {
                     errors.push({ accountId, message: r.reason?.message ?? 'Unknown error' });
                 }
             });
+        }
+        console.log('Иду писать в БД продукты');
+        const productsArray = Array.from(productsAccumulator.entries()).map(([productId, value]) => ({
+            productId,
+            node: value.node,
+            infos: Array.from(value.infos.values()), // { article, sku }[]
+        }));
+
+        if (productsArray.length) {
+            const productIds = productsArray.map(p => p.productId);
+
+            // 1) Забираем из БД уже существующие ProductInfo для этих productId
+            const existingInfos = await this.productService.getProductInfosByProductIds(productIds);
+
+            const existingKeys = new Set(existingInfos.map(i => `${i.productId}|${i.article}|${i.sku ?? ''}`));
+
+            // 2) Фильтруем только новые комбинации (productId, article, sku)
+            const productsToSave = productsArray
+                .map(p => {
+                    const newInfos = p.infos.filter(info => {
+                        const key = `${p.productId}|${info.article}|${info.sku ?? ''}`;
+                        return !existingKeys.has(key);
+                    });
+                    return { ...p, infos: newInfos };
+                })
+                .filter(p => p.infos.length > 0);
+
+            // 3) Пишем в БД: upsert Product + ProductInfo
+            // Батчим, чтобы не устроить DDOS БД
+            for (const portion of chunk(productsToSave, this.DB_CHUNK)) {
+                console.log('Пишем в БД: upsert Product + ProductInfo');
+                await Promise.all(
+                    portion.map(async p => {
+                        const [first, ...rest] = p.infos;
+
+                        // upsert Product + первая ProductInfo
+                        await this.productService.saveProductWithInfo({
+                            productId: p.productId,
+                            node: p.node,
+                            article: first.article,
+                            sku: first.sku ?? null,
+                        });
+
+                        // остальные ProductInfo для этого продукта
+                        if (rest.length) {
+                            for (const info of rest) {
+                                await this.productService.addProductInfo({
+                                    productId: p.productId,
+                                    article: info.article,
+                                    sku: info.sku ?? null,
+                                });
+                            }
+                        }
+                    }),
+                );
+            }
         }
 
         return { ok: errors.length === 0, results, errors };
@@ -883,39 +983,6 @@ export class AccountService {
         }
 
         return { ok: errors.length === 0, results, errors };
-    }
-
-    private computeCalculateProductFromProduct(
-        p: ProductApiResponse['product'],
-        isInventory: boolean,
-    ): { price: number; bonus: number } | null {
-        const catalog = Number(p?.price?.catalog?.value);
-        const retail = Number(p?.price?.retail?.value);
-        if (!isFinite(catalog) || !isFinite(retail) || catalog <= 0 || retail <= 0) {
-            return null;
-        }
-
-        const basePrice = catalog / 100;
-        const retailPrice = retail / 100;
-
-        let discountShop = Math.floor((1 - retailPrice / basePrice) * 100);
-        if (!isFinite(discountShop) || discountShop < 0) discountShop = 0;
-        if (discountShop > 100) discountShop = 100;
-
-        const promoPercent = 15;
-        const priceAfterPromo =
-            discountShop < 50
-                ? this.calculateService.computePriceWithPromoWithoutBonus(basePrice, retailPrice, discountShop, isInventory, promoPercent)
-                : retailPrice;
-
-        const bonus = this.calculateService.computeBonus(basePrice, priceAfterPromo, discountShop, isInventory);
-
-        const priceOnKassa = priceAfterPromo - bonus;
-
-        return {
-            price: Math.floor(priceOnKassa),
-            bonus: Math.floor(bonus),
-        };
     }
 
     async getDistinctNodePairsByTelegram(telegramId: string): Promise<{ nodes: NodePair[] }> {
@@ -1062,16 +1129,39 @@ export class AccountService {
         productId: string,
     ): Promise<{
         ok: boolean;
-        productId: string;
+        product: { productId: string; node: string | null; percent: number };
         processed: number;
         results: PreparedAccountInfo[];
         errors: ErrorItem[];
     }> {
+        // --- 1) Находим product + node ---
+        const info = await this.productService.getProductInfoWithProduct({
+            productId,
+        });
+
+        const node = info?.product?.node ?? null;
+        const percent = extractPercentFromNode(node);
+
+        const productObj = {
+            productId,
+            node,
+            percent,
+        };
+
+        // --- 2) Ищем аккаунты, на которых есть скидка по этому продукту ---
         const accountIds = await this.accountDiscountRepo.findAccountsForProduct(telegramId, productId);
+
         if (!accountIds.length) {
-            return { ok: true, productId, processed: 0, results: [], errors: [] };
+            return {
+                ok: true,
+                product: productObj,
+                processed: 0,
+                results: [],
+                errors: [],
+            };
         }
 
+        // --- 3) Предзагрузка бонусов и заказов ---
         const [ordersTodayMap, bonusMap] = await Promise.all([
             this.orderRepository.countTodayByAccountIds(accountIds),
             this.accountRep.getBonusCountByAccountIds(accountIds),
@@ -1088,6 +1178,7 @@ export class AccountService {
         const errors: ErrorItem[] = [];
         const MAX_ROUNDS = 3;
 
+        // --- 4) Обновляем bonus у топ-3 для повышения точности сортировки ---
         for (let round = 1; round <= MAX_ROUNDS; round++) {
             const topN = Math.min(3, accounts.length);
             if (topN === 0) break;
@@ -1101,13 +1192,16 @@ export class AccountService {
                 const acc = topSlice[idx];
                 if (res.status === 'fulfilled') {
                     const freshBonus = Number(res.value?.bonusCount ?? 0);
+
                     if (Number.isFinite(freshBonus)) {
                         if (freshBonus !== acc.bonus) mismatches++;
+
                         const target = accounts.find(x => x.accountId === acc.accountId);
                         if (target) target.bonus = freshBonus;
                     }
                 } else {
                     const msg = res.reason?.response?.data?.message ?? res.reason?.message ?? 'SHORTINFO_ERROR';
+
                     errors.push({ accountId: acc.accountId, error: msg });
                 }
             });
@@ -1116,6 +1210,7 @@ export class AccountService {
                 accounts.sort(cmp);
                 continue;
             }
+
             break;
         }
 
@@ -1123,7 +1218,7 @@ export class AccountService {
 
         return {
             ok: true,
-            productId,
+            product: productObj,
             processed: accountIds.length,
             results: accounts,
             errors,
@@ -1164,7 +1259,7 @@ export class AccountService {
                         /* не критично */
                     }
                 }
-                const calc = this.computeCalculateProductFromProduct(product, isInventory);
+                const calc = this.calculateService.computeCalculateProductFromProduct(product, isInventory);
                 const mapped = this.buildResult(product, probeId, bonusCount, calc || undefined, ordersTodayMap[probeId] ?? 0);
                 if (mapped) results.push(mapped);
             }
@@ -1200,7 +1295,7 @@ export class AccountService {
                     }
                 }
 
-                const calc = this.computeCalculateProductFromProduct(product, isInventory);
+                const calc = this.calculateService.computeCalculateProductFromProduct(product, isInventory);
                 const mapped = this.buildResult(product, accountId, bonusCount, calc || undefined, ordersTodayMap[accountId] ?? 0);
                 if (mapped) results.push(mapped);
             } catch (err: any) {
