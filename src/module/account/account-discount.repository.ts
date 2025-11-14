@@ -80,12 +80,8 @@ export class AccountDiscountRepository {
     //функции для нового поиска
     async findAccountsByTelegramUser(telegramId: string) {
         const records = await this.prisma.accountDiscountProduct.findMany({
-            where: {
-                telegramId,
-            },
-            select: {
-                accountId: true,
-            },
+            where: { telegramId },
+            select: { accountId: true },
             distinct: ['accountId'],
         });
         return records.map(r => r.accountId);
@@ -93,45 +89,51 @@ export class AccountDiscountRepository {
 
     async deleteDataForAccount(accountId: string, telegramId: string) {
         const { count } = await this.prisma.accountDiscountProduct.deleteMany({
-            where: {
-                accountId,
-                telegramId,
-            },
+            where: { accountId, telegramId },
         });
         return count;
     }
 
     async findAccountsForProduct(telegramId: string, productId: string) {
         const records = await this.prisma.accountDiscountProduct.findMany({
-            where: {
-                productId,
-                telegramId,
-            },
-            select: {
-                accountId: true,
-            },
+            where: { productId, telegramId },
+            select: { accountId: true },
         });
         return records.map(r => r.accountId);
     }
 
+    /**
+     * Массовый insert в account_discount_product.
+     * 1) Убираем дубли по (productId, telegramId, accountId) на уровне JS.
+     * 2) Делаем один createMany с skipDuplicates: true.
+     *
+     * Важно: при таком подходе dateEnd НЕ обновится, если запись уже существует.
+     * Если критично тащить актуальный dateEnd — нужно будет делать отдельный updateMany/сырое SQL.
+     */
     async upsertManyDiscountProducts(items: UpsertPersonalDiscountProductsInput[]): Promise<void> {
         if (!items.length) return;
 
-        await this.prisma.$transaction(
-            items.map(i =>
-                this.prisma.accountDiscountProduct.upsert({
-                    where: { productId_telegramId_accountId: { productId: i.productId, telegramId: i.telegramId, accountId: i.accountId } },
-                    create: {
-                        productId: i.productId,
-                        accountId: i.accountId,
-                        telegramId: i.telegramId,
-                        dateEnd: i.dateEnd,
-                    },
-                    update: {
-                        dateEnd: i.dateEnd,
-                    },
-                }),
-            ),
-        );
+        // дедупликация в памяти, чтобы не гнать лишние дубликаты в createMany
+        const dedupMap = new Map<string, UpsertPersonalDiscountProductsInput>();
+        for (const i of items) {
+            const key = `${i.productId}|${i.telegramId}|${i.accountId}`;
+            if (!dedupMap.has(key)) {
+                dedupMap.set(key, i);
+            }
+        }
+
+        const data = Array.from(dedupMap.values()).map(i => ({
+            productId: i.productId,
+            accountId: i.accountId,
+            telegramId: i.telegramId,
+            dateEnd: i.dateEnd,
+        }));
+
+        if (!data.length) return;
+
+        await this.prisma.accountDiscountProduct.createMany({
+            data,
+            skipDuplicates: true,
+        });
     }
 }
