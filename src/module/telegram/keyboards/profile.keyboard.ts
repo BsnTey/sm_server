@@ -8,7 +8,7 @@ export const profileKeyboard = (role: UserRole) => {
     role != UserRole.User ? btnArr.push([Markup.button.callback('Призы фортуны', 'fortune')]) : null;
     // role != 'User' ? btnArr.push([Markup.button.callback('Получить промокод для бота продаж', 'get_promocode')]) : null;
     btnArr.push([Markup.button.callback('Чекер промо', 'check_promo')]);
-    role == UserRole.Admin ? btnArr.push([Markup.button.callback('Чекер моей скидки', 'check_my_discount')]) : null;
+    btnArr.push([Markup.button.callback('Чекер моей скидки', 'check_my_discount')]);
     btnArr.push([Markup.button.callback('Получить инфо по заказу', 'get_info_order')]);
     return Markup.inlineKeyboard(btnArr);
 };
