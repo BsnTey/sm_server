@@ -101,7 +101,7 @@ export class MyDiscountUpdate extends BaseUpdate {
             lines.push(`📂 Категория скидки: ${node}`);
 
             if (percent > 0) {
-                lines.push(`💸 Персональная скидка: ${percent}%`);
+                lines.push(`💸 Моя скидка: ${percent}%`);
             }
 
             if (calc) {
