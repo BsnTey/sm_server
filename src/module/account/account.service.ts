@@ -93,7 +93,7 @@ export class AccountService {
 
     private TTL_CASH_ACCOUNT = 20_000;
     private TTL_CASH_DISCOUNT = 10_800_000;
-    private readonly MAX_CONCURRENCY = 3;
+    private readonly MAX_CONCURRENCY = 5;
     private readonly PAGE_SIZE = 100;
     private readonly DB_CHUNK = 800;
     private readonly PERSONAL_DISCOUNT_BATCH_SIZE = 5;
