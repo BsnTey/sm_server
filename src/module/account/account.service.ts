@@ -94,8 +94,9 @@ export class AccountService {
     private TTL_CASH_ACCOUNT = 20_000;
     private TTL_CASH_DISCOUNT = 10_800_000;
     private readonly MAX_CONCURRENCY = 5;
+    private readonly PRODUCT_WRITE_CONCURRENCY = 5;
     private readonly PAGE_SIZE = 100;
-    private readonly DB_CHUNK = 800;
+    private readonly DB_CHUNK = 200;
     private readonly PERSONAL_DISCOUNT_BATCH_SIZE = 5;
     private readonly PERSONAL_DISCOUNT_RATE_SECONDS = 80;
 
@@ -902,28 +903,41 @@ export class AccountService {
             // 3) Пишем в БД: upsert Product + ProductInfo
             // ❗ ВАЖНО: делаем это ПОСЛЕДОВАТЕЛЬНО, без Promise.all,
             // чтобы не застрелить connection pool
+
             for (const portion of chunk(productsToSave, this.DB_CHUNK)) {
-                console.log('Пишем в БД: upsert Product + ProductInfo (portion size =', portion.length, ')');
+                console.log(
+                    'Пишем в БД: upsert Product + ProductInfo (portion size =',
+                    portion.length,
+                    ', concurrency =',
+                    this.PRODUCT_WRITE_CONCURRENCY,
+                    ')',
+                );
 
-                for (const p of portion) {
-                    const [first, ...rest] = p.infos;
+                for (let i = 0; i < portion.length; i += this.PRODUCT_WRITE_CONCURRENCY) {
+                    const slice = portion.slice(i, i + this.PRODUCT_WRITE_CONCURRENCY);
 
-                    // upsert Product + первая ProductInfo
-                    await this.productService.saveProductWithInfo({
-                        productId: p.productId,
-                        node: p.node,
-                        article: first.article,
-                        sku: first.sku ?? null,
-                    });
+                    await Promise.all(
+                        slice.map(async p => {
+                            const [first, ...rest] = p.infos;
 
-                    // остальные ProductInfo для этого продукта
-                    for (const info of rest) {
-                        await this.productService.addProductInfo({
-                            productId: p.productId,
-                            article: info.article,
-                            sku: info.sku ?? null,
-                        });
-                    }
+                            // upsert Product + первая ProductInfo
+                            await this.productService.saveProductWithInfo({
+                                productId: p.productId,
+                                node: p.node,
+                                article: first.article,
+                                sku: first.sku ?? null,
+                            });
+
+                            // остальные ProductInfo для этого продукта
+                            for (const info of rest) {
+                                await this.productService.addProductInfo({
+                                    productId: p.productId,
+                                    article: info.article,
+                                    sku: info.sku ?? null,
+                                });
+                            }
+                        }),
+                    );
                 }
             }
         }
