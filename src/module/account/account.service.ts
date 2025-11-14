@@ -93,7 +93,7 @@ export class AccountService {
 
     private TTL_CASH_ACCOUNT = 20_000;
     private TTL_CASH_DISCOUNT = 10_800_000;
-    private readonly MAX_CONCURRENCY = 5;
+    private readonly MAX_CONCURRENCY = 3;
     private readonly PAGE_SIZE = 100;
     private readonly DB_CHUNK = 800;
     private readonly PERSONAL_DISCOUNT_BATCH_SIZE = 5;
@@ -758,7 +758,13 @@ export class AccountService {
 
         // Глобальный аккумулятор продуктов для ВСЕХ аккаунтов из этого вызова
         // productId -> { node, infos: Map<key, {article, sku}> }
-        const productsAccumulator = new Map<string, { node: string; infos: Map<string, { article: string; sku?: string | null }> }>();
+        const productsAccumulator = new Map<
+            string,
+            {
+                node: string;
+                infos: Map<string, { article: string; sku?: string | null }>;
+            }
+        >();
 
         const worker = async (accountId: string) => {
             const proxyId = await this.pickProxyForAccount(accountId);
@@ -775,6 +781,7 @@ export class AccountService {
             for (const node of urlNodes) {
                 const buffer: UpsertPersonalDiscountProductsInput[] = [];
                 console.log('в ноде ', node.name);
+
                 for await (const page of this.paginateProducts(
                     proxyId,
                     accountId,
@@ -850,7 +857,7 @@ export class AccountService {
             return { accountId, saved: savedTotal };
         };
 
-        // глобальный параллелизм: по 5 аккаунтов
+        // глобальный параллелизм: по this.MAX_CONCURRENCY аккаунтов
         for (let i = 0; i < personalDiscounts.length; i += this.MAX_CONCURRENCY) {
             console.log('зашел в паралельность');
             const slice = personalDiscounts.slice(i, i + this.MAX_CONCURRENCY);
@@ -865,6 +872,7 @@ export class AccountService {
                 }
             });
         }
+
         console.log('Иду писать в БД продукты');
         const productsArray = Array.from(productsAccumulator.entries()).map(([productId, value]) => ({
             productId,
@@ -892,33 +900,31 @@ export class AccountService {
                 .filter(p => p.infos.length > 0);
 
             // 3) Пишем в БД: upsert Product + ProductInfo
-            // Батчим, чтобы не устроить DDOS БД
+            // ❗ ВАЖНО: делаем это ПОСЛЕДОВАТЕЛЬНО, без Promise.all,
+            // чтобы не застрелить connection pool
             for (const portion of chunk(productsToSave, this.DB_CHUNK)) {
-                console.log('Пишем в БД: upsert Product + ProductInfo');
-                await Promise.all(
-                    portion.map(async p => {
-                        const [first, ...rest] = p.infos;
+                console.log('Пишем в БД: upsert Product + ProductInfo (portion size =', portion.length, ')');
 
-                        // upsert Product + первая ProductInfo
-                        await this.productService.saveProductWithInfo({
+                for (const p of portion) {
+                    const [first, ...rest] = p.infos;
+
+                    // upsert Product + первая ProductInfo
+                    await this.productService.saveProductWithInfo({
+                        productId: p.productId,
+                        node: p.node,
+                        article: first.article,
+                        sku: first.sku ?? null,
+                    });
+
+                    // остальные ProductInfo для этого продукта
+                    for (const info of rest) {
+                        await this.productService.addProductInfo({
                             productId: p.productId,
-                            node: p.node,
-                            article: first.article,
-                            sku: first.sku ?? null,
+                            article: info.article,
+                            sku: info.sku ?? null,
                         });
-
-                        // остальные ProductInfo для этого продукта
-                        if (rest.length) {
-                            for (const info of rest) {
-                                await this.productService.addProductInfo({
-                                    productId: p.productId,
-                                    article: info.article,
-                                    sku: info.sku ?? null,
-                                });
-                            }
-                        }
-                    }),
-                );
+                    }
+                }
             }
         }
 
