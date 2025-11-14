@@ -20,7 +20,7 @@ export const brokerProvider: Provider = {
             channel.on('disconnect', (err: any) => logger.error('❌ RabbitMQ отключен', err));
 
             await channel.addSetup(async (raw: ConfirmChannel) => {
-                raw.prefetch(1);
+                raw.prefetch(3);
 
                 await raw.assertExchange(DELAYED_EXCHANGE, DELAYED_EXCHANGE_TYPE, {
                     durable: true,
