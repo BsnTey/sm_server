@@ -46,12 +46,21 @@ export class BrokerConsumer implements OnModuleInit {
 
     private async safeHandle(label: string, msg: ConsumeMessage | null, raw: ConfirmChannel, handler: (payload: Buffer) => Promise<void>) {
         if (!msg) return;
+
         try {
             await handler(msg.content);
-            raw.ack(msg);
+            try {
+                raw.ack(msg);
+            } catch (ackErr) {
+                this.logger.error(`${label}: failed to ack (channel probably closed)`, ackErr);
+            }
         } catch (e) {
             this.logger.error(`${label} failed, ack anyway (no retries here):`, e);
-            raw.ack(msg);
+            try {
+                raw.ack(msg);
+            } catch (ackErr) {
+                this.logger.error(`${label}: failed to ack after error (channel probably closed)`, ackErr);
+            }
         }
     }
 }

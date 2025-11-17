@@ -249,11 +249,11 @@ export class AccountController {
     }
 
     //роуты версии через очередь
-    @Post('v1/set/personal-discount')
-    @HttpCode(200)
-    async setAccountsForPersonalDiscountV1(@Body() data: SetPersonalDiscountAccountRequestDto): Promise<any> {
-        return this.accountService.queueAccountsForPersonalDiscountV1(data);
-    }
+    // @Post('v1/set/personal-discount')
+    // @HttpCode(200)
+    // async setAccountsForPersonalDiscountV1(@Body() data: SetPersonalDiscountAccountRequestDto): Promise<any> {
+    //     return this.accountService.queueAccountsForPersonalDiscountV1(data);
+    // }
 
     @Post('v2/personal-discount/accounts/discount/:telegramId')
     @HttpCode(200)

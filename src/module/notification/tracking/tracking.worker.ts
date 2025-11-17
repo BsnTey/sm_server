@@ -81,7 +81,7 @@ export class OrderTrackingWorker {
         } catch (e) {
             // ошибка апи — сообщаем и выходим без репаблиша
             await this.notifyError(+telegramId, orderNumber);
-            this.logger.warn(`orderInfo failed for ${orderNumber}`, e);
+            this.logger.warn(`orderInfo failed for ${orderNumber}`);
             return;
         }
 
