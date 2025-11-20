@@ -48,4 +48,9 @@ export class ProxyService implements OnModuleInit {
     async updateProxy(uuid: string, dto: { proxy?: string; expiresAt?: Date; blockedAt?: Date | null }) {
         return this.proxyRepository.update(uuid, dto);
     }
+
+    async blockProxy(uuid: string): Promise<void> {
+        this.logger.warn(`Blocking proxy ${uuid} due to connection error.`);
+        await this.updateProxy(uuid, { blockedAt: new Date() });
+    }
 }

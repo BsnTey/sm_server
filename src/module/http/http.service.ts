@@ -5,7 +5,7 @@ import { IHttpInterface } from './interfaces/http.interface';
 @Injectable()
 export class HttpService implements IHttpInterface {
     private readonly logger = new Logger(HttpService.name);
-    private timeout = 10000;
+    private timeout = 5000;
 
     constructor() {}
 
