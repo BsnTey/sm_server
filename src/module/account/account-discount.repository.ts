@@ -136,4 +136,20 @@ export class AccountDiscountRepository {
             skipDuplicates: true,
         });
     }
+
+    async bulkUpsertProducts(products: { productId: string; node: string }[]) {
+        if (!products.length) return;
+        return this.prisma.product.createMany({
+            data: products,
+            skipDuplicates: true,
+        });
+    }
+
+    async bulkInsertProductInfos(infos: { productId: string; article: string; sku: string | null }[]) {
+        if (!infos.length) return;
+        return this.prisma.productInfo.createMany({
+            data: infos,
+            skipDuplicates: true,
+        });
+    }
 }

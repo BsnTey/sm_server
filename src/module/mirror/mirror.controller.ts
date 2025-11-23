@@ -7,22 +7,29 @@ export class MirrorController {
     constructor(private mirrorService: MirrorService) {}
 
     @Get('auth')
-    async accessMirror(@Query('token') mirrorToken: string, @Res({ passthrough: true }) res: Response, @Req() request: Request) {
-        if (!mirrorToken) {
-            throw new BadRequestException('Неверный запрос');
-        }
-        const mirrorEntry = await this.mirrorService.validateMirrorToken(mirrorToken);
+    // async accessMirror(@Query('token') mirrorToken: string, @Res({ passthrough: true }) res: Response, @Req() request: Request) {
+    async accessMirror(@Res({ passthrough: true }) res: Response, @Req() request: Request) {
+        // if (!mirrorToken) {
+        //     throw new BadRequestException('Неверный запрос');
+        // }
+        // const mirrorEntry = await this.mirrorService.validateMirrorToken(mirrorToken);
         const ipAddress = Array.isArray(request.headers['x-forwarded-for'])
             ? request.headers['x-forwarded-for'][0]
             : request.headers['x-forwarded-for'] || request.ip;
 
-        if (!ipAddress || mirrorEntry.userIp !== ipAddress) {
-            throw new BadRequestException('Неверный запрос');
-        }
+        // if (!ipAddress || mirrorEntry.userIp !== ipAddress) {
+        //     throw new BadRequestException('Неверный запрос');
+        // }
 
-        const { jwtToken, smid, domain, expiry } = await this.mirrorService.createJwt(mirrorEntry);
+        // const { jwtToken, smid, domain, expiry } = await this.mirrorService.createJwt(mirrorEntry);
+        const { jwtToken, smid, expiry } = await this.mirrorService.createJwt();
         res.clearCookie('SMID');
         res.clearCookie('jwt');
+
+        const host = request.get('host');
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
+        const domain = host.split(':')[0];
 
         const twoYearsFromNow = new Date();
         twoYearsFromNow.setFullYear(twoYearsFromNow.getFullYear() + 2);
@@ -32,7 +39,8 @@ export class MirrorController {
             httpOnly: true,
             path: '/',
             sameSite: 'lax',
-            secure: true,
+            // secure: true,
+            secure: false,
             expires: twoYearsFromNow,
         });
 
@@ -41,8 +49,10 @@ export class MirrorController {
             httpOnly: true,
             path: '/',
             sameSite: 'lax',
-            secure: true,
-            expires: expiry,
+            // secure: true,
+            secure: false,
+            // expires: expiry,
+            expires: twoYearsFromNow,
         });
 
         return res.redirect('/');

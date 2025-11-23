@@ -54,19 +54,21 @@ export class MirrorService {
         return mirrorEntry;
     }
 
-    async createJwt(mirrorEntry: AccountMirror): Promise<{ jwtToken: string; smid: string; domain: string; expiry: Date }> {
-        if (!mirrorEntry.accountId) {
-            throw new BadRequestException('Нет id');
-        }
+    // async createJwt(mirrorEntry: AccountMirror): Promise<{ jwtToken: string; smid: string; domain: string; expiry: Date }> {
+    async createJwt(): Promise<{ jwtToken: string; smid: string; domain: string; expiry: Date }> {
+        // if (!mirrorEntry.accountId) {
+        //     throw new BadRequestException('Нет id');
+        // }
+        //
+        // if (!mirrorEntry.mirrorTokenExpiry) {
+        //     throw new BadRequestException('Нет токена');
+        // }
+        // if (!mirrorEntry.userIp) {
+        //     throw new BadRequestException('Неверный запрос');
+        // }
 
-        if (!mirrorEntry.mirrorTokenExpiry) {
-            throw new BadRequestException('Нет токена');
-        }
-        if (!mirrorEntry.userIp) {
-            throw new BadRequestException('Неверный запрос');
-        }
-
-        const accountEntity = await this.accountService.getAccount(mirrorEntry.accountId);
+        // const accountEntity = await this.accountService.getAccount(mirrorEntry.accountId);
+        const accountEntity = await this.accountService.getAccount('273ab969-c02f-4761-9753-bcdfa4263f2d');
         const cookies: any[] = JSON.parse(accountEntity.cookie);
 
         const smidCookie = cookies.find(cookie => cookie.name === 'SMID');
@@ -77,10 +79,13 @@ export class MirrorService {
         const shortSmid = smid.slice(-50);
         const payload: JwtPayload = {
             smid: shortSmid,
-            ip: mirrorEntry.userIp,
-            exp: Math.floor(mirrorEntry.mirrorTokenExpiry.getTime() / 1000),
+            // ip: mirrorEntry.userIp,
+            ip: '127.0.0.1',
+            // exp: Math.floor(mirrorEntry.mirrorTokenExpiry.getTime() / 1000),
+            exp: 412442343,
         };
         const jwtToken = await this.jwtService.signAsync(payload, { secret: this.hash });
-        return { jwtToken, smid: smid, domain: this.domain, expiry: mirrorEntry.mirrorTokenExpiry };
+        // return { jwtToken, smid: smid, domain: this.domain, expiry: mirrorEntry.mirrorTokenExpiry };
+        return { jwtToken, smid: smid, domain: this.domain, expiry: new Date() };
     }
 }

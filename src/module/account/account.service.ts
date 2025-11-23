@@ -750,20 +750,37 @@ export class AccountService {
         const results: Array<{ accountId: string; saved: number }> = [];
         const errors: Array<{ accountId: string; message: string }> = [];
 
-        // Глобальный аккумулятор продуктов для ВСЕХ аккаунтов из этого вызова
-        // productId -> { node, infos: Map<key, {article, sku}> }
-        const productsAccumulator = new Map<
-            string,
-            {
-                node: string;
-                infos: Map<string, { article: string; sku?: string | null }>;
+        // Буферы для справочников (Product, ProductInfo)
+        // Используем Map, чтобы внутри батча убрать дубликаты перед отправкой в БД
+        const productBuffer = new Map<string, string>();
+        const infoBuffer = new Map<string, { productId: string; article: string; sku: string | null }>();
+
+        // Функция для сброса буфера справочников в БД
+        const flushProductBuffers = async () => {
+            if (productBuffer.size === 0 && infoBuffer.size === 0) return;
+
+            const productsToSave = Array.from(productBuffer.entries()).map(([productId, node]) => ({ productId, node }));
+            const infosToSave = Array.from(infoBuffer.values());
+
+            // Очищаем буферы СРАЗУ, чтобы освободить память, пока идет запись
+            productBuffer.clear();
+            infoBuffer.clear();
+
+            try {
+                // Пишем пачками, используя createMany (намного быстрее)
+                await this.accountDiscountRepo.bulkUpsertProducts(productsToSave);
+                await this.accountDiscountRepo.bulkInsertProductInfos(infosToSave);
+            } catch (e) {
+                this.logger.error('Error flushing product dictionaries', e);
+                // Не падаем, так как это справочная информация,
+                // но лучше залогировать, чтобы потом разобраться.
             }
-        >();
+        };
 
         const worker = async (accountId: string) => {
             const proxyId = await this.pickProxyForAccount(accountId);
-
             const pd = await this.personalDiscount(accountId);
+
             const urlNodes = (pd?.list ?? []).map(n => ({
                 url: n.url,
                 name: n.nodeName,
@@ -773,8 +790,7 @@ export class AccountService {
             let savedTotal = 0;
 
             for (const node of urlNodes) {
-                const buffer: UpsertPersonalDiscountProductsInput[] = [];
-                console.log('в ноде ', node.name);
+                const discountBuffer: UpsertPersonalDiscountProductsInput[] = [];
 
                 for await (const page of this.paginateProducts(
                     proxyId,
@@ -787,60 +803,63 @@ export class AccountService {
                     for (const it of page) {
                         const productId = String(it.id);
 
-                        // 1) Сохраняем скидочный продукт (привязка к аккаунту) — по productId
-                        buffer.push({
+                        // 1. Добавляем в буфер связи Аккаунт-Скидка
+                        discountBuffer.push({
                             productId,
                             telegramId: String(telegramId),
                             accountId,
                             dateEnd: node.dateEnd,
                         });
 
-                        // 2) Копим данные о товаре и всех его sku/article
-                        let acc = productsAccumulator.get(productId);
-                        if (!acc) {
-                            acc = {
-                                node: node.name, // человекочитаемое имя категории
-                                infos: new Map(),
-                            };
-                            productsAccumulator.set(productId, acc);
+                        // 2. Добавляем в буфер справочника Product
+                        if (!productBuffer.has(productId)) {
+                            productBuffer.set(productId, node.name);
                         }
 
+                        // 3. Добавляем в буфер справочника ProductInfo
                         if (Array.isArray(it.skus) && it.skus.length) {
-                            // на каждый размер — свой sku и article
                             for (const skuItem of it.skus) {
                                 const article = skuItem.code;
                                 const sku = skuItem.id;
-                                const key = `${article}|${sku}`;
-
-                                if (!acc.infos.has(key)) {
-                                    acc.infos.set(key, { article, sku });
+                                // Ключ для уникальности внутри пачки
+                                const key = `${productId}|${article}|${sku}`;
+                                if (!infoBuffer.has(key)) {
+                                    infoBuffer.set(key, { productId, article, sku });
                                 }
                             }
                         } else {
-                            // fallback: если skus нет, используем общий code как article
                             const article = it.code;
-                            const key = `${article}|`;
-                            if (!acc.infos.has(key)) {
-                                acc.infos.set(key, { article, sku: null });
+                            const key = `${productId}|${article}|null`;
+                            if (!infoBuffer.has(key)) {
+                                infoBuffer.set(key, { productId, article, sku: null });
                             }
                         }
                     }
 
-                    // периодически пишем в БД AccountDiscountProduct, чтобы не раздувать память
-                    if (buffer.length >= this.DB_CHUNK) {
-                        console.log('пишу из буфера в upsertManyDiscountProducts буфер ', buffer.length);
-                        const unique = Array.from(new Map(buffer.map(x => [`${x.productId}|${x.telegramId}|${x.accountId}`, x])).values());
+                    // Сброс буфера скидок (AccountDiscountProduct)
+                    if (discountBuffer.length >= this.DB_CHUNK) {
+                        const unique = Array.from(
+                            new Map(discountBuffer.map(x => [`${x.productId}|${x.telegramId}|${x.accountId}`, x])).values(),
+                        );
                         for (const part of chunk(unique, this.DB_CHUNK)) {
                             await this.accountDiscountRepo.upsertManyDiscountProducts(part);
                             savedTotal += part.length;
                         }
-                        buffer.length = 0;
+                        discountBuffer.length = 0;
+                    }
+
+                    // !!! Сброс буферов СПРАВОЧНИКОВ (Product / ProductInfo)
+                    // Если накопилось много данных (например > 1000), сбрасываем в БД
+                    if (productBuffer.size > 1000 || infoBuffer.size > 1000) {
+                        await flushProductBuffers();
                     }
                 }
 
-                if (buffer.length) {
-                    const unique = Array.from(new Map(buffer.map(x => [`${x.productId}|${x.telegramId}|${x.accountId}`, x])).values());
-                    console.log('пишу из буфера на остаток в upsertManyDiscountProducts');
+                // Дописываем остатки скидок
+                if (discountBuffer.length) {
+                    const unique = Array.from(
+                        new Map(discountBuffer.map(x => [`${x.productId}|${x.telegramId}|${x.accountId}`, x])).values(),
+                    );
                     for (const part of chunk(unique, this.DB_CHUNK)) {
                         await this.accountDiscountRepo.upsertManyDiscountProducts(part);
                         savedTotal += part.length;
@@ -851,9 +870,8 @@ export class AccountService {
             return { accountId, saved: savedTotal };
         };
 
-        // глобальный параллелизм: по this.MAX_CONCURRENCY аккаунтов
+        // Обработка аккаунтов
         for (let i = 0; i < personalDiscounts.length; i += this.MAX_CONCURRENCY) {
-            console.log('зашел в паралельность');
             const slice = personalDiscounts.slice(i, i + this.MAX_CONCURRENCY);
             const settled = await Promise.allSettled(slice.map(a => worker(a)));
 
@@ -865,75 +883,13 @@ export class AccountService {
                     errors.push({ accountId, message: r.reason?.message ?? 'Unknown error' });
                 }
             });
+
+            // После обработки пачки аккаунтов - обязательно сбрасываем остатки справочников
+            await flushProductBuffers();
         }
 
-        console.log('Иду писать в БД продукты');
-        const productsArray = Array.from(productsAccumulator.entries()).map(([productId, value]) => ({
-            productId,
-            node: value.node,
-            infos: Array.from(value.infos.values()), // { article, sku }[]
-        }));
-
-        if (productsArray.length) {
-            const productIds = productsArray.map(p => p.productId);
-
-            // 1) Забираем из БД уже существующие ProductInfo для этих productId
-            const existingInfos = await this.productService.getProductInfosByProductIds(productIds);
-
-            const existingKeys = new Set(existingInfos.map(i => `${i.productId}|${i.article}|${i.sku ?? ''}`));
-
-            // 2) Фильтруем только новые комбинации (productId, article, sku)
-            const productsToSave = productsArray
-                .map(p => {
-                    const newInfos = p.infos.filter(info => {
-                        const key = `${p.productId}|${info.article}|${info.sku ?? ''}`;
-                        return !existingKeys.has(key);
-                    });
-                    return { ...p, infos: newInfos };
-                })
-                .filter(p => p.infos.length > 0);
-
-            // 3) Пишем в БД: upsert Product + ProductInfo
-            // ❗ ВАЖНО: делаем это ПОСЛЕДОВАТЕЛЬНО, без Promise.all,
-            // чтобы не застрелить connection pool
-
-            for (const portion of chunk(productsToSave, this.DB_CHUNK)) {
-                console.log(
-                    'Пишем в БД: upsert Product + ProductInfo (portion size =',
-                    portion.length,
-                    ', concurrency =',
-                    this.PRODUCT_WRITE_CONCURRENCY,
-                    ')',
-                );
-
-                for (let i = 0; i < portion.length; i += this.PRODUCT_WRITE_CONCURRENCY) {
-                    const slice = portion.slice(i, i + this.PRODUCT_WRITE_CONCURRENCY);
-                    console.log('пишу в партишене ', new Date());
-                    await Promise.all(
-                        slice.map(async p => {
-                            const [first, ...rest] = p.infos;
-
-                            // upsert Product + первая ProductInfo
-                            await this.productService.saveProductWithInfo({
-                                productId: p.productId,
-                                node: p.node,
-                                article: first.article,
-                                sku: first.sku ?? null,
-                            });
-
-                            // остальные ProductInfo для этого продукта
-                            for (const info of rest) {
-                                await this.productService.addProductInfo({
-                                    productId: p.productId,
-                                    article: info.article,
-                                    sku: info.sku ?? null,
-                                });
-                            }
-                        }),
-                    );
-                }
-            }
-        }
+        // Финальный сброс на всякий случай (хотя flush внутри цикла выше должен был сработать)
+        await flushProductBuffers();
 
         return { ok: errors.length === 0, results, errors };
     }
