@@ -62,6 +62,7 @@ import { CheckingModule } from './module/checking/checking.module';
         TemplateModule,
         ProductModule,
         CheckingModule,
+        CacheModule,
     ],
 })
 export class AppModule {}
