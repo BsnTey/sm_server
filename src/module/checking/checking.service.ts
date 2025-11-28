@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { List, Products } from '../account/interfaces/products.interface';
 import { chunk, cmp, requestWithBackoff, startOfNextDayUTC } from './utils/set-products.utils';
 import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discount.dto';
@@ -12,7 +12,6 @@ import { PreparedAccountInfo } from './interfaces/extend-chrome.interface';
 import { ErrorItem } from '../account/interfaces/personal-discount.interface';
 import { extractPercentFromNode } from '../account/utils/extract.utils';
 import { ConfigService } from '@nestjs/config';
-import { AccountRepository } from '../account/account.repository';
 import { AccountDiscountRepository } from '../account/account-discount.repository';
 import { OrderRepository } from '../account/order.repository';
 import { ProxyService } from '../proxy/proxy.service';
@@ -22,6 +21,8 @@ import { ProductService } from '../product/product.service';
 import { CacheService } from '../cache/cache.service';
 import { AccountService } from '../account/account.service';
 import { parseDateFlexible } from '../account/utils/parse-data';
+import { UserService } from '../user/user.service';
+import { AccountWithProxyEntity } from '../account/entities/accountWithProxy.entity';
 
 @Injectable()
 export class CheckingService {
@@ -44,6 +45,7 @@ export class CheckingService {
         private readonly publisher: DelayedPublisher,
         private readonly productService: ProductService,
         private readonly cacheService: CacheService,
+        private readonly userService: UserService,
     ) {}
 
     async *paginateProducts(
@@ -86,7 +88,66 @@ export class CheckingService {
         }
     }
 
+    //принимает входящие аккаунты, сейвит в очередь на нарезку под прокси chunkingAccountForProxy
     async queueAccountsForPersonalDiscountV1(data: SetPersonalDiscountAccountRequestDto): Promise<{
+        ok: boolean;
+        estimatedSeconds: number;
+    }> {
+        const user = await this.userService.getUserByTelegramId(data.telegramId);
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        const normalized = data.personalDiscounts.map(id => id.trim()).filter(Boolean);
+        const uniqueAccountIds = Array.from(new Set(normalized));
+
+        if (!uniqueAccountIds.length) {
+            throw new HttpException('No valid accounts provided', HttpStatus.BAD_REQUEST);
+        }
+
+        await this.publisher.publish(
+            RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_INPUT_QUEUE,
+            {
+                telegramId: data.telegramId,
+                personalDiscounts: uniqueAccountIds,
+            },
+            0,
+        );
+
+        const estimatedSeconds = Math.ceil(uniqueAccountIds.length / this.MAX_CONCURRENCY) * this.PERSONAL_DISCOUNT_RATE_SECONDS;
+
+        this.logger.log(
+            `Queued ${uniqueAccountIds.length} accounts for personal discount V1 (telegramId=${data.telegramId}, batches=${uniqueAccountIds.length})`,
+        );
+
+        return {
+            ok: true,
+            estimatedSeconds,
+        };
+    }
+
+    async start(data: SetPersonalDiscountAccountRequestDto) {
+        const telegramId = data.telegramId;
+        const accountIds = data.personalDiscounts;
+
+        const results: Array<AccountWithProxyEntity> = [];
+
+        for (const partAcc of chunk(accountIds, this.MAX_CONCURRENCY)) {
+            const settled = await Promise.allSettled(partAcc.map(accountId => this.accountService.getAccountEntity(accountId)));
+
+            settled.forEach(resultPromise => {
+                if (resultPromise.status === 'fulfilled') {
+                    results.push(resultPromise.value);
+                }
+            });
+        }
+        const resultChanks: Array<Array<AccountWithProxyEntity>> = [];
+        //нарезать results по 5 аккаунтов в чанке по разным прокси, которые в аккаунтах results[0].proxy.uuid
+        //передать в другую очередь где будет обьект {telegramId, accounts: Array<AccountWithProxyEntity>, count, total}
+        // Где count - номер чанка, total - всего чанков
+    }
+
+    async queueAccounts(data: SetPersonalDiscountAccountRequestDto): Promise<{
         ok: boolean;
         estimatedSeconds: number;
     }> {
@@ -149,8 +210,7 @@ export class CheckingService {
 
         return { accountId, saved: valid.length };
     }
-если аккаунты существуют и их отправили повторно
-дробление по разным прокси
+
     async setAccountsForPersonalDiscount(data: SetPersonalDiscountAccountRequestDto): Promise<{
         ok: boolean;
         results: Array<{ accountId: string; saved: number }>;

@@ -6,6 +6,7 @@ import {
     AccountWDevice,
     AddressSuggestList,
     IAccountWithProxy,
+    IAccountWithProxyFromDB,
     IRecipientOrder,
     IRefreshAccount,
     ResolvedCity,
@@ -509,6 +510,7 @@ export class AccountService {
         return this.accountRep.updateCredentials(accountId, dto);
     }
 
+    @RetryOnProxyError()
     private async refreshForValidation(accountWithProxyEntity: AccountWithProxyEntity): Promise<IRefreshAccount> {
         const url = this.url + 'v1/auth/refresh';
         const httpOptions = await this.getHttpOptionsRefresh(url, accountWithProxyEntity);
@@ -538,12 +540,13 @@ export class AccountService {
         }
     }
 
-    private async getAndValidateOrSetProxyAccount(accountWithProxy: IAccountWithProxy): Promise<AccountWithProxyEntity> {
+    private async getAndValidateOrSetProxyAccount(
+        accountWithProxy: IAccountWithProxyFromDB | IAccountWithProxy,
+    ): Promise<AccountWithProxyEntity> {
         const currentTime = new Date();
         const timeBlockedAgo = new Date();
         timeBlockedAgo.setMinutes(currentTime.getMinutes() - +this.durationTimeProxyBlock);
 
-        let accountWithProxyEntity: AccountWithProxyEntity;
         if (
             !accountWithProxy.proxy ||
             accountWithProxy.proxy.expiresAt < currentTime ||
@@ -551,11 +554,9 @@ export class AccountService {
         ) {
             const proxy = await this.proxyService.getRandomProxy();
             const newAccountWithProxy = await this.accountRep.setProxyAccount(accountWithProxy.accountId, proxy.uuid);
-            accountWithProxyEntity = new AccountWithProxyEntity(newAccountWithProxy);
-        } else {
-            accountWithProxyEntity = new AccountWithProxyEntity(accountWithProxy);
+            return new AccountWithProxyEntity(newAccountWithProxy);
         }
-        return accountWithProxyEntity;
+        return new AccountWithProxyEntity(accountWithProxy as IAccountWithProxy);
     }
 
     private async loadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
@@ -568,7 +569,7 @@ export class AccountService {
         return entity;
     }
 
-    private async getAccountEntity(accountId: string): Promise<AccountWithProxyEntity> {
+    async getAccountEntity(accountId: string): Promise<AccountWithProxyEntity> {
         const accountEntityFromCache = await this.cacheManager.get<AccountWithProxyEntity>(accountId);
         if (!accountEntityFromCache) {
             const account = await this.loadAccountCore(accountId);

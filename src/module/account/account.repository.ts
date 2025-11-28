@@ -2,7 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { Account, CourseStatus, Order, Prisma } from '@prisma/client';
 import { PrismaService } from '@common/database/prisma.service';
 import { AccountEntity } from './entities/account.entity';
-import { IAccountWithProxy, ICourseTokens, IEmailFromDb, IRefreshDataAccount, IUpdateAccount } from './interfaces/account.interface';
+import {
+    IAccountWithProxy,
+    IAccountWithProxyFromDB,
+    ICourseTokens,
+    IEmailFromDb,
+    IRefreshDataAccount,
+    IUpdateAccount,
+} from './interfaces/account.interface';
 import { CitySMEntity } from './entities/citySM.entity';
 
 @Injectable()
@@ -73,7 +80,7 @@ export class AccountRepository {
         });
     }
 
-    async getAccountWithProxy(accountId: string): Promise<IAccountWithProxy | null> {
+    async getAccountWithProxy(accountId: string): Promise<IAccountWithProxyFromDB | null> {
         return this.prisma.account.findUnique({
             where: { accountId },
             include: {
@@ -84,6 +91,7 @@ export class AccountRepository {
     }
 
     async setProxyAccount(accountId: string, proxyUuid: string): Promise<IAccountWithProxy> {
+        //@ts-ignore
         return this.prisma.account.update({
             where: {
                 accountId,

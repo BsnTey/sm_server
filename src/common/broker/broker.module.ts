@@ -8,11 +8,20 @@ import { NotificationModule } from '../../module/notification/notification.modul
 import { AccountModule } from '../../module/account/account.module';
 import { PersonalDiscountWorker } from './workers/personal-discount.worker';
 import { AccountShortInfoWorker } from './workers/account-short-info.worker';
+import { PersonalDiscountInputWorker } from './workers/personal-discount-input.worker';
+import { CheckingModule } from '../../module/checking/checking.module';
 
 @Global()
 @Module({
-    imports: [ConfigModule, forwardRef(() => NotificationModule), AccountModule],
-    providers: [brokerProvider, BrokerConsumer, DelayedPublisher, PersonalDiscountWorker, AccountShortInfoWorker],
+    imports: [ConfigModule, forwardRef(() => NotificationModule), AccountModule, CheckingModule],
+    providers: [
+        brokerProvider,
+        BrokerConsumer,
+        DelayedPublisher,
+        PersonalDiscountWorker,
+        AccountShortInfoWorker,
+        PersonalDiscountInputWorker,
+    ],
     exports: [brokerProvider, DelayedPublisher],
 })
 export class BrokerModule implements OnApplicationShutdown {
