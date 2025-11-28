@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AccountDiscountRepository } from './account-discount.repository';
-import { UpsertPersonalDiscountProductsInput } from './interfaces/account-discount.interface';
+import { UpsertPersonalDiscountProductsInput } from '../checking/interfaces/account-discount.interface';
 
 @Injectable()
 export class AccountDiscountService {

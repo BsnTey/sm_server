@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@common/database/prisma.service';
-import { NodePair, UpsertPersonalDiscountInput, UpsertPersonalDiscountProductsInput } from './interfaces/account-discount.interface';
+import {
+    NodePair,
+    UpsertPersonalDiscountInput,
+    UpsertPersonalDiscountProductsInput,
+} from '../checking/interfaces/account-discount.interface';
 
 @Injectable()
 export class AccountDiscountRepository {
@@ -13,34 +17,46 @@ export class AccountDiscountRepository {
     async upsertMany(
         accountId: string,
         telegramId: string,
-        items: Array<Pick<UpsertPersonalDiscountInput, 'nodeId' | 'nodeName' | 'dateEnd'>>,
+        items: Array<Pick<UpsertPersonalDiscountInput, 'nodeId' | 'nodeName' | 'dateEnd' | 'url'>>,
     ): Promise<void> {
         if (!items.length) return;
 
-        await this.prisma.$transaction(
-            items.map(i =>
+        const operations: any[] = [];
+
+        for (const item of items) {
+            operations.push(
+                this.prisma.nodeDiscount.upsert({
+                    where: { nodeId: item.nodeId },
+                    create: {
+                        nodeId: item.nodeId,
+                        nodeName: item.nodeName,
+                        url: item.url,
+                        dateEnd: item.dateEnd,
+                    },
+                    update: {},
+                }),
+            );
+
+            operations.push(
                 this.prisma.accountDiscount.upsert({
                     where: {
                         account_node_telegram_unique: {
                             accountId,
-                            nodeId: i.nodeId,
+                            nodeId: item.nodeId,
                             telegramId,
                         },
                     },
                     create: {
                         accountId,
                         telegramId,
-                        nodeId: i.nodeId,
-                        nodeName: i.nodeName,
-                        dateEnd: i.dateEnd,
+                        nodeId: item.nodeId,
                     },
-                    update: {
-                        nodeName: i.nodeName,
-                        dateEnd: i.dateEnd,
-                    },
+                    update: {},
                 }),
-            ),
-        );
+            );
+        }
+
+        await this.prisma.$transaction(operations);
     }
 
     async findDistinctNodePairsByTelegram(telegramId: string): Promise<NodePair[]> {

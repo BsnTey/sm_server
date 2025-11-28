@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { CheckingService } from './checking.service';
-import { CheckingGateway } from './checking.gateway';
+import { CheckingController } from './checking.controller';
 
 @Module({
-  providers: [CheckingService, CheckingGateway]
+    providers: [CheckingService, CheckingController],
 })
 export class CheckingModule {}

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AccountService } from '../../../module/account/account.service';
-import { SetPersonalDiscountAccountCommand } from '../../../module/account/dto/set-personal-discount.dto';
+import { SetPersonalDiscountAccountCommand } from '../../../module/checking/dto/set-personal-discount.dto';
 
 @Injectable()
 export class PersonalDiscountWorker {

@@ -3,6 +3,7 @@ export interface UpsertPersonalDiscountInput {
     telegramId: string;
     nodeId: string;
     nodeName: string;
+    url: string;
     dateEnd: Date;
 }
 

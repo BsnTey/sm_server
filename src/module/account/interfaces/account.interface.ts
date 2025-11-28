@@ -73,7 +73,7 @@ export interface IAccountCashing {
 }
 
 export interface IAccountWithProxy extends Account {
-    proxy: Proxy | null;
+    proxy: Proxy;
     citySM: CitySM;
 }
 

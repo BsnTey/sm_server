@@ -2,6 +2,7 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
 const ProductCheckingRequestSchema = z.object({
+    telegramId: z.string(),
     productId: z.string().min(1, 'productId обязателен'),
 });
 
