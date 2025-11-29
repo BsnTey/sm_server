@@ -59,23 +59,24 @@ export class BrokerConsumer implements OnModuleInit {
             { noAck: false },
         );
 
-        // 5. Personal Discount Product
-        await channel.consume(
-            RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_PRODUCT_QUEUE,
-            msg =>
-                this.safeHandle('PersonalDiscountProduct', msg, channel, RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_PRODUCT_QUEUE, 3, payload =>
-                    this.personalDiscountProductWorker.process(payload),
-                ),
-            { noAck: false },
-        );
-
-        await channel.prefetch(1);
         // 3. Personal Discount Input
+        await channel.prefetch(1);
         await channel.consume(
             RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_INPUT_QUEUE,
             msg =>
                 this.safeHandle('PersonalDiscountInput', msg, channel, RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_INPUT_QUEUE, 3, payload =>
                     this.personalDiscountInputWorker.process(payload),
+                ),
+            { noAck: false },
+        );
+
+        // 5. Personal Discount Product
+        await channel.prefetch(4);
+        await channel.consume(
+            RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_PRODUCT_QUEUE,
+            msg =>
+                this.safeHandle('PersonalDiscountProduct', msg, channel, RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_PRODUCT_QUEUE, 3, payload =>
+                    this.personalDiscountProductWorker.process(payload),
                 ),
             { noAck: false },
         );

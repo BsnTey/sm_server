@@ -5,9 +5,11 @@ import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discoun
 import { RABBIT_MQ_QUEUES } from '@common/broker/rabbitmq.queues';
 import {
     AccountDiscountsToInsert,
+    CreatePersonalDiscountProductsInput,
+    NodeAccountDiscount,
+    NodeForAccount,
     NodePair,
     UpsertNodeDiscountInput,
-    UpsertPersonalDiscountProductsInput,
 } from './interfaces/account-discount.interface';
 import { keyDiscountAccount, keyDiscountNodes, keyNodeInput } from './cache-key/key';
 import { AccountTelegramParamsDto } from '../account/dto/account-telegram-ids.dto';
@@ -30,6 +32,7 @@ import { AccountWithProxyEntity } from '../account/entities/accountWithProxy.ent
 import { PersonalDiscountChunkWorkerPayload } from './interfaces/queqe.interface';
 import { AccountDiscountService } from './account-discount.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { ProductBatchSaver } from './utils/product-batch-saver';
 
 interface AccountProxyItem {
     accountId: string;
@@ -216,44 +219,6 @@ export class CheckingService {
         return allChunks.filter(b => b && b.length > 0);
     }
 
-    // async queueAccounts(data: SetPersonalDiscountAccountRequestDto): Promise<{
-    //     ok: boolean;
-    //     estimatedSeconds: number;
-    // }> {
-    //     const normalized = data.personalDiscounts.map(id => id.trim()).filter(Boolean);
-    //     const uniqueAccountIds = Array.from(new Set(normalized));
-    //
-    //     if (!uniqueAccountIds.length) {
-    //         throw new HttpException('No valid accounts provided', HttpStatus.BAD_REQUEST);
-    //     }
-    //
-    //     const batches = Array.from(chunk(uniqueAccountIds, this.PERSONAL_DISCOUNT_BATCH_SIZE));
-    //
-    //     await Promise.all(
-    //         batches.map(batch =>
-    //             this.publisher.publish(
-    //                 RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_QUEUE,
-    //                 {
-    //                     telegramId: data.telegramId,
-    //                     personalDiscounts: batch,
-    //                 },
-    //                 0,
-    //             ),
-    //         ),
-    //     );
-    //
-    //     const estimatedSeconds = batches.length * this.PERSONAL_DISCOUNT_RATE_SECONDS;
-    //
-    //     this.logger.log(
-    //         `Queued ${uniqueAccountIds.length} accounts for personal discount (telegramId=${data.telegramId}, batches=${batches.length})`,
-    //     );
-    //
-    //     return {
-    //         ok: true,
-    //         estimatedSeconds,
-    //     };
-    // }
-
     //воркер обновления AccountDiscount для чанков из очереди
     async setAccountsForNodes(chunkData: PersonalDiscountChunkWorkerPayload) {
         const { telegramId, accounts: accountIds, count, total } = chunkData;
@@ -362,145 +327,173 @@ export class CheckingService {
     }
 
     async setAccountsDiscountProduct(chunkData: PersonalDiscountChunkWorkerPayload) {
-        const { telegramId, personalDiscounts } = data;
+        const { telegramId, accounts: accountIds, count, total } = chunkData;
         const results: Array<{ accountId: string; saved: number }> = [];
         const errors: Array<{ accountId: string; message: string }> = [];
 
-        // Буферы для справочников (Product, ProductInfo)
-        // Используем Map, чтобы внутри батча убрать дубликаты перед отправкой в БД
-        const productBuffer = new Map<string, string>();
-        const infoBuffer = new Map<string, { productId: string; article: string; sku: string | null }>();
-        const discountBuffer: UpsertPersonalDiscountProductsInput[] = [];
-        const savedTotal = 0;
+        // 1. Подготовка данных (I/O)
+        // Получаем ноды для всех аккаунтов сразу (оптимизация)
+        const nodesByAccount = await this.accountDiscountService.getNodesForAccounts(String(telegramId), accountIds);
 
-        const flushProductBuffers = async () => {
-            if (infoBuffer.size === 0) return;
+        // 2. Инициализация менеджера батчей
+        const batchSaver = new ProductBatchSaver(this.accountDiscountService, this.logger);
 
-            const infosToSave = Array.from(infoBuffer.values());
+        // 3. Обработка аккаунтов чанками (Concurrency Control)
+        for (const part of chunk(accountIds, this.MAX_CONCURRENCY)) {
+            const settled = await Promise.allSettled(
+                part.map(accountId =>
+                    this.processSingleAccount(accountId, String(telegramId), nodesByAccount.get(accountId) || [], batchSaver),
+                ),
+            );
 
-            infoBuffer.clear();
-
-            try {
-                await this.accountDiscountRepo.bulkInsertProductInfos(infosToSave);
-            } catch (e) {
-                this.logger.error('Error flushing product dictionaries', e);
-            }
-        };
-
-        const worker = async (accountId: string) => {
-            const pd = await this.personalDiscount(accountId);
-
-            const urlNodes = (pd?.list ?? []).map(n => ({
-                url: n.url,
-                name: n.nodeName,
-                dateEnd: startOfNextDayUTC(n.dateEnd),
-            }));
-
-            let savedTotal = 0;
-
-            for (const node of urlNodes) {
-                const discountBuffer: UpsertPersonalDiscountProductsInput[] = [];
-
-                for await (const page of this.paginateProducts(
-                    accountId,
-                    node.url,
-                    this.PAGE_SIZE,
-                    20,
-                    this.findProductsBySearch.bind(this),
-                )) {
-                    for (const it of page) {
-                        const productId = String(it.id);
-
-                        // 1. Добавляем в буфер связи Аккаунт-Скидка
-                        discountBuffer.push({
-                            productId,
-                            telegramId: String(telegramId),
-                            accountId,
-                            nodeId: node.nodeId,
-                            dateEnd: node.dateEnd,
-                        });
-
-                        // 2. Добавляем в буфер справочника Product
-                        if (!productBuffer.has(productId)) {
-                            productBuffer.set(productId, node.name);
-                        }
-
-                        // 3. Добавляем в буфер справочника ProductInfo
-                        if (Array.isArray(it.skus) && it.skus.length) {
-                            for (const skuItem of it.skus) {
-                                const article = skuItem.code;
-                                const sku = skuItem.id;
-                                // Ключ для уникальности внутри пачки
-                                const key = `${productId}|${article}|${sku}`;
-                                if (!infoBuffer.has(key)) {
-                                    infoBuffer.set(key, { productId, article, sku });
-                                }
-                            }
-                        } else {
-                            const article = it.code;
-                            const key = `${productId}|${article}|null`;
-                            if (!infoBuffer.has(key)) {
-                                infoBuffer.set(key, { productId, article, sku: null });
-                            }
-                        }
-                    }
-
-                    // Сброс буфера скидок (AccountDiscountProduct)
-                    if (discountBuffer.length >= this.DB_CHUNK) {
-                        const unique = Array.from(
-                            new Map(discountBuffer.map(x => [`${x.productId}|${x.telegramId}|${x.accountId}`, x])).values(),
-                        );
-                        for (const part of chunk(unique, this.DB_CHUNK)) {
-                            await this.accountDiscountRepo.upsertManyDiscountProducts(part);
-                            savedTotal += part.length;
-                        }
-                        discountBuffer.length = 0;
-                    }
-
-                    // !!! Сброс буферов СПРАВОЧНИКОВ (Product / ProductInfo)
-                    // Если накопилось много данных (например > 1000), сбрасываем в БД
-                    if (productBuffer.size > 1000 || infoBuffer.size > 1000) {
-                        await flushProductBuffers();
-                    }
-                }
-
-                // Дописываем остатки скидок
-                if (discountBuffer.length) {
-                    const unique = Array.from(
-                        new Map(discountBuffer.map(x => [`${x.productId}|${x.telegramId}|${x.accountId}`, x])).values(),
-                    );
-                    for (const part of chunk(unique, this.DB_CHUNK)) {
-                        await this.accountDiscountRepo.upsertManyDiscountProducts(part);
-                        savedTotal += part.length;
-                    }
-                }
-            }
-
-            return { accountId, saved: savedTotal };
-        };
-
-        // Обработка аккаунтов
-        for (const part of chunk(personalDiscounts, this.MAX_CONCURRENCY)) {
-            const settled = await Promise.allSettled(part.map(a => worker(a)));
-
+            // Обработка результатов промисов
             settled.forEach((r, idx) => {
-                const accountId = part[idx];
+                const accId = part[idx];
                 if (r.status === 'fulfilled') {
-                    results.push({ accountId, saved: r.value.saved });
+                    results.push(r.value);
                 } else {
-                    errors.push({ accountId, message: r.reason?.message ?? 'Unknown error' });
+                    errors.push({ accountId: accId, message: r.reason?.message || 'Unknown' });
+                    this.logger.error(`Error processing account ${accId}`, r.reason);
                 }
             });
 
-            // После обработки пачки аккаунтов - обязательно сбрасываем остатки справочников
-            await flushProductBuffers();
+            // Сбрасываем буфер после каждой пачки аккаунтов
+            await batchSaver.flush();
         }
 
-        // Финальный сброс на всякий случай (хотя flush внутри цикла выше должен был сработать)
-        await flushProductBuffers();
+        // 4. Финальный сброс (на всякий случай)
+        await batchSaver.flush();
 
-        return { ok: errors.length === 0, results, errors };
+        // 5. Логирование и итоги
+        this.logProcessingResults(telegramId, results, errors);
+
+        if (count == total) {
+            this.telegramService.sendMessage(+telegramId, `✅ Обновление персональных скидок для быстрого режима завершено!`);
+        }
     }
+
+    /**
+     * Обрабатывает один аккаунт: проходит по всем его нодам.
+     */
+    private async processSingleAccount(accountId: string, telegramId: string, nodes: NodeAccountDiscount[], batchSaver: ProductBatchSaver) {
+        let totalSaved = 0;
+
+        for (const node of nodes) {
+            try {
+                const count = await this.fetchAndBufferProducts(accountId, telegramId, node, batchSaver);
+                totalSaved += count;
+            } catch (e) {
+                this.logger.error(`Failed to process node ${node.url} for account ${accountId}`, e);
+                // Не прерываем весь аккаунт из-за одной ноды
+            }
+        }
+
+        return { accountId, saved: totalSaved };
+    }
+
+    /**
+     * Работает с API: пагинация, маппинг данных и отправка в буфер.
+     */
+    private async fetchAndBufferProducts(
+        accountId: string,
+        telegramId: string,
+        node: NodeAccountDiscount,
+        batchSaver: ProductBatchSaver,
+    ): Promise<number> {
+        let savedCount = 0;
+
+        // Генератор пагинации
+        const productStream = this.paginateProducts(
+            accountId,
+            node.url,
+            this.PAGE_SIZE,
+            20, // Max pages cap
+            this.accountService.findProductsBySearch.bind(this),
+        );
+
+        for await (const page of productStream) {
+            for (const item of page) {
+                const productId = String(item.id);
+
+                // 1. Регистрируем Скидку (Связь Аккаунт -> Товар -> Нода)
+                // dateEnd убрал, так как его нет в интерфейсе CreatePersonalDiscountProductsInput
+                // и в модели Prisma account_discount_product (он есть в NodeDiscount)
+                const needFlushDiscount = batchSaver.addDiscount({
+                    productId,
+                    telegramId,
+                    accountId,
+                    nodeId: node.nodeId,
+                });
+
+                if (needFlushDiscount) await batchSaver.flush();
+                savedCount++;
+
+                // 2. Регистрируем Справочник (ProductInfo: SKU / Article)
+                if (Array.isArray(item.skus) && item.skus.length) {
+                    for (const skuItem of item.skus) {
+                        const needFlushInfo = batchSaver.addInfo(productId, skuItem.code, skuItem.id);
+                        if (needFlushInfo) await batchSaver.flush();
+                    }
+                } else if (item.code) {
+                    // Если SKU нет, но есть артикул у самого товара
+                    const needFlushInfo = batchSaver.addInfo(productId, item.code, null);
+                    if (needFlushInfo) await batchSaver.flush();
+                }
+            }
+        }
+
+        return savedCount;
+    }
+
+    async *paginateProducts(
+        accountId: string,
+        nodeUrl: string,
+        pageSize = 100,
+        maxPagesCap = 20,
+        findProductsBySearch: (accountId: string, url: string, limit: number, offset: number) => Promise<Products>,
+    ) {
+        let offset = 0;
+        let total: number | null = null;
+        let pages = 0;
+
+        while (pages < maxPagesCap) {
+            const res = await requestWithBackoff(() => findProductsBySearch(accountId, nodeUrl, pageSize, offset));
+            const items: List[] = res.list ?? [];
+            pages++;
+
+            // Если total ещё неизвестен и meta пришла — зафиксируем total один раз
+            if (total === null && res.meta?.count != null) {
+                total = res.meta.count;
+                if (total <= 0) break;
+            }
+
+            // Пустая страница — стоп
+            if (items.length === 0) break;
+
+            // Отдаём текущие элементы
+            yield items;
+
+            // Если знаем общий total — контролируем окончание по нему
+            if (total !== null) {
+                offset += pageSize;
+                if (offset >= total) break; // всё прочитали
+            } else {
+                // total неизвестен: ориентируемся по «неполной» странице
+                if (items.length < pageSize) break; // последняя страница
+                offset += pageSize;
+            }
+        }
+    }
+
+    private logProcessingResults(telegramId: number | string, results: any[], errors: any[]) {
+        const totalSaved = results.reduce((acc, val) => acc + val.saved, 0);
+        this.logger.log(`Discount Products: User ${telegramId} | Accs: ${results.length} | Saved: ${totalSaved} | Errs: ${errors.length}`);
+
+        if (errors.length > 0) {
+            this.telegramService.sendMessage(+telegramId, `⚠️ Ошибки при загрузке товаров (${errors.length} акк).`);
+        }
+    }
+
     //
     // async getDistinctNodePairsByTelegram(telegramId: string): Promise<{ nodes: NodePair[] }> {
     //     const key = keyDiscountNodes(telegramId);
@@ -605,46 +598,7 @@ export class CheckingService {
     //     return status === 404 || msg === 'PRODUCT_NOT_FOUND';
     // }
     //
-    // async *paginateProducts(
-    //     accountId: string,
-    //     nodeUrl: string,
-    //     pageSize = 100,
-    //     maxPagesCap = 20,
-    //     findProductsBySearch: (accountId: string, url: string, limit: number, offset: number) => Promise<Products>,
-    // ) {
-    //     let offset = 0;
-    //     let total: number | null = null;
-    //     let pages = 0;
-    //
-    //     while (pages < maxPagesCap) {
-    //         const res = await requestWithBackoff(() => findProductsBySearch(accountId, nodeUrl, pageSize, offset));
-    //         const items: List[] = res.list ?? [];
-    //         pages++;
-    //
-    //         // Если total ещё неизвестен и meta пришла — зафиксируем total один раз
-    //         if (total === null && res.meta?.count != null) {
-    //             total = res.meta.count;
-    //             if (total <= 0) break;
-    //         }
-    //
-    //         // Пустая страница — стоп
-    //         if (items.length === 0) break;
-    //
-    //         // Отдаём текущие элементы
-    //         yield items;
-    //
-    //         // Если знаем общий total — контролируем окончание по нему
-    //         if (total !== null) {
-    //             offset += pageSize;
-    //             if (offset >= total) break; // всё прочитали
-    //         } else {
-    //             // total неизвестен: ориентируемся по «неполной» странице
-    //             if (items.length < pageSize) break; // последняя страница
-    //             offset += pageSize;
-    //         }
-    //     }
-    // }
-    //
+
     // async getAccountsForPersonalDiscountV2(
     //     telegramId: string,
     //     productId: string,

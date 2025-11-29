@@ -11,11 +11,21 @@ export interface AccountDiscountsToInsert {
     nodeId: string;
 }
 
-export interface UpsertPersonalDiscountProductsInput {
+export interface CreatePersonalDiscountProductsInput {
     productId: string;
     accountId: string;
     telegramId: string;
-    dateEnd: Date;
+    nodeId: string;
 }
 
 export type NodePair = { nodeId: string; nodeName: string };
+
+export interface NodeForAccount {
+    accountId: string;
+    node: NodeAccountDiscount;
+}
+
+export interface NodeAccountDiscount {
+    url: string;
+    nodeId: string;
+}
