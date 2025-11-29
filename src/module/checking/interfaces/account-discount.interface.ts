@@ -1,10 +1,14 @@
-export interface UpsertPersonalDiscountInput {
-    accountId: string;
-    telegramId: string;
+export interface UpsertNodeDiscountInput {
     nodeId: string;
     nodeName: string;
     url: string;
     dateEnd: Date;
+}
+
+export interface AccountDiscountsToInsert {
+    accountId: string;
+    telegramId: string;
+    nodeId: string;
 }
 
 export interface UpsertPersonalDiscountProductsInput {

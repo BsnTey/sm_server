@@ -1,10 +1,29 @@
 import { Injectable } from '@nestjs/common';
 import { AccountDiscountRepository } from './account-discount.repository';
-import { UpsertPersonalDiscountProductsInput } from '../checking/interfaces/account-discount.interface';
+import { AccountDiscountsToInsert, UpsertNodeDiscountInput } from './interfaces/account-discount.interface';
 
 @Injectable()
 export class AccountDiscountService {
     constructor(private readonly accountDiscountRepository: AccountDiscountRepository) {}
+
+    async upsertNodeDiscount(node: UpsertNodeDiscountInput) {
+        return this.accountDiscountRepository.upsertNodeDiscount(node);
+    }
+
+    /**
+     * Удалить все данные по конкретному аккаунту (AccountDiscount и AccountDiscountProduct)
+     */
+    async clearAccountData(accountId: string): Promise<void> {
+        return this.accountDiscountRepository.clearAccountData(accountId);
+    }
+
+    async ensureNodesExist(nodes: UpsertNodeDiscountInput[]): Promise<void> {
+        await this.accountDiscountRepository.ensureNodesExist(nodes);
+    }
+
+    async refreshAccountDiscountsBatch(accountIds: string[], items: AccountDiscountsToInsert[]): Promise<void> {
+        await this.accountDiscountRepository.refreshAccountDiscountsBatch(accountIds, items);
+    }
 
     /**
      * Получить список accountId, у которых есть записи в account_discount_product
@@ -28,12 +47,5 @@ export class AccountDiscountService {
      */
     async findAccountsForProduct(telegramId: string, productId: string): Promise<string[]> {
         return this.accountDiscountRepository.findAccountsForProduct(telegramId, productId);
-    }
-
-    /**
-     * Массовый upsert записей в account_discount_product.
-     */
-    async upsertManyDiscountProducts(items: UpsertPersonalDiscountProductsInput[]): Promise<void> {
-        return this.accountDiscountRepository.upsertManyDiscountProducts(items);
     }
 }

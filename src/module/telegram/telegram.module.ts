@@ -58,7 +58,7 @@ import { CalculateModule } from '../calculate/calculate.module';
 import { BottModule } from '../bott/bott.module';
 import { TemplateModule } from '../template/template.module';
 import { MyDiscountUpdate } from './updates/myDiscount/myDiscount.update';
-import { ProductModule } from '../product/product.module';
+import { ProductModule } from '../checking/product/product.module';
 
 @Module({
     imports: [

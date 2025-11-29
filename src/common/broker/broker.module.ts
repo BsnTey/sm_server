@@ -6,10 +6,11 @@ import { ConfigModule } from '@nestjs/config';
 import { DelayedPublisher } from '@common/broker/delayed.publisher';
 import { NotificationModule } from '../../module/notification/notification.module';
 import { AccountModule } from '../../module/account/account.module';
-import { PersonalDiscountWorker } from './workers/personal-discount.worker';
 import { AccountShortInfoWorker } from './workers/account-short-info.worker';
 import { PersonalDiscountInputWorker } from './workers/personal-discount-input.worker';
 import { CheckingModule } from '../../module/checking/checking.module';
+import { PersonalDiscountChunkWorker } from './workers/personal-discount-chunk.worker';
+import { PersonalDiscountProductWorker } from './workers/personal-discount-product.worker';
 
 @Global()
 @Module({
@@ -18,9 +19,10 @@ import { CheckingModule } from '../../module/checking/checking.module';
         brokerProvider,
         BrokerConsumer,
         DelayedPublisher,
-        PersonalDiscountWorker,
         AccountShortInfoWorker,
         PersonalDiscountInputWorker,
+        PersonalDiscountChunkWorker,
+        PersonalDiscountProductWorker,
     ],
     exports: [brokerProvider, DelayedPublisher],
 })

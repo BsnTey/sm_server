@@ -6,7 +6,7 @@ import { MY_DISCOUNT_SCENE } from '../../scenes/profile.scene-constant';
 import { ALL_KEYS_MENU_BUTTON_NAME } from '../base-command/base-command.constants';
 import { BaseUpdate } from '../base/base.update';
 import { SenderTelegram } from '../../interfaces/telegram.context';
-import { ProductService } from '../../../product/product.service';
+import { ProductService } from '../../../checking/product/product.service';
 import { AccountService } from '../../../account/account.service';
 import { CalculateService } from '../../../calculate/calculate.service';
 

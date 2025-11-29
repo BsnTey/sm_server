@@ -9,11 +9,11 @@ import { CourseService } from './course.service';
 import { CourseRepository } from './course.repository';
 import { DeviceInfoService } from './deviceInfo.service';
 import { DeviceInfoRepository } from './deviceInfo.repository';
-import { AccountDiscountRepository } from './account-discount.repository';
+import { AccountDiscountRepository } from '../checking/account-discount.repository';
 import { CalculateModule } from '../calculate/calculate.module';
 import { OrderRepository } from './order.repository';
-import { ProductModule } from '../product/product.module';
-import { AccountDiscountService } from './account-discount.service';
+import { ProductModule } from '../checking/product/product.module';
+import { AccountDiscountService } from '../checking/account-discount.service';
 
 @Module({
     controllers: [AccountController],

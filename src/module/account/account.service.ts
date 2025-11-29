@@ -559,6 +559,15 @@ export class AccountService {
         return new AccountWithProxyEntity(accountWithProxy as IAccountWithProxy);
     }
 
+    async getProxyUuid(accountId: string): Promise<string | null> {
+        const accountWithProxy = await this.accountRep.getAccountWithProxy(accountId);
+
+        if (!accountWithProxy) return null;
+
+        const entity = await this.getAndValidateOrSetProxyAccount(accountWithProxy);
+        return entity.proxy.uuid;
+    }
+
     private async loadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
         const accountWithProxy = await this.accountRep.getAccountWithProxy(accountId);
 

@@ -24,7 +24,7 @@ import { CalculateModule } from './module/calculate/calculate.module';
 import { ConfigAppModule } from './module/config/config.module';
 import { TemplateModule } from './module/template/template.module';
 import { UserModule } from './module/user/user.module';
-import { ProductModule } from './module/product/product.module';
+import { ProductModule } from './module/checking/product/product.module';
 import { CheckingModule } from './module/checking/checking.module';
 
 @Module({

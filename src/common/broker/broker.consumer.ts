@@ -4,9 +4,10 @@ import { RABBIT_MQ } from './broker.provider';
 import { RABBIT_MQ_QUEUES } from '@common/broker/rabbitmq.queues';
 import { ConfirmChannel, ConsumeMessage } from 'amqplib';
 import { OrderTrackingWorker } from '../../module/notification/tracking/tracking.worker';
-import { PersonalDiscountWorker } from './workers/personal-discount.worker';
 import { AccountShortInfoWorker } from './workers/account-short-info.worker';
 import { PersonalDiscountInputWorker } from './workers/personal-discount-input.worker';
+import { PersonalDiscountChunkWorker } from './workers/personal-discount-chunk.worker';
+import { PersonalDiscountProductWorker } from './workers/personal-discount-product.worker';
 
 @Injectable()
 export class BrokerConsumer implements OnModuleInit {
@@ -14,78 +15,70 @@ export class BrokerConsumer implements OnModuleInit {
 
     constructor(
         @Inject(RABBIT_MQ) private readonly channel: ChannelWrapper,
-        private readonly worker: OrderTrackingWorker,
-        private readonly personalDiscountWorker: PersonalDiscountWorker,
+        private readonly orderTrackingWorker: OrderTrackingWorker,
         private readonly accountShortInfoWorker: AccountShortInfoWorker,
-        private readonly personalDiscountV1Worker: PersonalDiscountInputWorker,
+        private readonly personalDiscountInputWorker: PersonalDiscountInputWorker,
+        private readonly personalDiscountChunkWorker: PersonalDiscountChunkWorker,
+        private readonly personalDiscountProductWorker: PersonalDiscountProductWorker,
     ) {}
 
     async onModuleInit() {
-        await this.registerHandlers();
+        await this.channel.addSetup(async (channel: ConfirmChannel) => {
+            await this.registerHandlers(channel);
+        });
     }
 
-    private async registerHandlers() {
-        await this.channel.addSetup(async (raw: ConfirmChannel) => {
-            await raw.prefetch(3);
+    private async registerHandlers(channel: ConfirmChannel) {
+        // 1. Order Tracking
+        await channel.consume(
+            RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE,
+            msg =>
+                this.safeHandle('OrderTracking', msg, channel, RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE, 3, payload =>
+                    this.orderTrackingWorker.process(payload),
+                ),
+            { noAck: false },
+        );
 
-            await raw.consume(
-                RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE,
-                msg =>
-                    this.safeHandle(
-                        'OrderTrackingWorker',
-                        msg,
-                        raw,
-                        RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE,
-                        1, // maxAttempts
-                        payload => this.worker.process(payload),
-                    ),
-                { noAck: false },
-            );
+        // 2. Account Short Info
+        await channel.consume(
+            RABBIT_MQ_QUEUES.ACCOUNT_SHORT_INFO_QUEUE,
+            msg =>
+                this.safeHandle('AccountShortInfo', msg, channel, RABBIT_MQ_QUEUES.ACCOUNT_SHORT_INFO_QUEUE, 3, payload =>
+                    this.accountShortInfoWorker.process(payload),
+                ),
+            { noAck: false },
+        );
 
-            await raw.consume(
-                RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_QUEUE,
-                msg =>
-                    this.safeHandle(
-                        'PersonalDiscountWorker',
-                        msg,
-                        raw,
-                        RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_QUEUE,
-                        3, // maxAttempts
-                        payload => this.personalDiscountWorker.process(payload),
-                    ),
-                { noAck: false },
-            );
+        // 4. Personal Discount Chunk
+        await channel.consume(
+            RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_CHUNK_QUEUE,
+            msg =>
+                this.safeHandle('PersonalDiscountChunk', msg, channel, RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_CHUNK_QUEUE, 3, payload =>
+                    this.personalDiscountChunkWorker.process(payload),
+                ),
+            { noAck: false },
+        );
 
-            await raw.consume(
-                RABBIT_MQ_QUEUES.ACCOUNT_SHORT_INFO_QUEUE,
-                msg =>
-                    this.safeHandle(
-                        'AccountShortInfoWorker',
-                        msg,
-                        raw,
-                        RABBIT_MQ_QUEUES.ACCOUNT_SHORT_INFO_QUEUE,
-                        1, // maxAttempts
-                        payload => this.accountShortInfoWorker.process(payload),
-                    ),
-                { noAck: false },
-            );
+        // 5. Personal Discount Product
+        await channel.consume(
+            RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_PRODUCT_QUEUE,
+            msg =>
+                this.safeHandle('PersonalDiscountProduct', msg, channel, RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_PRODUCT_QUEUE, 3, payload =>
+                    this.personalDiscountProductWorker.process(payload),
+                ),
+            { noAck: false },
+        );
 
-            await raw.prefetch(1);
-
-            await raw.consume(
-                RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_INPUT_QUEUE,
-                msg =>
-                    this.safeHandle(
-                        'PersonalDiscountV1Worker',
-                        msg,
-                        raw,
-                        RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_INPUT_QUEUE,
-                        3, // maxAttempts
-                        payload => this.personalDiscountV1Worker.process(payload),
-                    ),
-                { noAck: false },
-            );
-        });
+        await channel.prefetch(1);
+        // 3. Personal Discount Input
+        await channel.consume(
+            RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_INPUT_QUEUE,
+            msg =>
+                this.safeHandle('PersonalDiscountInput', msg, channel, RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_INPUT_QUEUE, 3, payload =>
+                    this.personalDiscountInputWorker.process(payload),
+                ),
+            { noAck: false },
+        );
     }
 
     private async safeHandle(

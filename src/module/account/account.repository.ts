@@ -119,6 +119,17 @@ export class AccountRepository {
         });
     }
 
+    async getProxyUuid(accountId: string): Promise<string | null> {
+        const result = await this.prisma.account.findUnique({
+            where: { accountId },
+            select: {
+                proxyUuid: true,
+            },
+        });
+
+        return result?.proxyUuid ?? null;
+    }
+
     async getAccountEmail(accountId: string): Promise<IEmailFromDb | null> {
         return this.prisma.account.findUnique({
             where: { accountId },

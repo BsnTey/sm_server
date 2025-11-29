@@ -1,62 +1,86 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@common/database/prisma.service';
 import {
+    AccountDiscountsToInsert,
     NodePair,
+    UpsertNodeDiscountInput,
     UpsertPersonalDiscountInput,
     UpsertPersonalDiscountProductsInput,
-} from '../checking/interfaces/account-discount.interface';
+} from './interfaces/account-discount.interface';
 
 @Injectable()
 export class AccountDiscountRepository {
     constructor(private readonly prisma: PrismaService) {}
 
-    /**
-     * Для каждого (accountId,nodeId,telegramId) — upsert.
-     * В update НЕ трогаем telegramId, чтобы не «переезжал» владелец.
-     */
-    async upsertMany(
-        accountId: string,
-        telegramId: string,
-        items: Array<Pick<UpsertPersonalDiscountInput, 'nodeId' | 'nodeName' | 'dateEnd' | 'url'>>,
-    ): Promise<void> {
-        if (!items.length) return;
+    async clearAccountData(accountId: string): Promise<void> {
+        if (!accountId) return;
 
-        const operations: any[] = [];
+        await this.prisma.$transaction([
+            this.prisma.accountDiscountProduct.deleteMany({
+                where: {
+                    accountId: accountId,
+                },
+            }),
 
-        for (const item of items) {
-            operations.push(
-                this.prisma.nodeDiscount.upsert({
-                    where: { nodeId: item.nodeId },
-                    create: {
-                        nodeId: item.nodeId,
-                        nodeName: item.nodeName,
-                        url: item.url,
-                        dateEnd: item.dateEnd,
-                    },
-                    update: {},
-                }),
-            );
+            this.prisma.accountDiscount.deleteMany({
+                where: {
+                    accountId: accountId,
+                },
+            }),
+        ]);
+    }
 
-            operations.push(
-                this.prisma.accountDiscount.upsert({
-                    where: {
-                        account_node_telegram_unique: {
-                            accountId,
-                            nodeId: item.nodeId,
-                            telegramId,
-                        },
-                    },
-                    create: {
-                        accountId,
-                        telegramId,
-                        nodeId: item.nodeId,
-                    },
-                    update: {},
-                }),
-            );
-        }
+    async upsertNodeDiscount(node: UpsertNodeDiscountInput) {
+        return this.prisma.nodeDiscount.upsert({
+            where: { nodeId: node.nodeId },
+            create: {
+                nodeId: node.nodeId,
+                nodeName: node.nodeName,
+                url: node.url,
+                dateEnd: node.dateEnd,
+            },
+            update: {},
+        });
+    }
 
-        await this.prisma.$transaction(operations);
+    async ensureNodesExist(nodes: UpsertNodeDiscountInput[]): Promise<void> {
+        if (!nodes.length) return;
+
+        // createMany с skipDuplicates работает быстрее upsertMany
+        await this.prisma.nodeDiscount.createMany({
+            data: nodes.map(n => ({
+                nodeId: n.nodeId,
+                nodeName: n.nodeName,
+                url: n.url,
+                dateEnd: n.dateEnd,
+            })),
+            skipDuplicates: true,
+        });
+    }
+
+    // Атомарная замена данных для группы аккаунтов
+    async refreshAccountDiscountsBatch(accountIds: string[], items: AccountDiscountsToInsert[]): Promise<void> {
+        if (!accountIds.length) return;
+
+        await this.prisma.$transaction([
+            // 1. Массово удаляем продукты для списка аккаунтов
+            this.prisma.accountDiscountProduct.deleteMany({
+                where: { accountId: { in: accountIds } },
+            }),
+            // 2. Массово удаляем скидки для списка аккаунтов
+            this.prisma.accountDiscount.deleteMany({
+                where: { accountId: { in: accountIds } },
+            }),
+            // 3. Массово вставляем новые связи (если есть что вставлять)
+            ...(items.length > 0
+                ? [
+                      this.prisma.accountDiscount.createMany({
+                          data: items,
+                          skipDuplicates: true,
+                      }),
+                  ]
+                : []),
+        ]);
     }
 
     async findDistinctNodePairsByTelegram(telegramId: string): Promise<NodePair[]> {
