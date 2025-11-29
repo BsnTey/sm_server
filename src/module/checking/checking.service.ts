@@ -16,7 +16,7 @@ import { AccountTelegramParamsDto } from '../account/dto/account-telegram-ids.dt
 import { ProductApiResponse } from '../account/interfaces/product.interface';
 import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
 import { PreparedAccountInfo } from './interfaces/extend-chrome.interface';
-import { ErrorItem } from '../account/interfaces/personal-discount.interface';
+import { ErrorItem, PersonalDiscount } from '../account/interfaces/personal-discount.interface';
 import { extractPercentFromNode } from '../account/utils/extract.utils';
 import { ConfigService } from '@nestjs/config';
 import { AccountDiscountRepository } from './account-discount.repository';
@@ -219,52 +219,78 @@ export class CheckingService {
         return allChunks.filter(b => b && b.length > 0);
     }
 
-    //воркер обновления AccountDiscount для чанков из очереди
+    /**
+     * Воркер обновления AccountDiscount для чанков из очереди.
+     * Оркестратор процесса.
+     */
     async setAccountsForNodes(chunkData: PersonalDiscountChunkWorkerPayload) {
         const { telegramId, accounts: accountIds, count, total } = chunkData;
 
-        const responses = await Promise.allSettled(accountIds.map(accId => this.accountService.personalDiscount(accId)));
+        // 1. Получение данных (Parallel API calls)
+        const responses = await this.fetchPersonalDiscounts(accountIds);
 
-        // Коллекции для сбора данных
-        const uniqueNodes = new Map<string, UpsertNodeDiscountInput>();
-        const accountDiscountsToInsert: AccountDiscountsToInsert[] = [];
+        // 2. Обработка результатов (Data Transformation & Error Handling)
+        const data = this.processDiscountResults(telegramId, accountIds, responses);
 
-        // successfulAccountIds — аккаунты, по которым мы получили корректный ответ (даже если скидок нет).
-        // Нужны для очистки БД.
+        // 3. Сохранение Нод (Cache-First Strategy)
+        // Сохраняем только те ноды, которых еще нет в кеше/БД
+        await this.saveNewNodesIfNotExist(data.uniqueNodes);
+
+        // 4. Перезапись связей (AccountDiscount)
+        // Обновляем БД для всех успешных аккаунтов (даже если у них пустой список скидок, надо стереть старые)
+        if (data.successfulAccountIds.length > 0) {
+            await this.accountDiscountService.refreshAccountDiscountsBatch(data.successfulAccountIds, data.relationsToInsert);
+        }
+
+        // 5. Отправка в следующую очередь (только те, у кого есть скидки)
+        if (data.accountsWithDiscounts.length > 0) {
+            await this.publishToProductQueue(telegramId, data.accountsWithDiscounts, count, total);
+        }
+
+        // 6. Завершение (Cleanup & Notification)
+        await this.cleanupAndNotify(telegramId, count, total);
+    }
+
+    /**
+     * Шаг 1: Загрузка данных из внешнего сервиса
+     */
+    private async fetchPersonalDiscounts(accountIds: string[]) {
+        return Promise.allSettled(accountIds.map(accId => this.accountService.personalDiscount(accId)));
+    }
+
+    /**
+     * Шаг 2: Разбор ответов, обработка ошибок и подготовка структур данных
+     */
+    private processDiscountResults(telegramId: string | number, accountIds: string[], responses: PromiseSettledResult<PersonalDiscount>[]) {
+        // Результаты
         const successfulAccountIds: string[] = [];
-
-        // accountsWithDiscounts — ТОЛЬКО аккаунты, где реально есть скидки.
-        // Нужны для отправки в следующую очередь.
         const accountsWithDiscounts: string[] = [];
+        const uniqueNodes = new Map<string, UpsertNodeDiscountInput>();
+        const relationsToInsert: AccountDiscountsToInsert[] = [];
 
         responses.forEach((res, index) => {
             const accountId = accountIds[index];
 
+            // А. Обработка ошибки запроса
             if (res.status === 'rejected') {
-                this.logger.error(`Ошибка получения скидок для ${accountId}`, res.reason);
-                this.telegramService.sendMessage(
-                    +telegramId,
-                    `❗️ Ошибка получения скидок для аккаунта ${accountId}: ${res.reason?.message || res.reason}`,
-                );
+                this.handleAccountError(telegramId, accountId, res.reason);
                 return;
             }
 
             const pd = res.value;
-
-            // Если ответ успешный, добавляем в список для обработки БД (чтобы как минимум стереть старые данные)
             successfulAccountIds.push(accountId);
 
-            if (!pd?.list?.length) {
-                // Скидок нет — выходим, в accountsWithDiscounts НЕ добавляем
-                return;
-            }
+            // Б. Если скидок нет - просто пропускаем (аккаунт уже в successful для очистки БД)
+            if (!pd?.list?.length) return;
 
-            // Если скидки есть — добавляем в список для следующей очереди
+            // В. Если скидки есть - готовим к следующему этапу
             accountsWithDiscounts.push(accountId);
 
+            // Г. Сбор данных для вставки
             pd.list.forEach(n => {
                 const nodeId = n.base.nodeId;
 
+                // Справочник нод (дедупликация)
                 if (!uniqueNodes.has(nodeId)) {
                     uniqueNodes.set(nodeId, {
                         nodeId: nodeId,
@@ -274,58 +300,84 @@ export class CheckingService {
                     });
                 }
 
-                accountDiscountsToInsert.push({
+                // Связь Аккаунт-Нода
+                relationsToInsert.push({
                     accountId,
-                    telegramId,
+                    telegramId: String(telegramId),
                     nodeId,
                 });
             });
         });
 
-        // 3. Работа с Нодами (Nodes)
+        return { successfulAccountIds, accountsWithDiscounts, uniqueNodes, relationsToInsert };
+    }
+
+    /**
+     * Шаг 3: Умное сохранение нод. Проверяет кеш, чтобы не долбить БД лишний раз.
+     */
+    private async saveNewNodesIfNotExist(nodesMap: Map<string, UpsertNodeDiscountInput>) {
+        if (nodesMap.size === 0) return;
+
         const nodesToWrite: UpsertNodeDiscountInput[] = [];
+        const nodes = Array.from(nodesMap.values());
 
-        for (const node of uniqueNodes.values()) {
-            const key = keyNodeInput(node.nodeId);
-            const cached = await this.cacheService.get(key);
+        // Параллельная проверка кеша
+        await Promise.all(
+            nodes.map(async node => {
+                const key = keyNodeInput(node.nodeId);
+                const cached = await this.cacheService.get(key);
 
-            if (!cached) {
-                nodesToWrite.push(node);
-                await this.cacheService.set(key, node, this.TTL_NODE_INPUT);
-            }
-        }
+                if (!cached) {
+                    nodesToWrite.push(node);
+                    // Сразу греем кеш, не дожидаясь записи в БД, чтобы соседние потоки уже видели эту ноду
+                    await this.cacheService.set(key, node, this.TTL_NODE_INPUT);
+                }
+            }),
+        );
 
         if (nodesToWrite.length > 0) {
             await this.accountDiscountService.ensureNodesExist(nodesToWrite);
         }
+    }
 
-        // 4. Перезапись связей (AccountDiscount)
-        if (successfulAccountIds.length > 0) {
-            await this.accountDiscountService.refreshAccountDiscountsBatch(successfulAccountIds, accountDiscountsToInsert);
-        }
+    /**
+     * Шаг 5: Публикация в RabbitMQ
+     */
+    private async publishToProductQueue(telegramId: string, accounts: string[], count: number, total: number) {
+        const nextPayload: PersonalDiscountChunkWorkerPayload = {
+            telegramId,
+            accounts,
+            count,
+            total,
+        };
+        await this.publisher.publish(RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_PRODUCT_QUEUE, nextPayload, 0);
+    }
 
-        // 5. Отправка в следующую очередь (PERSONAL_DISCOUNT_PRODUCT_QUEUE)
-        if (accountsWithDiscounts.length > 0) {
-            const nextPayload: PersonalDiscountChunkWorkerPayload = {
-                telegramId,
-                accounts: accountsWithDiscounts,
-                count,
-                total,
-            };
-
-            await this.publisher.publish(RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_PRODUCT_QUEUE, nextPayload, 0);
-        }
-
-        // 6. Чистим общие кеши
+    /**
+     * Шаг 6: Очистка кешей и уведомление пользователя
+     */
+    private async cleanupAndNotify(telegramId: string, count: number, total: number) {
+        // Чистим общие кеши пользователя
         const keyNodes = keyDiscountNodes(telegramId);
         const keyAccounts = keyDiscountAccount(telegramId);
+
         await Promise.all([this.cacheService.del(keyNodes), this.cacheService.del(keyAccounts)]);
 
-        if (count == total) {
+        // Если это последний чанк - шлем уведомление
+        if (count === total) {
             this.telegramService.sendMessage(+telegramId, `✅ Обновление персональных скидок для режима категорий завершено!`);
         }
     }
 
+    /**
+     * Вспомогательная: Логирование ошибок одного аккаунта
+     */
+    private handleAccountError(telegramId: string | number, accountId: string, reason: any) {
+        this.logger.error(`Ошибка получения скидок для ${accountId}`, reason);
+        this.telegramService.sendMessage(+telegramId, `❗️ Ошибка получения скидок для аккаунта ${accountId}: ${reason?.message || reason}`);
+    }
+
+    //воркер обновления AccountDiscountProduct для чанков из очереди
     async setAccountsDiscountProduct(chunkData: PersonalDiscountChunkWorkerPayload) {
         const { telegramId, accounts: accountIds, count, total } = chunkData;
         const results: Array<{ accountId: string; saved: number }> = [];
