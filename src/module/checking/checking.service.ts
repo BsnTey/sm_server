@@ -262,7 +262,11 @@ export class CheckingService {
 
             // А. Обработка ошибки запроса
             if (res.status === 'rejected') {
-                this.handleAccountError(telegramId, accountId, res.reason);
+                this.logger.error(`Ошибка получения скидок для ${accountId}`, res.reason?.message);
+                this.telegramService.sendMessage(
+                    +telegramId,
+                    `❗️ Ошибка получения скидок для аккаунта ${accountId}: ${res.reason?.message}`,
+                );
                 return;
             }
 
@@ -358,14 +362,6 @@ export class CheckingService {
         }
     }
 
-    /**
-     * Вспомогательная: Логирование ошибок одного аккаунта
-     */
-    private handleAccountError(telegramId: string | number, accountId: string, reason: any) {
-        this.logger.error(`Ошибка получения скидок для ${accountId}`, reason);
-        this.telegramService.sendMessage(+telegramId, `❗️ Ошибка получения скидок для аккаунта ${accountId}: ${reason?.message || reason}`);
-    }
-
     //воркер обновления AccountDiscountProduct для чанков из очереди
     async setAccountsDiscountProduct(chunkData: PersonalDiscountChunkWorkerPayload) {
         const { telegramId, accounts: accountIds, count, total } = chunkData;
@@ -452,7 +448,7 @@ export class CheckingService {
             node.url,
             this.PAGE_SIZE,
             20, // Max pages cap
-            this.accountService.findProductsBySearch.bind(this),
+            this.accountService.findProductsBySearch.bind(this.accountService),
         );
 
         for await (const page of productStream) {
