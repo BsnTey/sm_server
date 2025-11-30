@@ -52,11 +52,7 @@ services:
   redis:
     container_name: redisAvito
     image: redis:8.4.0-alpine
-    command: >
-      redis-server
-      --appendonly yes
-      --appendfsync everysec
-      --requirepass ${REDIS_PASSWORD:-redispassword}
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-redispassword}"
     restart: unless-stopped
     ports:
     - "6379:6379"

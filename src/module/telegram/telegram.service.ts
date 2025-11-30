@@ -1,21 +1,16 @@
-import { HttpException, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
-import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Injectable, Logger } from '@nestjs/common';
 import { Ctx, InjectBot } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { getValueKeysMenu } from './updates/base-command/base-command.constants';
-import { IAccountCashing } from '../account/interfaces/account.interface';
-import { ERROR_TIMEOUT_TTL_CASH } from './constants/error.constant';
 import { ConfigService } from '@nestjs/config';
 import { Telegraf } from 'telegraf';
 
 @Injectable()
 export class TelegramService {
     private readonly logger = new Logger(TelegramService.name);
-    private TTL_CASH = this.configService.getOrThrow('TTL_CASH', 86000000);
     private adminsId: string[] = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
 
     constructor(
-        @Inject(CACHE_MANAGER) private cacheManager: Cache,
         private configService: ConfigService,
         @InjectBot() private readonly bot: Telegraf,
     ) {}
@@ -28,35 +23,6 @@ export class TelegramService {
         }
     }
 
-    async setTelegramAccountCache(telegramId: string, accountId: string) {
-        const accountFromCache = await this.cacheManager.get<IAccountCashing>(String(telegramId));
-        if (accountFromCache) {
-            await this.cacheManager.del(accountFromCache.accountId);
-        }
-        await this.cacheManager.del(accountId);
-        await this.cacheManager.set(String(telegramId), { accountId }, this.TTL_CASH);
-    }
-
-    async getFromCache(telegramId: string) {
-        const account = await this.cacheManager.get<IAccountCashing>(String(telegramId));
-        if (!account) throw new HttpException(ERROR_TIMEOUT_TTL_CASH, HttpStatus.FORBIDDEN);
-        return account;
-    }
-
-    async setDataCache<T>(telegramId: string, data: T) {
-        const dataFromCache = await this.cacheManager.get<any>(String(telegramId));
-        if (dataFromCache) {
-            await this.cacheManager.del(dataFromCache.data);
-        }
-        await this.cacheManager.set(String(telegramId), data, this.TTL_CASH);
-    }
-
-    async getDataFromCache<T>(telegramId: string): Promise<T> {
-        const data = await this.cacheManager.get<T>(String(telegramId));
-        if (!data) throw new HttpException(ERROR_TIMEOUT_TTL_CASH, HttpStatus.FORBIDDEN);
-        return data;
-    }
-
     async sendMessage(chatId: number, text: string) {
         try {
             await this.bot.telegram.sendMessage(chatId, text);
@@ -67,7 +33,6 @@ export class TelegramService {
 
     async sendAdminMessage(text: string) {
         const adminId = this.adminsId[0];
-
         try {
             await this.bot.telegram.sendMessage(adminId, text);
         } catch (error) {

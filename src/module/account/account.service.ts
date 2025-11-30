@@ -64,11 +64,11 @@ import { RetryOn401 } from './decorators/retry-on-403.decorator';
 import { PersonalDiscount } from './interfaces/personal-discount.interface';
 import { ProfileFamilyResponse } from './interfaces/profile-family.interface';
 import { FamilyInviteResponse, InviteMemberFamily, MemberFamily } from './interfaces/family-invite.interface';
-import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ProductApiResponse } from './interfaces/product.interface';
 import { Cookie } from './interfaces/cookie.interface';
 import { Products } from './interfaces/products.interface';
 import { RetryOnProxyError } from './decorators/retry-on-proxy-error.decorator';
+import { RedisCacheService } from '../cache/cache.service';
 
 @Injectable()
 export class AccountService {
@@ -89,7 +89,7 @@ export class AccountService {
         private courseService: CourseService,
         private deviceInfoService: DeviceInfoService,
         private sportmasterHeaders: SportmasterHeadersService,
-        @Inject(CACHE_MANAGER) private cacheManager: Cache,
+        private readonly cacheService: RedisCacheService,
     ) {}
 
     async addingAccount(accountDto: AddingAccountRequestDto): Promise<AccountEntity> {
@@ -579,10 +579,10 @@ export class AccountService {
     }
 
     async getAccountEntity(accountId: string): Promise<AccountWithProxyEntity> {
-        const accountEntityFromCache = await this.cacheManager.get<AccountWithProxyEntity>(accountId);
+        const accountEntityFromCache = await this.cacheService.get<AccountWithProxyEntity>(accountId);
         if (!accountEntityFromCache) {
             const account = await this.loadAccountCore(accountId);
-            await this.cacheManager.set(accountId, account, this.TTL_CASH_ACCOUNT);
+            await this.cacheService.set(accountId, account, this.TTL_CASH_ACCOUNT);
             return account;
         }
         return accountEntityFromCache;
@@ -630,7 +630,7 @@ export class AccountService {
 
         if (account.cityId !== city.cityId) {
             await this.setCityToAccount(accountId, city.cityId);
-            await this.cacheManager.del(accountId);
+            await this.cacheService.del(accountId);
         }
 
         return city;

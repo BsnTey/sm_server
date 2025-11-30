@@ -6,7 +6,6 @@ import { MY_DISCOUNT_SCENE } from '../../scenes/profile.scene-constant';
 import { ALL_KEYS_MENU_BUTTON_NAME } from '../base-command/base-command.constants';
 import { BaseUpdate } from '../base/base.update';
 import { SenderTelegram } from '../../interfaces/telegram.context';
-import { ProductService } from '../../../checking/product/product.service';
 import { AccountService } from '../../../account/account.service';
 import { CalculateService } from '../../../calculate/calculate.service';
 
@@ -16,7 +15,6 @@ export class MyDiscountUpdate extends BaseUpdate {
     private readonly logger = new Logger(MyDiscountUpdate.name);
 
     constructor(
-        private readonly productService: ProductService,
         private readonly accountService: AccountService,
         private readonly calculateService: CalculateService,
     ) {
@@ -33,109 +31,109 @@ export class MyDiscountUpdate extends BaseUpdate {
         await this.telegramService.exitScene(menuBtn, ctx);
     }
 
-    @On('text')
-    async findProduct(@Message('text') product: string, @Sender() sender: SenderTelegram, @Ctx() ctx: WizardContext) {
-        const telegramId = String(sender.id);
-        const query = product.trim();
-
-        if (!query) {
-            await ctx.reply('⚠️ Пожалуйста, пришлите productId, артикул или SKU.');
-            return;
-        }
-
-        try {
-            // 1) Ищем товар по productId / article / sku в нашей БД
-            const infoWithProduct = await this.productService.getProductInfoWithProduct({
-                productId: query,
-                article: query,
-                sku: query,
-            });
-
-            if (!infoWithProduct) {
-                await ctx.reply('❌ Моя скидка не проходит на этот товар, либо данные для поиска не верны');
-                return;
-            }
-
-            const { productId, article, sku } = infoWithProduct;
-
-            // 2) Берём аккаунты + базовую инфу о продукте (node, percent)
-            const res = await this.accountService.getAccountsForPersonalDiscountV2(telegramId, productId);
-            const { product: productInfo, results: accounts } = res;
-
-            const node = productInfo.node ?? 'не найдена';
-            const percent = productInfo.percent;
-
-            // 3) Пробуем достать живой продукт по первому аккаунту,
-            //    чтобы посчитать цену на кассе и нужные бонусы
-            let calc: { price: number; bonus: number } | null = null;
-
-            if (accounts.length > 0) {
-                const probeId = accounts[0].accountId;
-
-                try {
-                    const probeRes = await this.accountService.getProductById(probeId, productId);
-                    const apiProduct = probeRes?.product;
-
-                    if (apiProduct) {
-                        const isInventory =
-                            Array.isArray(apiProduct.markers) && apiProduct.markers.some(m => m.title?.includes('До 20% бонусами'));
-
-                        calc = this.calculateService.computeCalculateProductFromProduct(apiProduct, isInventory, percent);
-                    }
-                } catch (e) {
-                    this.logger.warn(
-                        `MyDiscountUpdate: failed to fetch live product for accountId=${accounts[0].accountId}, productId=${productId}`,
-                        e as any,
-                    );
-                }
-            }
-
-            const lines: string[] = [];
-
-            lines.push('🔎 Результаты проверки товара:');
-            lines.push('');
-            lines.push(`🆔 productId: <code>${productInfo.productId}</code>`);
-            if (article) {
-                lines.push(`📦 Артикул: <code>${article}</code>`);
-            }
-            lines.push(`📂 Категория скидки: ${node}`);
-
-            if (percent > 0) {
-                lines.push(`💸 Моя скидка: ${percent}%`);
-            }
-
-            if (calc) {
-                lines.push(`💰 Возможная цена на кассе: <b>${calc.price}</b> ₽`);
-                lines.push(`🎯 Требуемые бонусы: <b>${calc.bonus}</b>`);
-            }
-
-            if (!accounts.length) {
-                lines.push('');
-                lines.push('ℹ️ На данный момент у вас нет аккаунтов с персональной скидкой по этому товару (по сохранённым данным).');
-                await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
-                return;
-            }
-
-            const topAccounts = accounts.slice(0, 10);
-
-            lines.push('');
-            lines.push(`✅ Найдено ${accounts.length} аккаунт(ов), на которых мы зафиксировали персональную скидку для этого товара.`);
-            lines.push('👇 Ниже список первых 10 аккаунтов (нажмите на ID, чтобы скопировать):');
-            lines.push('');
-
-            for (const acc of topAccounts) {
-                const ordersPart = acc.ordersNumber > 0 ? ` (${acc.ordersNumber})` : '';
-
-                const hasEnoughBonus = !!(calc && calc.bonus > 0 && acc.bonus >= calc.bonus);
-                const prefix = hasEnoughBonus ? '✅' : '•';
-
-                lines.push(`${prefix} <code>${acc.accountId}</code>${ordersPart} — бонусов: ${acc.bonus}`);
-            }
-
-            await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
-        } catch (e) {
-            this.logger.error(`Error while searching product "${product}" for ${telegramId}`, e as any);
-            await ctx.reply('❌ Произошла ошибка при поиске товара. Попробуйте ещё раз чуть позже.');
-        }
-    }
+    // @On('text')
+    // async findProduct(@Message('text') product: string, @Sender() sender: SenderTelegram, @Ctx() ctx: WizardContext) {
+    //     const telegramId = String(sender.id);
+    //     const query = product.trim();
+    //
+    //     if (!query) {
+    //         await ctx.reply('⚠️ Пожалуйста, пришлите productId, артикул или SKU.');
+    //         return;
+    //     }
+    //
+    //     try {
+    //         // 1) Ищем товар по productId / article / sku в нашей БД
+    //         const infoWithProduct = await this.productService.getProductInfoWithProduct({
+    //             productId: query,
+    //             article: query,
+    //             sku: query,
+    //         });
+    //
+    //         if (!infoWithProduct) {
+    //             await ctx.reply('❌ Моя скидка не проходит на этот товар, либо данные для поиска не верны');
+    //             return;
+    //         }
+    //
+    //         const { productId, article, sku } = infoWithProduct;
+    //
+    //         // 2) Берём аккаунты + базовую инфу о продукте (node, percent)
+    //         const res = await this.accountService.getAccountsForPersonalDiscountV2(telegramId, productId);
+    //         const { product: productInfo, results: accounts } = res;
+    //
+    //         const node = productInfo.node ?? 'не найдена';
+    //         const percent = productInfo.percent;
+    //
+    //         // 3) Пробуем достать живой продукт по первому аккаунту,
+    //         //    чтобы посчитать цену на кассе и нужные бонусы
+    //         let calc: { price: number; bonus: number } | null = null;
+    //
+    //         if (accounts.length > 0) {
+    //             const probeId = accounts[0].accountId;
+    //
+    //             try {
+    //                 const probeRes = await this.accountService.getProductById(probeId, productId);
+    //                 const apiProduct = probeRes?.product;
+    //
+    //                 if (apiProduct) {
+    //                     const isInventory =
+    //                         Array.isArray(apiProduct.markers) && apiProduct.markers.some(m => m.title?.includes('До 20% бонусами'));
+    //
+    //                     calc = this.calculateService.computeCalculateProductFromProduct(apiProduct, isInventory, percent);
+    //                 }
+    //             } catch (e) {
+    //                 this.logger.warn(
+    //                     `MyDiscountUpdate: failed to fetch live product for accountId=${accounts[0].accountId}, productId=${productId}`,
+    //                     e as any,
+    //                 );
+    //             }
+    //         }
+    //
+    //         const lines: string[] = [];
+    //
+    //         lines.push('🔎 Результаты проверки товара:');
+    //         lines.push('');
+    //         lines.push(`🆔 productId: <code>${productInfo.productId}</code>`);
+    //         if (article) {
+    //             lines.push(`📦 Артикул: <code>${article}</code>`);
+    //         }
+    //         lines.push(`📂 Категория скидки: ${node}`);
+    //
+    //         if (percent > 0) {
+    //             lines.push(`💸 Моя скидка: ${percent}%`);
+    //         }
+    //
+    //         if (calc) {
+    //             lines.push(`💰 Возможная цена на кассе: <b>${calc.price}</b> ₽`);
+    //             lines.push(`🎯 Требуемые бонусы: <b>${calc.bonus}</b>`);
+    //         }
+    //
+    //         if (!accounts.length) {
+    //             lines.push('');
+    //             lines.push('ℹ️ На данный момент у вас нет аккаунтов с персональной скидкой по этому товару (по сохранённым данным).');
+    //             await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
+    //             return;
+    //         }
+    //
+    //         const topAccounts = accounts.slice(0, 10);
+    //
+    //         lines.push('');
+    //         lines.push(`✅ Найдено ${accounts.length} аккаунт(ов), на которых мы зафиксировали персональную скидку для этого товара.`);
+    //         lines.push('👇 Ниже список первых 10 аккаунтов (нажмите на ID, чтобы скопировать):');
+    //         lines.push('');
+    //
+    //         for (const acc of topAccounts) {
+    //             const ordersPart = acc.ordersNumber > 0 ? ` (${acc.ordersNumber})` : '';
+    //
+    //             const hasEnoughBonus = !!(calc && calc.bonus > 0 && acc.bonus >= calc.bonus);
+    //             const prefix = hasEnoughBonus ? '✅' : '•';
+    //
+    //             lines.push(`${prefix} <code>${acc.accountId}</code>${ordersPart} — бонусов: ${acc.bonus}`);
+    //         }
+    //
+    //         await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
+    //     } catch (e) {
+    //         this.logger.error(`Error while searching product "${product}" for ${telegramId}`, e as any);
+    //         await ctx.reply('❌ Произошла ошибка при поиске товара. Попробуйте ещё раз чуть позже.');
+    //     }
+    // }
 }

@@ -10,16 +10,25 @@ export const redisProvider: Provider = {
     useFactory: async (configService: ConfigService) => {
         const logger = new Logger('RedisProvider');
 
+        const url = configService.getOrThrow<string>('REDIS_CONNECTION_URL');
+
+        const sanitizedUrl = url.replace(/(:)([^@]+)(@)/, '$1***$3');
+        logger.log(`Connecting to Redis at: ${sanitizedUrl}`);
+
         const client = createClient({
-            url: configService.getOrThrow<string>('REDIS_CONNECTION_URL'),
+            url: url,
         });
 
         client.on('error', err => {
-            logger.error('Redis Client Error', err);
+            logger.error(`Redis Client Error: ${err.message}`, err.stack);
         });
 
         client.on('connect', () => {
             logger.log('Redis Client Connected');
+        });
+
+        client.on('ready', () => {
+            logger.log('Redis Client Ready');
         });
 
         await client.connect();

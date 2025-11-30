@@ -14,17 +14,20 @@ import { getFileNameForReceipt } from '../../utils/receipt.utils';
 import { extractAmountFTransferedPay } from '../../utils/payment.utils';
 import { PaymentService } from '../../../payment/payment.service';
 import { FortuneCouponService } from '../../../coupon/fortune-coupon.service';
+import { RedisCacheService } from '../../../cache/cache.service';
 
 @Scene(MAKE_DEPOSIT_SCENE)
 @UseFilters(TelegrafExceptionFilter)
 export class PaymentUpdate {
     private readonly logger = new Logger(PaymentUpdate.name);
+    private readonly PAYMENT_TTL = 3600;
 
     constructor(
         private telegramService: TelegramService,
         private paymentService: PaymentService,
         private fileService: FileService,
         private fortuneCouponService: FortuneCouponService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -67,7 +70,9 @@ export class PaymentUpdate {
         @Sender() { id: telegramId }: any,
     ) {
         const createOrder = await this.paymentService.createPaymentOrder(amountCount, String(telegramId));
-        await this.telegramService.setDataCache<string>(String(telegramId), createOrder.id);
+
+        await this.cacheService.set(`payment_process:${telegramId}`, { paymentId: createOrder.id }, this.PAYMENT_TTL);
+
         await ctx.reply(
             `Создана заявка на пополнение на сумму ${createOrder.amount}р.\nК зачислению ${createOrder.amountCredited}р\n
 Сделайте перевод (${createOrder.amount}р) на реквизиты Админа и пришлите чек о переводе в чат`,
@@ -110,7 +115,8 @@ export class PaymentUpdate {
         //@ts-ignore
         const paymentInfo = ctx.match[0].split('_')[1];
         const [paymentId, amount, amountCredited] = paymentInfo.split('|');
-        await this.telegramService.setDataCache<string>(String(telegramId), paymentId);
+
+        await this.cacheService.set(`payment_process:${telegramId}`, { paymentId: paymentId }, this.PAYMENT_TTL);
 
         await ctx.editMessageText(
             `Заявка на сумму ${amount}р\nК зачислению ${amountCredited}р\n
@@ -121,7 +127,13 @@ export class PaymentUpdate {
 
     @On('photo')
     async inputReceipt(@Sender() { id: telegramId }: any, @Ctx() ctx: WizardContext) {
-        const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
+        const cached = await this.cacheService.get<{ paymentId: string }>(`payment_process:${telegramId}`);
+        const paymentId = cached?.paymentId;
+
+        if (!paymentId) {
+            await ctx.reply('Не найдена или истекла заявка на пополнение. Попробуйте заново.');
+            return;
+        }
         let fileName;
         try {
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -135,12 +147,12 @@ export class PaymentUpdate {
             await this.fileService.saveFileFromTg(fileName, fileLink);
         } catch (error) {
             this.logger.error('Error processing receipt:', error);
-            await ctx.reply('Произошла ошибка при сохранении квитанции.');
             return;
         }
 
         const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
         await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
+        await this.cacheService.del(`payment_process:${telegramId}`);
         await ctx.scene.leave();
     }
 
@@ -149,7 +161,14 @@ export class PaymentUpdate {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const document = ctx.message!.document!;
-        const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
+        const cached = await this.cacheService.get<{ paymentId: string }>(`payment_process:${telegramId}`);
+        const paymentId = cached?.paymentId;
+
+        if (!paymentId) {
+            await ctx.reply('Сессия истекла или заявка не найдена.');
+            return;
+        }
+
         let fileName;
         try {
             if (document?.mime_type === 'application/pdf') {
@@ -169,6 +188,7 @@ export class PaymentUpdate {
         }
         const orderPayment = await this.paymentService.makeDepositUserBalance(paymentId, fileName);
         await ctx.reply(`Заявка на сумму ${orderPayment.amountCredited}р исполнена. Квитанция сохранена.`);
+        await this.cacheService.del(`payment_process:${telegramId}`);
         await ctx.scene.leave();
     }
 
@@ -196,6 +216,7 @@ export class PaymentPromocodeUpdate {
         private telegramService: TelegramService,
         private paymentService: PaymentService,
         private fortuneCouponService: FortuneCouponService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -210,7 +231,9 @@ export class PaymentPromocodeUpdate {
 
     @On('text')
     async inputCoupon(@Message('text') couponCode: string, @Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const paymentId = await this.telegramService.getDataFromCache<string>(String(telegramId));
+        const cached = await this.cacheService.get<{ paymentId: string }>(`payment_process:${telegramId}`);
+        const paymentId = cached?.paymentId;
+
         if (!paymentId) {
             await ctx.reply('Не найдена заявка на пополнение. Попробуйте снова.');
             return;

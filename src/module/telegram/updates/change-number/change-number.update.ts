@@ -13,6 +13,9 @@ import { Context } from '../../interfaces/telegram.context';
 import { UserService } from '../../../user/user.service';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
+import { RedisCacheService } from '../../../cache/cache.service';
+
+const CHANGE_NUM_TTL = 3600;
 
 @Scene(CHANGE_NUMBER.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -20,6 +23,7 @@ export class ChangeNumberUpdate {
     constructor(
         private telegramService: TelegramService,
         private userService: UserService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -48,7 +52,7 @@ export class ChangeNumberUpdate {
         @Sender() { id: telegramId }: any,
         @Ctx() ctx: WizardContext,
     ) {
-        await this.telegramService.setTelegramAccountCache(telegramId, accountId);
+        await this.cacheService.set(`change_num_acc:${telegramId}`, { accountId }, CHANGE_NUM_TTL);
         await ctx.scene.enter(CHANGE_NUMBER_INPUT_NUMBER_SCENE);
     }
 }
@@ -59,11 +63,13 @@ export class ChangeNumberInputNumber {
     constructor(
         private accountService: AccountService,
         private telegramService: TelegramService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(String(telegramId));
+        const account = await this.cacheService.get<{ accountId: string }>(`change_num_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
 
         const shortInfo = await this.accountService.shortInfo(account.accountId);
         const text = `📱 Аккаунт найден. Баланс: ${shortInfo.bonusCount}.\nВведите номер телефона, на который хотите перепривязать его`;
@@ -81,8 +87,10 @@ export class ChangeNumberInputNumber {
         @Ctx() ctx: WizardContext,
         @Sender() { id: telegramId }: any,
     ) {
-        const account = await this.telegramService.getFromCache(String(telegramId));
+        const account = await this.cacheService.get<{ accountId: string; requestId?: string }>(`change_num_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
         account.requestId = await this.accountService.sendSmsWithAnalytics(account.accountId, phoneNumber);
+        await this.cacheService.set(`change_num_acc:${telegramId}`, account, CHANGE_NUM_TTL);
         await ctx.scene.enter(CHANGE_NUMBER_CODE_SCENE);
     }
 }
@@ -94,6 +102,7 @@ export class ChangeNumberInputCode {
         private accountService: AccountService,
         private telegramService: TelegramService,
         private userService: UserService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -114,11 +123,13 @@ export class ChangeNumberInputCode {
         @Ctx() ctx: WizardContext,
         @Sender() { id: telegramId }: any,
     ) {
-        const account = await this.telegramService.getFromCache(String(telegramId));
+        const account = await this.cacheService.get<{ accountId: string; requestId: string }>(`change_num_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
         await this.accountService.phoneChange(account.accountId, account.requestId, code);
         const user = await this.userService.getUserByTelegramId(String(telegramId));
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
         await ctx.reply('✅ Номер успешно изменен. Можете авторизоваться в аккаунт', getMainMenuKeyboard(user.role));
+        await this.cacheService.del(`change_num_acc:${telegramId}`);
         await ctx.scene.leave();
     }
 }

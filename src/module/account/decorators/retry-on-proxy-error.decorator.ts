@@ -1,7 +1,7 @@
 import { isAxiosError } from 'axios';
 import { Logger } from '@nestjs/common';
-import { Cache } from 'cache-manager';
 import { IAccountWithProxy } from '../interfaces/account.interface';
+import { RedisCacheService } from '../../cache/cache.service';
 
 // --- 1. Исправленный Троттлер ---
 
@@ -42,11 +42,9 @@ export async function throttleProxy(proxyId: string, minIntervalMs: number) {
 
 export interface IProxyRetryableService {
     logger: Logger;
-    cacheManager: Cache;
+    cacheService: RedisCacheService;
 
-    accountService: {
-        getAccountEntity(accountId: string): Promise<IAccountWithProxy>;
-    };
+    getAccountEntity(accountId: string): Promise<IAccountWithProxy>;
 
     proxyService: {
         updateProxy(uuid: string, dto: { blockedAt?: Date | null }): Promise<any>;
@@ -115,7 +113,7 @@ export function RetryOnProxyError(options: RetryOnProxyErrorOptions = {}): Metho
                     }
 
                     try {
-                        await self.cacheManager.del(context.accountId);
+                        await self.cacheService.del(context.accountId);
                     } catch (cacheErr) {
                         logger.error(`[RetryOnProxyError] Failed to clear cache:`, cacheErr);
                     }
@@ -141,7 +139,7 @@ interface AccountContext {
 async function resolveAccountContext(self: IProxyRetryableService, firstArg: AccountLike): Promise<AccountContext> {
     if (typeof firstArg === 'string') {
         const accountId = firstArg;
-        const accountWithProxy = await self.accountService.getAccountEntity(accountId);
+        const accountWithProxy = await self.getAccountEntity(accountId);
         return {
             accountId,
             proxyUuid: accountWithProxy.proxy.uuid,

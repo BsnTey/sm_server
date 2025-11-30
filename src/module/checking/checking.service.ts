@@ -1,38 +1,19 @@
 import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { List, Products } from '../account/interfaces/products.interface';
-import { chunk, cmp, requestWithBackoff, startOfNextDayUTC } from './utils/set-products.utils';
+import { chunk, requestWithBackoff, startOfNextDayUTC } from './utils/set-products.utils';
 import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discount.dto';
 import { RABBIT_MQ_QUEUES } from '@common/broker/rabbitmq.queues';
-import {
-    AccountDiscountsToInsert,
-    CreatePersonalDiscountProductsInput,
-    NodeAccountDiscount,
-    NodeForAccount,
-    NodePair,
-    UpsertNodeDiscountInput,
-} from './interfaces/account-discount.interface';
+import { AccountDiscountsToInsert, NodeAccountDiscount, UpsertNodeDiscountInput } from './interfaces/account-discount.interface';
 import { keyDiscountAccount, keyDiscountNodes, keyNodeInput } from './cache-key/key';
-import { AccountTelegramParamsDto } from '../account/dto/account-telegram-ids.dto';
-import { ProductApiResponse } from '../account/interfaces/product.interface';
-import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
-import { PreparedAccountInfo } from './interfaces/extend-chrome.interface';
-import { ErrorItem, PersonalDiscount } from '../account/interfaces/personal-discount.interface';
-import { extractPercentFromNode } from '../account/utils/extract.utils';
-import { ConfigService } from '@nestjs/config';
-import { AccountDiscountRepository } from './account-discount.repository';
-import { OrderRepository } from '../account/order.repository';
-import { ProxyService } from '../proxy/proxy.service';
-import { CalculateService } from '../calculate/calculate.service';
 import { DelayedPublisher } from '@common/broker/delayed.publisher';
-import { CacheService } from '../cache/cache.service';
+import { RedisCacheService } from '../cache/cache.service';
 import { AccountService } from '../account/account.service';
-import { parseDateFlexible } from '../account/utils/parse-data';
 import { UserService } from '../user/user.service';
-import { AccountWithProxyEntity } from '../account/entities/accountWithProxy.entity';
 import { PersonalDiscountChunkWorkerPayload } from './interfaces/queqe.interface';
 import { AccountDiscountService } from './account-discount.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { ProductBatchSaver } from './utils/product-batch-saver';
+import { PersonalDiscount } from '../account/interfaces/personal-discount.interface';
 
 interface AccountProxyItem {
     accountId: string;
@@ -55,12 +36,10 @@ export class CheckingService {
     constructor(
         private accountService: AccountService,
         private telegramService: TelegramService,
-        private orderRepository: OrderRepository,
-        private calculateService: CalculateService,
         private accountDiscountService: AccountDiscountService,
         private userService: UserService,
         private readonly publisher: DelayedPublisher,
-        private readonly cacheService: CacheService,
+        private readonly cacheService: RedisCacheService,
     ) {}
 
     //принимает с контроллера входящие аккаунты, сейвит в очередь на нарезку под прокси chunkingAccountForProxy
@@ -70,14 +49,14 @@ export class CheckingService {
     }> {
         const user = await this.userService.getUserByTelegramId(data.telegramId);
         if (!user) {
-            throw new NotFoundException('User not found');
+            throw new NotFoundException('Пользователь не найден');
         }
 
         const normalized = data.personalDiscounts.map(id => id.trim()).filter(Boolean);
         const uniqueAccountIds = Array.from(new Set(normalized));
 
         if (!uniqueAccountIds.length) {
-            throw new HttpException('No valid accounts provided', HttpStatus.BAD_REQUEST);
+            throw new HttpException('Не предоставлено валидных аккаунтов', HttpStatus.BAD_REQUEST);
         }
 
         await this.publisher.publish(
@@ -92,7 +71,7 @@ export class CheckingService {
         const estimatedSeconds = Math.ceil(uniqueAccountIds.length / this.MAX_CONCURRENCY) * this.PERSONAL_DISCOUNT_RATE_SECONDS;
 
         this.logger.log(
-            `Queued ${uniqueAccountIds.length} accounts for personal discount V1 (telegramId=${data.telegramId}, batches=${uniqueAccountIds.length})`,
+            `[queueAccountsForPersonalDiscountV1] Поставлено в очередь ${uniqueAccountIds.length} аккаунтов для персональных скидок (telegramId=${data.telegramId}). Ожидаемое время: ${estimatedSeconds}с`,
         );
 
         return {
@@ -121,6 +100,7 @@ export class CheckingService {
                 total,
             };
             await this.publisher.publish(RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_CHUNK_QUEUE, payload, 0);
+            this.logger.log(`[Chunking] Отправлен чанк ${count}/${total} для telegramId=${telegramId} (аккаунтов: ${batch.length})`);
         }
     }
 
@@ -158,7 +138,8 @@ export class CheckingService {
             settled.forEach(r => {
                 // Собираем только успешные результаты, у которых есть proxyUuid
                 if (r.status === 'fulfilled' && r.value.proxyUuid) {
-                    //@ts-ignore
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                    //@ts-expect-error
                     results.push(r.value);
                 }
             });
@@ -225,6 +206,9 @@ export class CheckingService {
      */
     async setAccountsForNodes(chunkData: PersonalDiscountChunkWorkerPayload) {
         const { telegramId, accounts: accountIds, count, total } = chunkData;
+        this.logger.log(
+            `[NodesWorker] Начало обработки чанка на проверку категорий ${count}/${total} для telegramId=${telegramId} (аккаунтов: ${accountIds.length})`,
+        );
 
         // 1. Получение данных (Parallel API calls)
         const responses = await this.fetchPersonalDiscounts(accountIds);
@@ -245,6 +229,11 @@ export class CheckingService {
         // 5. Отправка в следующую очередь (только те, у кого есть скидки)
         if (data.accountsWithDiscounts.length > 0) {
             await this.publishToProductQueue(telegramId, data.accountsWithDiscounts, count, total);
+            this.logger.log(
+                `[NodesWorker] Чанк ${count}/${total} обработан. Аккаунтов со скидками: ${data.accountsWithDiscounts.length}. Отправлено в очередь продуктов.`,
+            );
+        } else {
+            this.logger.log(`[NodesWorker] Чанк ${count}/${total} обработан. Скидок не найдено. В очередь продуктов не отправляем.`);
         }
 
         // 6. Завершение (Cleanup & Notification)
@@ -380,6 +369,9 @@ export class CheckingService {
     //воркер обновления AccountDiscountProduct для чанков из очереди
     async setAccountsDiscountProduct(chunkData: PersonalDiscountChunkWorkerPayload) {
         const { telegramId, accounts: accountIds, count, total } = chunkData;
+        this.logger.log(
+            `[ProductsWorker] Начало обработки чанка ${count}/${total} для telegramId=${telegramId} (аккаунтов: ${accountIds.length})`,
+        );
         const results: Array<{ accountId: string; saved: number }> = [];
         const errors: Array<{ accountId: string; message: string }> = [];
 
@@ -405,7 +397,7 @@ export class CheckingService {
                     results.push(r.value);
                 } else {
                     errors.push({ accountId: accId, message: r.reason?.message || 'Unknown' });
-                    this.logger.error(`Error processing account ${accId}`, r.reason);
+                    this.logger.error(`Ошибка обработки аккаунта ${accId}`, r.reason);
                 }
             });
 
@@ -435,7 +427,7 @@ export class CheckingService {
                 const count = await this.fetchAndBufferProducts(accountId, telegramId, node, batchSaver);
                 totalSaved += count;
             } catch (e) {
-                this.logger.error(`Failed to process node ${node.url} for account ${accountId}`, e);
+                this.logger.error(`Не удалось обработать ноду ${node.url} для аккаунта ${accountId}`, e);
                 // Не прерываем весь аккаунт из-за одной ноды
             }
         }
@@ -539,7 +531,9 @@ export class CheckingService {
 
     private logProcessingResults(telegramId: number | string, results: any[], errors: any[]) {
         const totalSaved = results.reduce((acc, val) => acc + val.saved, 0);
-        this.logger.log(`Discount Products: User ${telegramId} | Accs: ${results.length} | Saved: ${totalSaved} | Errs: ${errors.length}`);
+        this.logger.log(
+            `[ProductsWorker] Итоги: User ${telegramId} | Аккаунтов: ${results.length} | Сохранено товаров: ${totalSaved} | Ошибок: ${errors.length}`,
+        );
 
         if (errors.length > 0) {
             this.telegramService.sendMessage(+telegramId, `⚠️ Ошибки при загрузке товаров (${errors.length} акк).`);

@@ -12,7 +12,6 @@ import { DeviceInfoRepository } from './deviceInfo.repository';
 import { AccountDiscountRepository } from '../checking/account-discount.repository';
 import { CalculateModule } from '../calculate/calculate.module';
 import { OrderRepository } from './order.repository';
-import { ProductModule } from '../checking/product/product.module';
 import { AccountDiscountService } from '../checking/account-discount.service';
 
 @Module({
@@ -30,6 +29,6 @@ import { AccountDiscountService } from '../checking/account-discount.service';
         AccountDiscountService,
     ],
     exports: [AccountService, SportmasterHeadersService, CourseService, AccountDiscountService],
-    imports: [ProxyModule, HttpModule, CalculateModule, ProductModule],
+    imports: [ProxyModule, HttpModule, CalculateModule],
 })
 export class AccountModule {}

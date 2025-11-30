@@ -4,7 +4,6 @@ import { getTelegramConfig } from '@common/telegram/telegram.config';
 import { ConfigModule } from '@nestjs/config';
 import { TelegramModule } from './module/telegram/telegram.module';
 import { AccountModule } from './module/account/account.module';
-import { CacheModule } from '@nestjs/cache-manager';
 import { ProxyModule } from './module/proxy/proxy.module';
 import { HttpModule } from './module/http/http.module';
 import { OrderModule } from './module/order/order.module';
@@ -24,8 +23,8 @@ import { CalculateModule } from './module/calculate/calculate.module';
 import { ConfigAppModule } from './module/config/config.module';
 import { TemplateModule } from './module/template/template.module';
 import { UserModule } from './module/user/user.module';
-import { ProductModule } from './module/checking/product/product.module';
 import { CheckingModule } from './module/checking/checking.module';
+import { RedisCacheModule } from './module/cache/cache.module';
 
 @Module({
     imports: [
@@ -33,11 +32,6 @@ import { CheckingModule } from './module/checking/checking.module';
             isGlobal: true,
         }),
         ScheduleModule.forRoot(),
-        CacheModule.register({
-            isGlobal: true,
-            ttl: 18000000,
-            max: 1000,
-        }),
         TelegrafModule.forRootAsync(getTelegramConfig()),
         BrokerModule,
         AuthModule,
@@ -60,9 +54,8 @@ import { CheckingModule } from './module/checking/checking.module';
         ConfigModule,
         ConfigAppModule,
         TemplateModule,
-        ProductModule,
         CheckingModule,
-        CacheModule,
+        RedisCacheModule,
     ],
 })
 export class AppModule {}

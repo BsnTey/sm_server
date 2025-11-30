@@ -19,12 +19,16 @@ import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { UserService } from '../../../user/user.service';
 import { TemplateService } from '../../../template/template.service';
 import { CommissionType } from '@prisma/client';
+import { RedisCacheService } from '../../../cache/cache.service';
+
+const TEMPLATE_TTL = 3600;
 
 @Scene(CALCULATE_SETTINGS_SCENE)
 export class CalculateSettingsScene {
     constructor(
         private telegramService: TelegramService,
         private calculateService: TemplateService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -57,7 +61,7 @@ export class CalculateSettingsScene {
     @Action('create_template')
     async createTemplate(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         // Очищаем все данные о текущем создаваемом шаблоне
-        await this.telegramService.setDataCache<any>(`template_${telegramId}`, {});
+        await this.cacheService.set(`template_draft:${telegramId}`, {}, TEMPLATE_TTL);
         await ctx.scene.enter(TEMPLATE_NAME_SCENE);
     }
 
@@ -110,7 +114,10 @@ export class CalculateSettingsScene {
 
 @Scene(TEMPLATE_NAME_SCENE)
 export class TemplateNameScene {
-    constructor(private telegramService: TelegramService) {}
+    constructor(
+        private telegramService: TelegramService,
+        private cacheService: RedisCacheService,
+    ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -129,9 +136,9 @@ export class TemplateNameScene {
 
     @On('text')
     async onNameEntered(@Ctx() ctx: WizardContext, @Message('text') name: string, @Sender() { id: telegramId }: any) {
-        const templateData = (await this.telegramService.getDataFromCache<any>(`template_${telegramId}`)) || {};
+        const templateData = (await this.cacheService.get<any>(`template_draft:${telegramId}`)) || {};
         templateData.name = name;
-        await this.telegramService.setDataCache<any>(`template_${telegramId}`, templateData);
+        await this.cacheService.set(`template_draft:${telegramId}`, templateData, TEMPLATE_TTL);
 
         await ctx.scene.enter(TEMPLATE_TEXT_SCENE);
     }
@@ -139,7 +146,10 @@ export class TemplateNameScene {
 
 @Scene(TEMPLATE_TEXT_SCENE)
 export class TemplateTextScene {
-    constructor(private telegramService: TelegramService) {}
+    constructor(
+        private telegramService: TelegramService,
+        private cacheService: RedisCacheService,
+    ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -173,19 +183,20 @@ export class TemplateTextScene {
     async onTextEntered(@Ctx() ctx: WizardContext, @Message('text') text: string, @Sender() { id: telegramId }: any) {
         if (text === 'Отмена') return;
 
-        // Сохраняем текст шаблона в кеш
-        const templateData = (await this.telegramService.getDataFromCache<any>(`template_${telegramId}`)) || {};
+        const templateData = (await this.cacheService.get<any>(`template_draft:${telegramId}`)) || {};
         templateData.template = text;
-        await this.telegramService.setDataCache<any>(`template_${telegramId}`, templateData);
+        await this.cacheService.set(`template_draft:${telegramId}`, templateData, TEMPLATE_TTL);
 
-        // Переходим к следующему шагу
         await ctx.scene.enter(COMMISSION_TYPE_SCENE);
     }
 }
 
 @Scene(COMMISSION_TYPE_SCENE)
 export class CommissionTypeScene {
-    constructor(private telegramService: TelegramService) {}
+    constructor(
+        private telegramService: TelegramService,
+        private cacheService: RedisCacheService,
+    ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -216,10 +227,9 @@ export class CommissionTypeScene {
         //@ts-ignore
         const commissionType = ctx.match[1];
 
-        // Сохраняем тип комиссии в кеш
-        const templateData = (await this.telegramService.getDataFromCache<any>(`template_${telegramId}`)) || {};
+        const templateData = (await this.cacheService.get<any>(`template_draft:${telegramId}`)) || {};
         templateData.commissionType = commissionType;
-        await this.telegramService.setDataCache<any>(`template_${telegramId}`, templateData);
+        await this.cacheService.set(`template_draft:${telegramId}`, templateData, TEMPLATE_TTL);
 
         await ctx.scene.enter(COMMISSION_RATE_SCENE);
     }
@@ -227,7 +237,10 @@ export class CommissionTypeScene {
 
 @Scene(COMMISSION_RATE_SCENE)
 export class CommissionRateScene {
-    constructor(private telegramService: TelegramService) {}
+    constructor(
+        private telegramService: TelegramService,
+        private cacheService: RedisCacheService,
+    ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -260,12 +273,10 @@ export class CommissionRateScene {
                 return;
             }
 
-            // Сохраняем ставку комиссии в кеш
-            const templateData = (await this.telegramService.getDataFromCache<any>(`template_${telegramId}`)) || {};
+            const templateData = (await this.cacheService.get<any>(`template_draft:${telegramId}`)) || {};
             templateData.commissionRate = rate;
-            await this.telegramService.setDataCache<any>(`template_${telegramId}`, templateData);
+            await this.cacheService.set(`template_draft:${telegramId}`, templateData, TEMPLATE_TTL);
 
-            // Переходим к следующему шагу
             await ctx.scene.enter(ROUND_TO_SCENE);
         } catch (e) {
             await ctx.reply('Пожалуйста, введите корректное число.');
@@ -279,6 +290,7 @@ export class RoundToScene {
         private telegramService: TelegramService,
         private templateService: TemplateService,
         private userService: UserService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -321,7 +333,7 @@ export class RoundToScene {
     }
 
     private async saveTemplate(ctx: WizardContext, telegramId: string, roundTo: number) {
-        const templateData = await this.telegramService.getDataFromCache<any>(`template_${telegramId}`);
+        const templateData = await this.cacheService.get<any>(`template_draft:${telegramId}`);
 
         if (!templateData || !templateData.name || !templateData.template || !templateData.commissionType || !templateData.commissionRate) {
             await ctx.editMessageText('Что-то пошло не так. Пожалуйста, начните создание шаблона заново.');
@@ -338,8 +350,7 @@ export class RoundToScene {
             roundTo,
         });
 
-        // Очищаем данные о текущем создаваемом шаблоне
-        await this.telegramService.setDataCache<any>(`template_${telegramId}`, null);
+        await this.cacheService.del(`template_draft:${telegramId}`);
 
         const user = await this.userService.getUserByTelegramId(String(telegramId));
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
@@ -363,6 +374,7 @@ export class CustomRoundScene {
         private telegramService: TelegramService,
         private templateService: TemplateService,
         private userService: UserService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -396,7 +408,7 @@ export class CustomRoundScene {
                 return;
             }
 
-            const templateData = await this.telegramService.getDataFromCache<any>(`template_${telegramId}`);
+            const templateData = await this.cacheService.get<any>(`template_draft:${telegramId}`);
 
             if (
                 !templateData ||
@@ -419,8 +431,7 @@ export class CustomRoundScene {
                 roundTo,
             });
 
-            // Очищаем данные о текущем создаваемом шаблоне
-            await this.telegramService.setDataCache<any>(`template_${telegramId}`, null);
+            await this.cacheService.del(`template_draft:${telegramId}`);
 
             const user = await this.userService.getUserByTelegramId(String(telegramId));
             if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);

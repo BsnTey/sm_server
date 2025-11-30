@@ -4,9 +4,13 @@ import { CheckingService } from './checking.service';
 import { CheckingController } from './checking.controller';
 import { TelegramModule } from '../telegram/telegram.module';
 import { AccountDiscountService } from './account-discount.service';
+import { AccountModule } from '../account/account.module';
+import { AccountDiscountRepository } from './account-discount.repository';
 
 @Module({
-    imports: [UserModule, TelegramModule],
-    providers: [CheckingService, CheckingController, AccountDiscountService],
+    imports: [UserModule, TelegramModule, AccountModule],
+    providers: [CheckingService, AccountDiscountService, AccountDiscountRepository],
+    controllers: [CheckingController],
+    exports: [CheckingService],
 })
-export class CheckingModule { }
+export class CheckingModule {}

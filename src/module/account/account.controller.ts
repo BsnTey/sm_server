@@ -207,16 +207,6 @@ export class AccountController {
         }
     }
 
-    @Get('checking/:accountId/personal-discount')
-    @HttpCode(200)
-    async getPersonalDiscount(@Param() params: AccountIdParamsDto): Promise<any> {
-        try {
-            return this.accountService.getPersonalDiscount(params.accountId);
-        } catch (err: any) {
-            return this.handleError(err);
-        }
-    }
-
     private handleError(err: any): { error: string } {
         let errorMessage = '';
         if (err instanceof NotFoundException) {

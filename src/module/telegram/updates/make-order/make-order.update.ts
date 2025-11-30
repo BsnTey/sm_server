@@ -47,6 +47,10 @@ import { IRecipient, IRecipientOrder } from '../../../account/interfaces/account
 import { ConfigService } from '@nestjs/config';
 import { Context } from '../../interfaces/telegram.context';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
+import { RedisCacheService } from '../../../cache/cache.service';
+import { OrderState } from '../../interfaces/order.interface';
+
+const ORDER_TTL = 3600 * 2;
 
 @Scene(MAKE_ORDER.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -54,6 +58,7 @@ export class MakeOrderUpdate {
     constructor(
         private telegramService: TelegramService,
         private userService: UserService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -82,7 +87,8 @@ export class MakeOrderUpdate {
         @Sender() { id: telegramId }: any,
         @Ctx() ctx: WizardContext,
     ) {
-        await this.telegramService.setTelegramAccountCache(telegramId, accountId);
+        const state: OrderState = { accountId };
+        await this.cacheService.set(`order_acc:${telegramId}`, state, ORDER_TTL);
         await ctx.scene.enter(ORDER_MENU_ACCOUNT_SCENE);
     }
 }
@@ -93,11 +99,13 @@ export class OrderMenuAccount {
     constructor(
         private accountService: AccountService,
         private telegramService: TelegramService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(String(telegramId));
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
 
         const shortInfo = await this.accountService.shortInfo(account.accountId);
         const text = `📱 Аккаунт найден. Баланс: ${shortInfo.bonusCount}`;
@@ -140,6 +148,7 @@ export class OrderCity {
         private telegramService: TelegramService,
         private userService: UserService,
         private makeOrderService: MakeOrderService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -162,7 +171,8 @@ export class OrderCity {
 
     @On('text')
     async inputCity(@Message('text', new isCityPipe()) city: string, @Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
         const suggestCitysByGeo = await this.accountService.suggestCityByGeo(account.accountId, city);
         if (suggestCitysByGeo.length == 0) {
             await ctx.reply(ERROR_FIND_CITY);
@@ -172,6 +182,7 @@ export class OrderCity {
 
         const formattingGeo = this.makeOrderService.formatGeo(suggestCitysByGeo);
         account.geo = formattingGeo;
+        await this.cacheService.set(`order_acc:${telegramId}`, account, ORDER_TTL);
 
         const keyboard = getCitiesKeyboard(formattingGeo);
         await ctx.reply('Выберете город для изменения', keyboard);
@@ -182,7 +193,8 @@ export class OrderCity {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const id = ctx.match[0].split('_')[2];
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account?.geo) return ctx.reply('Сессия истекла.');
 
         const uri = account.geo.find(i => i.id === id)?.uri;
         if (!uri) throw new NotFoundException(ERROR_FOUND_CASH);
@@ -196,7 +208,8 @@ export class OrderCity {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const cityId = ctx.match[0].split('_')[3];
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
 
         await this.accountService.setCityToAccount(account.accountId, cityId);
         await ctx.scene.enter(ORDER_MENU_ACCOUNT_SCENE);
@@ -243,6 +256,7 @@ export class OrderFavouriteCity {
         private telegramService: TelegramService,
         private userService: UserService,
         private makeOrderService: MakeOrderService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -261,7 +275,9 @@ export class OrderFavouriteCity {
         @Ctx() ctx: WizardContext,
         @Sender() { id: telegramId }: any,
     ) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
+
         const suggestCitysByGeo = await this.accountService.suggestCityByGeo(account.accountId, city);
         if (suggestCitysByGeo.length == 0) {
             await ctx.reply(ERROR_FIND_CITY);
@@ -271,6 +287,7 @@ export class OrderFavouriteCity {
 
         const formattingGeo = this.makeOrderService.formatGeo(suggestCitysByGeo);
         account.geo = formattingGeo;
+        await this.cacheService.set(`order_acc:${telegramId}`, account, ORDER_TTL);
 
         const keyboard = getFoundedCitiesForFavKeyboard(formattingGeo);
         await ctx.reply('Выберете город для добавления', keyboard);
@@ -281,7 +298,8 @@ export class OrderFavouriteCity {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const id = ctx.match[0].split('_')[3];
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account?.geo) return ctx.reply('Сессия истекла.');
 
         const uri = account.geo.find(i => i.id === id)?.uri;
         if (!uri) throw new NotFoundException(ERROR_FOUND_CASH);
@@ -305,13 +323,18 @@ export class OrderMenuCart {
         private accountService: AccountService,
         private telegramService: TelegramService,
         private makeOrderService: MakeOrderService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
+
         const cartResponse = await this.accountService.getCart(account.accountId);
         account.email = cartResponse.data.cartFull.owner.email;
+        await this.cacheService.set(`order_acc:${telegramId}`, account, ORDER_TTL);
+
         let keyboard;
         let text;
         if (cartResponse.data.cartFull.soldOutLines.length != 0) {
@@ -321,6 +344,7 @@ export class OrderMenuCart {
             keyboard = cartItemsKeyboard(cartResponse.data.cartFull.availableItems);
             text = getTextCart(cartResponse);
             account.cartResponse = cartResponse;
+            await this.cacheService.set(`order_acc:${telegramId}`, account, ORDER_TTL);
         } else {
             keyboard = emptyCartKeyboard;
             text = 'Выберете действие';
@@ -345,7 +369,9 @@ export class OrderMenuCart {
 
     @Action('share_cart')
     async shareCartLink(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
+
         const url = await this.accountService.createSnapshot(account.accountId);
         await ctx.reply(url);
         await ctx.scene.reenter();
@@ -358,7 +384,8 @@ export class OrderMenuCart {
 
     @Action('shop_selection')
     async choosingShopOrder(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
 
         //Не понятно, как определить, что есть самовывоз
         // const nonAccessItems = isAccessShop(account.cartResponse!);
@@ -373,6 +400,8 @@ export class OrderMenuCart {
         account.internalPickupAvabilityItems = internalPickupAvabilityItems;
         account.accessItemsPickupAvailability = accessItemsPickupAvailability;
 
+        await this.cacheService.set(`order_acc:${telegramId}`, account, ORDER_TTL);
+
         const keyboardShops = accessShopsKeyboard(accessItemsPickupAvailability);
         await ctx.editMessageText('Выберите ТЦ', keyboardShops);
     }
@@ -382,17 +411,23 @@ export class OrderMenuCart {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const shopId = ctx.match[0].split('_')[2];
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
 
-        const account = await this.telegramService.getFromCache(telegramId);
         const { text, keyboard, shop } = await this.makeOrderService.approveShop(account, shopId);
-        if (shop) account.shop = shop;
+        if (shop) {
+            account.shop = shop;
+            await this.cacheService.set(`order_acc:${telegramId}`, account, ORDER_TTL);
+        }
         await ctx.editMessageText(text, keyboard);
     }
 
     @Action('approve_shop')
     async choiceChangeRecipient(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
-        const shopId = String(account.shop!.shopNumber);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account?.shop?.shopNumber || !account.internalPickupAvabilityItems) return ctx.reply('Сессия истекла.');
+
+        const shopId = String(account.shop.shopNumber);
 
         const { potentialOrder, version } = await this.accountService.internalPickup(
             account.accountId,
@@ -401,13 +436,16 @@ export class OrderMenuCart {
         );
         account.version = version;
         account.potentialOrder = potentialOrder;
+        await this.cacheService.set(`order_acc:${telegramId}`, account, ORDER_TTL);
 
         await ctx.editMessageText(`Изменить получателя заказа?`, recipientKeyboard);
     }
 
     @Action('recipient_i')
     async orderConfirmation(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
+
         const orderNumber = await this.accountService.submitOrder(account.accountId, account.version!);
 
         await ctx.editMessageText(`Поздравляю! Ваш заказ под номером: <code>${orderNumber}</code>`, {
@@ -433,7 +471,9 @@ export class OrderMenuCart {
 
     @Action('delete_promo')
     async deletePromo(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
+
         await this.accountService.deletePromocode(account.accountId);
         await ctx.reply('Промокод удален');
         await ctx.scene.reenter();
@@ -441,7 +481,9 @@ export class OrderMenuCart {
 
     @Action('clear_cart')
     async clearCart(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
+
         await this.accountService.removeAllCart(account.accountId);
         await ctx.reply('Вещи удалены из списка');
         await ctx.scene.reenter();
@@ -449,7 +491,9 @@ export class OrderMenuCart {
 
     @Action(/id_remove_\d+_\d+/)
     async removeItemCart(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
+
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const productId = ctx.match[0].split('_')[2];
@@ -470,7 +514,8 @@ export class OrderMenuCart {
 
     @Action(/id_add_\d+_\d+/)
     async addItemCart(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const productId = ctx.match[0].split('_')[2];
@@ -500,6 +545,7 @@ export class OrderInputArticle {
     constructor(
         private accountService: AccountService,
         private telegramService: TelegramService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -519,13 +565,15 @@ export class OrderInputArticle {
 
     @On('text')
     async searchingAddingArticle(@Message('text') article: string, @Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
 
         const foundedProduct = await this.accountService.searchProduct(account.accountId, article);
         let text;
         if (foundedProduct.data.list.length != 0) {
             text = 'Выберете товар';
             account.foundedProduct = foundedProduct;
+            await this.cacheService.set(`order_acc:${telegramId}`, account, ORDER_TTL);
         } else {
             text = 'Товар не найден';
         }
@@ -535,12 +583,13 @@ export class OrderInputArticle {
 
     @Action(/id_product_\d/)
     async selectProduct(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account || !account.foundedProduct) return ctx.reply('Сессия истекла.');
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const productId = ctx.update.callback_query.data.split('_')[2];
 
-        const foundedProduct = account.foundedProduct!;
+        const foundedProduct = account.foundedProduct;
         const list = foundedProduct.data.list;
         const item = list.filter(value => value.id == productId)[0];
         const keyboard = getSearchSkuKeyboard(productId, foundedProduct);
@@ -553,7 +602,8 @@ export class OrderInputArticle {
 
     @Action(/id_add_\d+_\d+/)
     async addItemCart(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const productId = ctx.match[0].split('_')[2];
@@ -573,6 +623,7 @@ export class OrderInputLink {
     constructor(
         private accountService: AccountService,
         private telegramService: TelegramService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -592,7 +643,8 @@ export class OrderInputLink {
 
     @On('text')
     async addOrderLink(@Message('text', new isUrlPipe()) urlLink: string, @Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
 
         await this.accountService.applySnapshot(account.accountId, urlLink);
         await ctx.reply('Товары были добавлены в корзину');
@@ -606,6 +658,7 @@ export class OrderInputPromo {
     constructor(
         private accountService: AccountService,
         private telegramService: TelegramService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -625,7 +678,9 @@ export class OrderInputPromo {
 
     @On('text')
     async inputPromocode(@Message('text') promocode: string, @Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
+
         await this.accountService.addPromocode(account.accountId, promocode);
         await ctx.reply('Промокод успешно применен');
         await ctx.scene.enter(ORDER_MENU_CART_SCENE);
@@ -638,11 +693,14 @@ export class OrderChangeRecipient {
     constructor(
         private accountService: AccountService,
         private telegramService: TelegramService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
+
         await ctx.editMessageText(
             `Введите Имя, Фамилию, email и номер телефона через пробелы:\nИванов Иван <code>${account.email}</code> 88005553535`,
             {
@@ -668,10 +726,12 @@ export class OrderChangeRecipient {
         @Sender() { id: telegramId }: any,
         @Ctx() ctx: WizardContext,
     ) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account || !account.potentialOrder) return ctx.reply('Сессия истекла.');
+
         const data: IRecipientOrder = {
             ...fioData,
-            potentialOrder: account.potentialOrder!,
+            potentialOrder: account.potentialOrder,
         };
 
         const version = await this.accountService.approveRecipientOrder(account.accountId, data);
@@ -697,11 +757,14 @@ export class OrderGetOrders {
         private accountService: AccountService,
         private telegramService: TelegramService,
         private configService: ConfigService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
+
         const orders = await this.accountService.orderHistory(account.accountId);
         const keyboard = orderHistoryKeyboard(orders);
         const text = 'Имеющиеся заказы на аккаунте:';
@@ -719,7 +782,8 @@ export class OrderGetOrders {
 
     @Action(/^order_(\d+)-\d+$/)
     async selectOrder(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const orderNumber = ctx.match[0].split('_')[1];
@@ -735,7 +799,8 @@ export class OrderGetOrders {
 
     @Action(/^cancelled_order_(\d+)-\d+$/)
     async cancellOrder(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(telegramId);
+        const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const orderNumber = ctx.match[0].split('_')[2];

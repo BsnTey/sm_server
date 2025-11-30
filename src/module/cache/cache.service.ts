@@ -3,7 +3,7 @@ import { RedisClientType } from 'redis';
 import { REDIS } from './cache.provider';
 
 @Injectable()
-export class CacheService {
+export class RedisCacheService {
     private readonly ttlSeconds = 60;
 
     constructor(@Inject(REDIS) private readonly client: RedisClientType) {}

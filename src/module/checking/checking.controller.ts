@@ -16,52 +16,52 @@ export class CheckingController {
         return this.checkingService.queueAccountsForPersonalDiscountV1(data);
     }
 
-    @Patch('personal-discount/v1/update')
-    @HttpCode(200)
-    async updateAccountsForPersonalDiscount(@Body() data: SetPersonalDiscountAccountRequestDto) {
-        return this.checkingService.updateAccountsForPersonalDiscount(data);
-    }
-
-    @Delete('personal-discount/v1/:telegramId/:accountId')
-    @HttpCode(200)
-    async delDiscountsByAccountIdV1(@Param() params: AccountTelegramParamsDto) {
-        return this.checkingService.removeDiscountsByAccountIdV1(params);
-    }
-
-    @Delete('personal-discount/v1/:telegramId')
-    @HttpCode(200)
-    async delAccounts(@Param() params: AccountTelegramParamsDto) {
-        return this.checkingService.delAccounts(params);
-    }
-
-    @Get('personal-discount/nodes/:telegramId')
-    @HttpCode(200)
-    async getDistinctNodePairsByTelegram(@Param() params: TelegramIdParamsDto) {
-        return this.checkingService.getDistinctNodePairsByTelegram(params.telegramId);
-    }
-
-    @Post('personal-discount/v1/prepare/accounts')
-    @HttpCode(200)
-    async prepareAccountsForProductCheckV1(@Body() data: PrepareProductCheckRequestDto) {
-        return this.checkingService.prepareAccountsForProductCheckV1(data);
-    }
-
-    @Post('personal-discount/v1/batch')
-    @HttpCode(200)
-    async checkProductBatchForPersonalDiscount(@Body() data: CheckProductBatchRequestDto) {
-        return this.checkingService.checkProductBatchForPersonalDiscount(data);
-    }
-
-    //роуты версии через очередь
-    @Post('personal-discount/v2/stream')
-    @HttpCode(200)
-    async getAccountsForPersonalDiscountV2(@Body() data: ProductCheckingRequestDto) {
-        return this.checkingService.getAccountsForPersonalDiscountV2(data.telegramId, data.productId);
-    }
-
-    @Get('personal-discount/v1/accounts/:telegramId')
-    @HttpCode(200)
-    async getUserAccountIdsV2(@Param() params: TelegramIdParamsDto) {
-        return this.checkingService.getUserAccountIdsV2(params.telegramId);
-    }
+    // @Patch('personal-discount/v1/update')
+    // @HttpCode(200)
+    // async updateAccountsForPersonalDiscount(@Body() data: SetPersonalDiscountAccountRequestDto) {
+    //     return this.checkingService.updateAccountsForPersonalDiscount(data);
+    // }
+    //
+    // @Delete('personal-discount/v1/:telegramId/:accountId')
+    // @HttpCode(200)
+    // async delDiscountsByAccountIdV1(@Param() params: AccountTelegramParamsDto) {
+    //     return this.checkingService.removeDiscountsByAccountIdV1(params);
+    // }
+    //
+    // @Delete('personal-discount/v1/:telegramId')
+    // @HttpCode(200)
+    // async delAccounts(@Param() params: AccountTelegramParamsDto) {
+    //     return this.checkingService.delAccounts(params);
+    // }
+    //
+    // @Get('personal-discount/nodes/:telegramId')
+    // @HttpCode(200)
+    // async getDistinctNodePairsByTelegram(@Param() params: TelegramIdParamsDto) {
+    //     return this.checkingService.getDistinctNodePairsByTelegram(params.telegramId);
+    // }
+    //
+    // @Post('personal-discount/v1/prepare/accounts')
+    // @HttpCode(200)
+    // async prepareAccountsForProductCheckV1(@Body() data: PrepareProductCheckRequestDto) {
+    //     return this.checkingService.prepareAccountsForProductCheckV1(data);
+    // }
+    //
+    // @Post('personal-discount/v1/batch')
+    // @HttpCode(200)
+    // async checkProductBatchForPersonalDiscount(@Body() data: CheckProductBatchRequestDto) {
+    //     return this.checkingService.checkProductBatchForPersonalDiscount(data);
+    // }
+    //
+    // //роуты версии через очередь
+    // @Post('personal-discount/v2/stream')
+    // @HttpCode(200)
+    // async getAccountsForPersonalDiscountV2(@Body() data: ProductCheckingRequestDto) {
+    //     return this.checkingService.getAccountsForPersonalDiscountV2(data.telegramId, data.productId);
+    // }
+    //
+    // @Get('personal-discount/v1/accounts/:telegramId')
+    // @HttpCode(200)
+    // async getUserAccountIdsV2(@Param() params: TelegramIdParamsDto) {
+    //     return this.checkingService.getUserAccountIdsV2(params.telegramId);
+    // }
 }
