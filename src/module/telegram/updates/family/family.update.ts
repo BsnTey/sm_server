@@ -351,7 +351,7 @@ export class FamilyInviteUpdate extends BaseUpdate {
             await this.familyService.inviteMember(accountIdOwner, namePhoneInvited);
             success = true;
         } catch (e: any) {
-            throw new Error(e?.message || 'Что то пошло не так при добавлении участника');
+            throw new Error(e?.response?.data?.error?.message || 'Что то пошло не так при добавлении участника');
         }
 
         await ctx.reply('✅ Приглашение выслано. Проверьте информацию');
