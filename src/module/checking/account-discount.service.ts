@@ -4,12 +4,20 @@ import {
     AccountDiscountsToInsert,
     CreatePersonalDiscountProductsInput,
     NodeAccountDiscount,
+    NodePair,
     UpsertNodeDiscountInput,
 } from './interfaces/account-discount.interface';
+import { keyDiscountNodes } from './cache-key/key';
+import { RedisCacheService } from '../cache/cache.service';
 
 @Injectable()
 export class AccountDiscountService {
-    constructor(private readonly accountDiscountRepository: AccountDiscountRepository) {}
+    private TTL_CASH_DISCOUNT = 10_800_000;
+
+    constructor(
+        private readonly accountDiscountRepository: AccountDiscountRepository,
+        private readonly cacheService: RedisCacheService,
+    ) {}
 
     async upsertNodeDiscount(node: UpsertNodeDiscountInput) {
         return this.accountDiscountRepository.upsertNodeDiscount(node);
@@ -24,6 +32,8 @@ export class AccountDiscountService {
     }
 
     async deleteAllByTelegramId(telegramId: string): Promise<number> {
+        const key = keyDiscountNodes(telegramId);
+        await this.cacheService.del(key);
         return this.accountDiscountRepository.deleteAllByTelegramId(telegramId);
     }
 
@@ -58,6 +68,20 @@ export class AccountDiscountService {
 
     async findDistinctAccountIdsByTelegram(telegramId: string): Promise<string[]> {
         return this.accountDiscountRepository.findDistinctAccountIdsByTelegram(telegramId);
+    }
+
+    async getDistinctNodePairsByTelegram(telegramId: string): Promise<{ nodes: NodePair[] }> {
+        const key = keyDiscountNodes(telegramId);
+
+        const nodesCache = await this.cacheService.get<NodePair[]>(key);
+
+        if (nodesCache) return { nodes: nodesCache };
+
+        const nodes = await this.accountDiscountRepository.findDistinctNodePairsByTelegram(telegramId);
+
+        await this.cacheService.set(key, nodes, this.TTL_CASH_DISCOUNT);
+
+        return { nodes };
     }
 
     /**

@@ -5,7 +5,7 @@ import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discoun
 import { TgPersonalDiscountDto } from './dto/tg-personal-discount.dto';
 import { RABBIT_MQ_QUEUES } from '@common/broker/rabbitmq.queues';
 import { AccountDiscountsToInsert, NodeAccountDiscount, UpsertNodeDiscountInput } from './interfaces/account-discount.interface';
-import { keyDiscountAccount, keyDiscountNodes, keyNodeInput } from './cache-key/key';
+import { keyNodeInput } from './cache-key/key';
 import { DelayedPublisher } from '@common/broker/delayed.publisher';
 import { RedisCacheService } from '../cache/cache.service';
 import { AccountService } from '../account/account.service';
@@ -25,7 +25,7 @@ interface AccountProxyItem {
 @Injectable()
 export class CheckingService {
     private readonly logger = new Logger(CheckingService.name);
-    private TTL_CASH_DISCOUNT = 10_800_000;
+
     private TTL_NODE_INPUT = 80_000_000;
     private readonly MAX_CONCURRENCY = 5;
     private readonly RABBIT_THREADS = 3; // Количество параллельных потоков RabbitMQ
@@ -257,8 +257,9 @@ export class CheckingService {
             this.logger.log(`[NodesWorker] Чанк ${count}/${total} обработан. Скидок не найдено. В очередь продуктов не отправляем.`);
         }
 
-        // 6. Завершение (Cleanup & Notification)
-        await this.cleanupAndNotify(telegramId, count, total);
+        if (count === total) {
+            this.telegramService.sendMessage(+telegramId, `✅ Обновление персональных скидок для режима категорий завершено!`);
+        }
     }
 
     /**
@@ -362,22 +363,6 @@ export class CheckingService {
             total,
         };
         await this.publisher.publish(RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_PRODUCT_QUEUE, nextPayload, 0);
-    }
-
-    /**
-     * Шаг 6: Очистка кешей и уведомление пользователя
-     */
-    private async cleanupAndNotify(telegramId: string, count: number, total: number) {
-        // Чистим общие кеши пользователя
-        const keyNodes = keyDiscountNodes(telegramId);
-        const keyAccounts = keyDiscountAccount(telegramId);
-
-        await Promise.all([this.cacheService.del(keyNodes), this.cacheService.del(keyAccounts)]);
-
-        // Если это последний чанк - шлем уведомление
-        if (count === total) {
-            this.telegramService.sendMessage(+telegramId, `✅ Обновление персональных скидок для режима категорий завершено!`);
-        }
     }
 
     //воркер обновления AccountDiscountProduct для чанков из очереди
@@ -549,20 +534,6 @@ export class CheckingService {
         }
     }
 
-    //
-    // async getDistinctNodePairsByTelegram(telegramId: string): Promise<{ nodes: NodePair[] }> {
-    //     const key = keyDiscountNodes(telegramId);
-    //
-    //     const nodesCache = await this.cacheManager.get<NodePair[]>(key);
-    //
-    //     if (nodesCache) return { nodes: nodesCache };
-    //
-    //     const nodes = await this.accountDiscountRepo.findDistinctNodePairsByTelegram(telegramId);
-    //
-    //     await this.cacheManager.set(key, nodes, this.TTL_CASH_DISCOUNT);
-    //
-    //     return { nodes };
-    // }
     //
     //
     // async getUserAccountIdsV2(telegramId: string): Promise<{ accountIds: string[] }> {

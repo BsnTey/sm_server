@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Param, HttpCode, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, HttpCode, Patch, Post } from '@nestjs/common';
 import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discount.dto';
 import { CheckingService } from './checking.service';
 import { TgPersonalDiscountDto } from './dto/tg-personal-discount.dto';
 import { DeleteAccountRequestDto } from './dto/delete-account.dto';
 import { AccountDiscountService } from './account-discount.service';
+import { TelegramIdParamsDto } from '../account/dto/telegramId.dto';
 
 @Controller('checking')
 export class CheckingController {
@@ -36,13 +37,13 @@ export class CheckingController {
         const delAccountIds = [data.accountId];
         return this.accountDiscountService.deleteAccountDiscountsBatch(delAccountIds, data.telegramId);
     }
-    //
-    // @Get('personal-discount/nodes/:telegramId')
-    // @HttpCode(200)
-    // async getDistinctNodePairsByTelegram(@Param() params: TelegramIdParamsDto) {
-    //     return this.checkingService.getDistinctNodePairsByTelegram(params.telegramId);
-    // }
-    //
+
+    @Get('personal-discount/nodes/:telegramId')
+    @HttpCode(200)
+    async getDistinctNodePairsByTelegram(@Param() params: TelegramIdParamsDto) {
+        return this.accountDiscountService.getDistinctNodePairsByTelegram(params.telegramId);
+    }
+
     // @Post('personal-discount/v1/prepare/accounts')
     // @HttpCode(200)
     // async prepareAccountsForProductCheckV1(@Body() data: PrepareProductCheckRequestDto) {

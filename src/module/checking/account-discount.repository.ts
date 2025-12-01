@@ -138,13 +138,21 @@ export class AccountDiscountRepository {
         });
     }
 
-    // async findDistinctNodePairsByTelegram(telegramId: string): Promise<NodePair[]> {
-    //     return this.prisma.accountDiscount.findMany({
-    //         where: { telegramId },
-    //         select: { nodeId: true, nodeName: true },
-    //         distinct: ['nodeId', 'nodeName'],
-    //     });
-    // }
+    async findDistinctNodePairsByTelegram(telegramId: string): Promise<NodePair[]> {
+        return this.prisma.nodeDiscount.findMany({
+            where: {
+                AccountDiscount: {
+                    some: {
+                        telegramId: telegramId,
+                    },
+                },
+            },
+            select: {
+                nodeId: true,
+                nodeName: true,
+            },
+        });
+    }
 
     async findDistinctAccountIdsByTelegram(telegramId: string): Promise<string[]> {
         const rows = await this.prisma.accountDiscount.findMany({
