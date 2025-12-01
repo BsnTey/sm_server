@@ -1,14 +1,16 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
-import { TelegramIdParamsDto } from '../account/dto/telegramId.dto';
+import { Body, Controller, Delete, Param, HttpCode, Patch, Post } from '@nestjs/common';
 import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discount.dto';
-import { ProductCheckingRequestDto } from './dto/product-checking.dto';
-import { AccountTelegramParamsDto } from '../account/dto/account-telegram-ids.dto';
-import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
 import { CheckingService } from './checking.service';
+import { TgPersonalDiscountDto } from './dto/tg-personal-discount.dto';
+import { DeleteAccountRequestDto } from './dto/delete-account.dto';
+import { AccountDiscountService } from './account-discount.service';
 
 @Controller('checking')
 export class CheckingController {
-    constructor(private checkingService: CheckingService) {}
+    constructor(
+        private checkingService: CheckingService,
+        private accountDiscountService: AccountDiscountService,
+    ) {}
 
     @Post('personal-discount/v1/set')
     @HttpCode(200)
@@ -16,23 +18,24 @@ export class CheckingController {
         return this.checkingService.queueAccountsForPersonalDiscountV1(data);
     }
 
-    // @Patch('personal-discount/v1/update')
-    // @HttpCode(200)
-    // async updateAccountsForPersonalDiscount(@Body() data: SetPersonalDiscountAccountRequestDto) {
-    //     return this.checkingService.updateAccountsForPersonalDiscount(data);
-    // }
-    //
-    // @Delete('personal-discount/v1/:telegramId/:accountId')
-    // @HttpCode(200)
-    // async delDiscountsByAccountIdV1(@Param() params: AccountTelegramParamsDto) {
-    //     return this.checkingService.removeDiscountsByAccountIdV1(params);
-    // }
-    //
-    // @Delete('personal-discount/v1/:telegramId')
-    // @HttpCode(200)
-    // async delAccounts(@Param() params: AccountTelegramParamsDto) {
-    //     return this.checkingService.delAccounts(params);
-    // }
+    @Patch('personal-discount/v1/update')
+    @HttpCode(200)
+    async updateAccountsForPersonalDiscount(@Body() data: TgPersonalDiscountDto) {
+        return this.checkingService.updatePersonalDiscountByTelegram(data);
+    }
+
+    @Delete('personal-discount/all')
+    @HttpCode(200)
+    async deleteAllByTelegramId(@Body() data: TgPersonalDiscountDto) {
+        return this.accountDiscountService.deleteAllByTelegramId(data.telegramId);
+    }
+
+    @Delete('personal-discount/single')
+    @HttpCode(200)
+    async delSingleDiscountByAccountId(@Body() data: DeleteAccountRequestDto) {
+        const delAccountIds = [data.accountId];
+        return this.accountDiscountService.deleteAccountDiscountsBatch(delAccountIds, data.telegramId);
+    }
     //
     // @Get('personal-discount/nodes/:telegramId')
     // @HttpCode(200)

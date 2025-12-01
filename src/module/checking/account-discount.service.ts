@@ -4,7 +4,6 @@ import {
     AccountDiscountsToInsert,
     CreatePersonalDiscountProductsInput,
     NodeAccountDiscount,
-    NodeForAccount,
     UpsertNodeDiscountInput,
 } from './interfaces/account-discount.interface';
 
@@ -20,8 +19,16 @@ export class AccountDiscountService {
         await this.accountDiscountRepository.ensureNodesExist(nodes);
     }
 
-    async refreshAccountDiscountsBatch(accountIds: string[], items: AccountDiscountsToInsert[]): Promise<void> {
-        await this.accountDiscountRepository.refreshAccountDiscountsBatch(accountIds, items);
+    async deleteAccountDiscountsBatch(accountIds: string[], telegramId: string): Promise<void> {
+        await this.accountDiscountRepository.deleteAccountDiscountsBatch(accountIds, telegramId);
+    }
+
+    async deleteAllByTelegramId(telegramId: string): Promise<number> {
+        return this.accountDiscountRepository.deleteAllByTelegramId(telegramId);
+    }
+
+    async createAccountDiscountsBatch(items: AccountDiscountsToInsert[]): Promise<void> {
+        await this.accountDiscountRepository.createAccountDiscountsBatch(items);
     }
 
     async getNodesForAccounts(telegramId: string, accountIds: string[]): Promise<Map<string, NodeAccountDiscount[]>> {
@@ -49,6 +56,10 @@ export class AccountDiscountService {
         return this.accountDiscountRepository.createManyDiscountProducts(items);
     }
 
+    async findDistinctAccountIdsByTelegram(telegramId: string): Promise<string[]> {
+        return this.accountDiscountRepository.findDistinctAccountIdsByTelegram(telegramId);
+    }
+
     /**
      * Получить список accountId, у которых есть записи в account_discount_product
      * для данного telegramId.
@@ -61,9 +72,7 @@ export class AccountDiscountService {
     //  * Удалить все данные по конкретному аккаунту и telegramId
     //  * из account_discount_product. Возвращает количество удалённых строк.
     //  */
-    // async deleteDataForAccount(accountId: string, telegramId: string): Promise<number> {
-    //     return this.accountDiscountRepository.deleteDataForAccount(accountId, telegramId);
-    // }
+
     //
     // /**
     //  * Найти accountId, у которых есть скидочный продукт с данным productId

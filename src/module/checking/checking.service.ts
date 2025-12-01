@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from
 import { List, Products } from '../account/interfaces/products.interface';
 import { chunk, requestWithBackoff, startOfNextDayUTC } from './utils/set-products.utils';
 import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discount.dto';
+import { TgPersonalDiscountDto } from './dto/tg-personal-discount.dto';
 import { RABBIT_MQ_QUEUES } from '@common/broker/rabbitmq.queues';
 import { AccountDiscountsToInsert, NodeAccountDiscount, UpsertNodeDiscountInput } from './interfaces/account-discount.interface';
 import { keyDiscountAccount, keyDiscountNodes, keyNodeInput } from './cache-key/key';
@@ -14,6 +15,7 @@ import { AccountDiscountService } from './account-discount.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { ProductBatchSaver } from './utils/product-batch-saver';
 import { PersonalDiscount } from '../account/interfaces/personal-discount.interface';
+import { DeleteAccountRequestDto } from './dto/delete-account.dto';
 
 interface AccountProxyItem {
     accountId: string;
@@ -59,6 +61,9 @@ export class CheckingService {
             throw new HttpException('Не предоставлено валидных аккаунтов', HttpStatus.BAD_REQUEST);
         }
 
+        //делаем обнуление сразу перед новой загрузкой
+        await this.accountDiscountService.deleteAllByTelegramId(data.telegramId);
+
         await this.publisher.publish(
             RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_INPUT_QUEUE,
             {
@@ -78,6 +83,25 @@ export class CheckingService {
             ok: true,
             estimatedSeconds,
         };
+    }
+
+    async updatePersonalDiscountByTelegram(data: TgPersonalDiscountDto) {
+        const { telegramId } = data;
+        const user = await this.userService.getUserByTelegramId(telegramId);
+        if (!user) {
+            throw new NotFoundException('Пользователь не найден');
+        }
+
+        const accountIds = await this.accountDiscountService.findDistinctAccountIdsByTelegram(telegramId);
+
+        if (!accountIds.length) {
+            throw new HttpException('Не найдено аккаунтов для обновления', HttpStatus.BAD_REQUEST);
+        }
+
+        return this.queueAccountsForPersonalDiscountV1({
+            telegramId,
+            personalDiscounts: accountIds,
+        });
     }
 
     //нарезает аккаунты по проксям и шлет в очередь на обработку setAccountsForNodes
@@ -221,10 +245,7 @@ export class CheckingService {
         await this.saveNewNodesIfNotExist(data.uniqueNodes);
 
         // 4. Перезапись связей (AccountDiscount)
-        // Обновляем БД для всех успешных аккаунтов (даже если у них пустой список скидок, надо стереть старые)
-        if (data.successfulAccountIds.length > 0) {
-            await this.accountDiscountService.refreshAccountDiscountsBatch(data.successfulAccountIds, data.relationsToInsert);
-        }
+        await this.accountDiscountService.createAccountDiscountsBatch(data.relationsToInsert);
 
         // 5. Отправка в следующую очередь (только те, у кого есть скидки)
         if (data.accountsWithDiscounts.length > 0) {
@@ -252,7 +273,6 @@ export class CheckingService {
      */
     private processDiscountResults(telegramId: string | number, accountIds: string[], responses: PromiseSettledResult<PersonalDiscount>[]) {
         // Результаты
-        const successfulAccountIds: string[] = [];
         const accountsWithDiscounts: string[] = [];
         const uniqueNodes = new Map<string, UpsertNodeDiscountInput>();
         const relationsToInsert: AccountDiscountsToInsert[] = [];
@@ -271,9 +291,7 @@ export class CheckingService {
             }
 
             const pd = res.value;
-            successfulAccountIds.push(accountId);
 
-            // Б. Если скидок нет - просто пропускаем (аккаунт уже в successful для очистки БД)
             if (!pd?.list?.length) return;
 
             // В. Если скидки есть - готовим к следующему этапу
@@ -302,7 +320,7 @@ export class CheckingService {
             });
         });
 
-        return { successfulAccountIds, accountsWithDiscounts, uniqueNodes, relationsToInsert };
+        return { accountsWithDiscounts, uniqueNodes, relationsToInsert };
     }
 
     /**
@@ -455,9 +473,6 @@ export class CheckingService {
             for (const item of page) {
                 const productId = String(item.id);
 
-                // 1. Регистрируем Скидку (Связь Аккаунт -> Товар -> Нода)
-                // dateEnd убрал, так как его нет в интерфейсе CreatePersonalDiscountProductsInput
-                // и в модели Prisma account_discount_product (он есть в NodeDiscount)
                 const needFlushDiscount = batchSaver.addDiscount({
                     productId,
                     telegramId,
@@ -468,14 +483,12 @@ export class CheckingService {
                 if (needFlushDiscount) await batchSaver.flush();
                 savedCount++;
 
-                // 2. Регистрируем Справочник (ProductInfo: SKU / Article)
                 if (Array.isArray(item.skus) && item.skus.length) {
                     for (const skuItem of item.skus) {
                         const needFlushInfo = batchSaver.addInfo(productId, skuItem.code, skuItem.id);
                         if (needFlushInfo) await batchSaver.flush();
                     }
                 } else if (item.code) {
-                    // Если SKU нет, но есть артикул у самого товара
                     const needFlushInfo = batchSaver.addInfo(productId, item.code, null);
                     if (needFlushInfo) await batchSaver.flush();
                 }
@@ -551,13 +564,6 @@ export class CheckingService {
     //     return { nodes };
     // }
     //
-    // async removeDiscountsByAccountIdV1({ telegramId, accountId }: AccountTelegramParamsDto): Promise<{
-    //     deleted: number;
-    // }> {
-    //     const countDelete = await this.accountDiscountRepo.deleteDataForAccount(accountId, telegramId);
-    //
-    //     return { deleted: countDelete ?? 0 };
-    // }
     //
     // async getUserAccountIdsV2(telegramId: string): Promise<{ accountIds: string[] }> {
     //     const accountIds = await this.accountDiscountRepo.findAccountsByTelegramUser(telegramId);
