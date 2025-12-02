@@ -5,7 +5,7 @@ import { TgPersonalDiscountDto } from './dto/tg-personal-discount.dto';
 import { DeleteAccountRequestDto } from './dto/delete-account.dto';
 import { AccountDiscountService } from './account-discount.service';
 import { TelegramIdParamsDto } from '../account/dto/telegramId.dto';
-import { PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
+import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
 
 @Controller('checking')
 export class CheckingController {
@@ -51,11 +51,11 @@ export class CheckingController {
         return this.checkingService.prepareAccountsForProductCheckV1(data);
     }
 
-    // @Post('personal-discount/v1/batch')
-    // @HttpCode(200)
-    // async checkProductBatchForPersonalDiscount(@Body() data: CheckProductBatchRequestDto) {
-    //     return this.checkingService.checkProductBatchForPersonalDiscount(data);
-    // }
+    @Post('personal-discount/v1/batch')
+    @HttpCode(200)
+    async checkProductBatchForPersonalDiscount(@Body() data: CheckProductBatchRequestDto) {
+        return this.checkingService.checkProductBatchForPersonalDiscount(data);
+    }
     //
     // //роуты версии через очередь
     // @Post('personal-discount/v2/stream')

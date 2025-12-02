@@ -16,9 +16,11 @@ import { TelegramService } from '../telegram/telegram.service';
 import { ProductBatchSaver } from './utils/product-batch-saver';
 import { PersonalDiscount } from '../account/interfaces/personal-discount.interface';
 import { DeleteAccountRequestDto } from './dto/delete-account.dto';
-import { PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
+import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
 import { PreparedAccountInfo } from './interfaces/extend-chrome.interface';
 import { OrderService } from '../order/order.service';
+import { CheckProductResultItem, Product } from './interfaces/my-discount.interface';
+import { ProductApiResponse } from '../account/interfaces/product.interface';
 
 interface AccountProxyItem {
     accountId: string;
@@ -46,7 +48,7 @@ export class CheckingService {
         private userService: UserService,
         private readonly publisher: DelayedPublisher,
         private readonly cacheService: RedisCacheService,
-    ) { }
+    ) {}
 
     //принимает с контроллера входящие аккаунты, сейвит в очередь на нарезку под прокси chunkingAccountForProxy
     async queueAccountsForPersonalDiscountV1(data: SetPersonalDiscountAccountRequestDto): Promise<{
@@ -544,42 +546,6 @@ export class CheckingService {
     //     const accountIds = await this.accountDiscountRepo.findAccountsByTelegramUser(telegramId);
     //     return { accountIds };
     // }
-    //
-    // private hasMyDiscountInDiscountList(p: ProductApiResponse['product']): boolean {
-    //     const list = p?.personalPrice?.discountList ?? [];
-    //     return list.some(x => x?.actionName?.toLowerCase() === 'моя скидка');
-    // }
-    //
-    // private mapBonuses(p: ProductApiResponse['product']): number {
-    //     const list = p?.personalPrice?.discountList ?? [];
-    //     const item = list.find(x => x?.actionName?.toLowerCase() === 'оплата бонусами');
-    //     const raw = item?.summa?.value ?? 0;
-    //     return Number(raw) / 100;
-    // }
-    //
-    // private mapPrice(p: ProductApiResponse['product']): number {
-    //     const raw = p?.personalPrice?.price?.value ?? 0;
-    //     return Number(raw) / 100;
-    // }
-    //
-    // private buildResult(
-    //     product: ProductApiResponse['product'],
-    //     accountId: string,
-    //     bonusCount?: number,
-    //     calculateProduct?: { price: number; bonus: number },
-    //     ordersToday: number = 0,
-    // ): CheckProductResultItem | null {
-    //     if (!this.hasMyDiscountInDiscountList(product)) return null;
-    //     return {
-    //         accountId,
-    //         discountRate: product?.price?.discountRate ?? null,
-    //         price: this.mapPrice(product),
-    //         bonuses: this.mapBonuses(product),
-    //         bonusCount,
-    //         ordersToday,
-    //         calculateProduct,
-    //     };
-    // }
 
     async prepareAccountsForProductCheckV1({ telegramId, nodeId }: PrepareProductCheckRequestDto): Promise<{
         accounts: PreparedAccountInfo[];
@@ -611,21 +577,6 @@ export class CheckingService {
 
         return { accounts };
     }
-
-    // private getHttpStatus(err: any): number | undefined {
-    //     return err?.response?.status ?? err?.response?.data?.statusCode;
-    // }
-    //
-    // private isBadRequest400(err: any): boolean {
-    //     return this.getHttpStatus(err) === 400;
-    // }
-    //
-    // private isNotFound404(err: any): boolean {
-    //     const status = this.getHttpStatus(err);
-    //     const msg = err?.response?.data?.message ?? err?.message;
-    //     return status === 404 || msg === 'PRODUCT_NOT_FOUND';
-    // }
-    //
 
     // async getAccountsForPersonalDiscountV2(
     //     telegramId: string,
@@ -727,98 +678,170 @@ export class CheckingService {
     //         errors,
     //     };
     // }
-    //
-    // async checkProductBatchForPersonalDiscount({ telegramId, isInventory, productId, accountIds }: CheckProductBatchRequestDto): Promise<{
-    //     ok: boolean;
-    //     productId: string;
-    //     processed: number;
-    //     results: CheckProductResultItem[];
-    //     errors: CheckProductResultItem[];
-    // }> {
-    //     if (!accountIds?.length) {
-    //         return { ok: true, productId, processed: 0, results: [], errors: [] };
-    //     }
-    //
-    //     const ordersTodayMap = await this.orderRepository.countTodayByAccountIds(accountIds);
-    //
-    //     const results: CheckProductResultItem[] = [];
-    //     const errors: CheckProductResultItem[] = [];
-    //
-    //     const [probeId, ...restIds] = accountIds;
-    //
-    //     try {
-    //         const probeRes = await this.getProductById(probeId, productId);
-    //         const product = probeRes?.product;
-    //         if (!product?.id) {
-    //             // защитный вариант: нет id продукта в 200-ответе — считаем локальной проблемой
-    //             errors.push({ accountId: probeId, error: 'NO_PRODUCT' });
-    //         } else {
-    //             let bonusCount: number | undefined;
-    //             if (this.hasMyDiscountInDiscountList(product)) {
-    //                 try {
-    //                     const short = await this.shortInfo(probeId);
-    //                     bonusCount = short?.bonusCount;
-    //                 } catch {
-    //                     /* не критично */
-    //                 }
-    //             }
-    //             const calc = this.calculateService.computeCalculateProductFromProduct(product, isInventory);
-    //             const mapped = this.buildResult(product, probeId, bonusCount, calc || undefined, ordersTodayMap[probeId] ?? 0);
-    //             if (mapped) results.push(mapped);
-    //         }
-    //     } catch (e: any) {
-    //         if (this.isNotFound404(e)) {
-    //             // 404 на пробном — глобально для всех
-    //             throw new NotFoundException('PRODUCT_NOT_FOUND');
-    //         }
-    //         // 400 на пробном — локальная ошибка этого аккаунта, остальные продолжаем
-    //         const errorText = this.isBadRequest400(e)
-    //             ? e?.response?.data?.message ?? 'BAD_REQUEST'
-    //             : e?.response?.data?.message ?? e?.message ?? 'UNKNOWN_ERROR';
-    //         errors.push({ accountId: probeId, error: errorText });
-    //     }
-    //
-    //     // --- ОСТАЛЬНЫЕ АККАУНТЫ ---
-    //     const worker = async (accountId: string): Promise<void> => {
-    //         try {
-    //             const res = await this.getProductById(accountId, productId);
-    //             const product = res?.product;
-    //             if (!product?.id) {
-    //                 errors.push({ accountId, error: 'NO_PRODUCT' });
-    //                 return;
-    //             }
-    //
-    //             let bonusCount: number | undefined;
-    //             if (this.hasMyDiscountInDiscountList(product)) {
-    //                 try {
-    //                     const short = await this.shortInfo(accountId);
-    //                     bonusCount = short?.bonusCount;
-    //                 } catch {
-    //                     /* ignore */
-    //                 }
-    //             }
-    //
-    //             const calc = this.calculateService.computeCalculateProductFromProduct(product, isInventory);
-    //             const mapped = this.buildResult(product, accountId, bonusCount, calc || undefined, ordersTodayMap[accountId] ?? 0);
-    //             if (mapped) results.push(mapped);
-    //         } catch (err: any) {
-    //             // для остальных — любые 4xx/5xx считаем локальными
-    //             const errorText = err?.response?.data?.message ?? err?.message ?? 'UNKNOWN_ERROR';
-    //             errors.push({ accountId, error: errorText });
-    //         }
-    //     };
-    //
-    //     for (let i = 0; i < restIds.length; i += this.MAX_CONCURRENCY) {
-    //         const slice = restIds.slice(i, i + this.MAX_CONCURRENCY);
-    //         await Promise.all(slice.map(id => worker(id)));
-    //     }
-    //
-    //     return {
-    //         ok: true,
-    //         productId,
-    //         processed: accountIds.length,
-    //         results,
-    //         errors,
-    //     };
-    // }
+
+    async checkProductBatchForPersonalDiscount({ telegramId, productId, accountIds }: CheckProductBatchRequestDto): Promise<{
+        ok: boolean;
+        productId: string;
+        processed: number;
+        results: CheckProductResultItem[];
+        errors: CheckProductResultItem[];
+    }> {
+        const user = await this.userService.getUserByTelegramId(telegramId);
+        if (!user) {
+            throw new NotFoundException('Пользователь не найден');
+        }
+
+        if (!accountIds?.length) {
+            return { ok: true, productId, processed: 0, results: [], errors: [] };
+        }
+
+        const ordersTodayMap = await this.orderService.countTodayByAccountIds(accountIds);
+        const results: CheckProductResultItem[] = [];
+        const errors: CheckProductResultItem[] = [];
+
+        const [probeId, ...restIds] = accountIds;
+
+        try {
+            const result = await this.processSingleAccountForNode(probeId, productId, ordersTodayMap[probeId] || 0);
+            if (result) results.push(result);
+        } catch (e: any) {
+            if (this.isNotFound404(e)) {
+                throw new NotFoundException('Не найден продукт');
+            }
+            const errorText = this.extractErrorMessage(e);
+            errors.push({ accountId: probeId, error: errorText });
+        }
+
+        const worker = async (accountId: string): Promise<void> => {
+            try {
+                const result = await this.processSingleAccountForNode(accountId, productId, ordersTodayMap[accountId] || 0);
+                if (result) results.push(result);
+            } catch (err: any) {
+                const errorText = this.extractErrorMessage(err);
+                errors.push({ accountId, error: errorText });
+            }
+        };
+
+        for (let i = 0; i < restIds.length; i += this.MAX_CONCURRENCY) {
+            const slice = restIds.slice(i, i + this.MAX_CONCURRENCY);
+            await Promise.all(slice.map(id => worker(id)));
+        }
+
+        return {
+            ok: true,
+            productId,
+            processed: accountIds.length,
+            results,
+            errors,
+        };
+    }
+
+    /**
+     * Единая логика обработки одного аккаунта.
+     * Запрашивает продукт и баланс бонусов параллельно для ускорения.
+     */
+    private async processSingleAccountForNode(
+        accountId: string,
+        productId: string,
+        ordersToday: number,
+    ): Promise<CheckProductResultItem | null> {
+        // 1. Получаем продукт
+        const productRes = await this.accountService.getProductById(accountId, productId);
+        const product = productRes?.product;
+
+        if (!product?.id) {
+            throw new Error('NO_PRODUCT_DATA');
+        }
+
+        if (!this.hasMyDiscountInDiscountList(product)) {
+            return null;
+        }
+
+        let bonusCount = 0;
+        try {
+            const short = await this.accountService.shortInfo(accountId);
+            bonusCount = short.bonusCount || 0;
+        } catch (e) {}
+
+        return this.buildResult(product, accountId, bonusCount, ordersToday);
+    }
+
+    private extractErrorMessage(err: any): string {
+        if (this.isBadRequest400(err)) {
+            return err?.response?.data?.message ?? 'Ошибка аккаунта (400)';
+        }
+        return err?.response?.data?.message ?? err?.message ?? 'UNKNOWN_ERROR';
+    }
+
+    private getHttpStatus(err: any): number | undefined {
+        return err?.response?.status ?? err?.response?.data?.statusCode;
+    }
+
+    private isBadRequest400(err: any): boolean {
+        return this.getHttpStatus(err) === 400;
+    }
+
+    private isNotFound404(err: any): boolean {
+        const status = this.getHttpStatus(err);
+        const msg = err?.response?.data?.message ?? err?.message;
+        return status === 404 || msg === 'PRODUCT_NOT_FOUND';
+    }
+
+    private hasMyDiscountInDiscountList(p: ProductApiResponse['product']): boolean {
+        const list = p?.personalPrice?.discountList ?? [];
+        return list.some(x => x?.actionName?.toLowerCase() === 'моя скидка');
+    }
+
+    private mapBonuses(p: ProductApiResponse['product']): number {
+        const list = p?.personalPrice?.discountList ?? [];
+        const item = list.find(x => x?.actionName?.toLowerCase() === 'оплата бонусами');
+        const raw = item?.summa?.value;
+        // Безопасное преобразование
+        return raw ? Number(raw) / 100 : 0;
+    }
+
+    private mapProduct(p: ProductApiResponse['product']) {
+        const rawPrice = p?.personalPrice?.price?.value;
+        const priceOnKassa = rawPrice ? Number(rawPrice) / 100 : 0;
+
+        const percentMyDiscount = this.calcPercent(p);
+
+        return {
+            priceOnKassa,
+            percentMyDiscount,
+            bonusAmount: this.mapBonuses(p),
+        };
+    }
+
+    private calcPercent(p: ProductApiResponse['product']): number {
+        const list = p?.personalPrice?.discountList ?? [];
+        const value = list.find(x => x?.actionName?.toLowerCase() === 'моя скидка');
+
+        const catalogVal = Number(p.price.catalog.value);
+        if (!value || !catalogVal) return 0;
+
+        const summaDiscount = Number(value.summa.value) / 100;
+        const priceCatalog = catalogVal / 100;
+
+        return Number(((summaDiscount / priceCatalog) * 100).toFixed(1));
+    }
+
+    private buildResult(
+        p: ProductApiResponse['product'],
+        accountId: string,
+        bonuses: number,
+        ordersToday: number = 0,
+    ): CheckProductResultItem {
+        const product = this.mapProduct(p);
+        const info = {
+            bonuses,
+            ordersToday,
+            product,
+        };
+
+        return {
+            accountId,
+            info,
+        };
+    }
 }
