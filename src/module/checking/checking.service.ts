@@ -46,7 +46,7 @@ export class CheckingService {
         private userService: UserService,
         private readonly publisher: DelayedPublisher,
         private readonly cacheService: RedisCacheService,
-    ) {}
+    ) { }
 
     //принимает с контроллера входящие аккаунты, сейвит в очередь на нарезку под прокси chunkingAccountForProxy
     async queueAccountsForPersonalDiscountV1(data: SetPersonalDiscountAccountRequestDto): Promise<{
@@ -600,7 +600,7 @@ export class CheckingService {
         const ordersTodayMap = await this.orderService.countTodayByAccountIds(accountIds);
 
         // 3. бонусы (map accountId -> bonusCount)
-        const bonusMap = await this.accountRep.getBonusCountByAccountIds(accountIds);
+        const bonusMap = await this.accountService.getBonusCountByAccountIds(accountIds);
 
         // 4. собрать итоговый список
         const accounts: PreparedAccountInfo[] = accountIds.map(accountId => ({

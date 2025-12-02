@@ -17,7 +17,7 @@ export class AccountDiscountService {
     constructor(
         private readonly accountDiscountRepository: AccountDiscountRepository,
         private readonly cacheService: RedisCacheService,
-    ) {}
+    ) { }
 
     async upsertNodeDiscount(node: UpsertNodeDiscountInput) {
         return this.accountDiscountRepository.upsertNodeDiscount(node);

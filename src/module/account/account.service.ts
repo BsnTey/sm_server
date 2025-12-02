@@ -79,7 +79,7 @@ export class AccountService {
     private adminsId: string[] = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
     private durationTimeProxyBlock = this.configService.getOrThrow('TIME_DURATION_PROXY_BLOCK_IN_MIN');
 
-    private TTL_CASH_ACCOUNT = 60;
+    private TTL_CASH_ACCOUNT = 5000;
 
     constructor(
         private configService: ConfigService,
@@ -1289,5 +1289,31 @@ export class AccountService {
 
         const response = await this.httpService.delete<ProfileFamilyResponse>(url, httpOptions);
         return response.data;
+    }
+
+    async getBonusCountByAccountIds(accountIds: string[]): Promise<Record<string, number>> {
+        if (!accountIds?.length) return {};
+
+        const result: Record<string, number> = {};
+        const missedAccountIds: string[] = [];
+
+        // Try to get bonus from cache
+        for (const accountId of accountIds) {
+            const key = getAccountEntityKey(accountId);
+            const cachedEntity = await this.cacheService.get<AccountWithProxyEntity>(key);
+
+            if (cachedEntity) {
+                result[accountId] = cachedEntity.bonusCount;
+            } else {
+                missedAccountIds.push(accountId);
+            }
+        }
+
+        if (missedAccountIds.length > 0) {
+            const bonusMapFromDb = await this.accountRep.getBonusCountByAccountIds(missedAccountIds);
+            Object.assign(result, bonusMapFromDb);
+        }
+
+        return result;
     }
 }
