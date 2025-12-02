@@ -16,6 +16,9 @@ import { TelegramService } from '../telegram/telegram.service';
 import { ProductBatchSaver } from './utils/product-batch-saver';
 import { PersonalDiscount } from '../account/interfaces/personal-discount.interface';
 import { DeleteAccountRequestDto } from './dto/delete-account.dto';
+import { PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
+import { PreparedAccountInfo } from './interfaces/extend-chrome.interface';
+import { OrderService } from '../order/order.service';
 
 interface AccountProxyItem {
     accountId: string;
@@ -26,7 +29,7 @@ interface AccountProxyItem {
 export class CheckingService {
     private readonly logger = new Logger(CheckingService.name);
 
-    private TTL_NODE_INPUT = 80_000_000;
+    private TTL_NODE_INPUT = 1000;
     private readonly MAX_CONCURRENCY = 5;
     private readonly RABBIT_THREADS = 3; // Количество параллельных потоков RabbitMQ
     private readonly PRODUCT_WRITE_CONCURRENCY = 5;
@@ -39,6 +42,7 @@ export class CheckingService {
         private accountService: AccountService,
         private telegramService: TelegramService,
         private accountDiscountService: AccountDiscountService,
+        private orderService: OrderService,
         private userService: UserService,
         private readonly publisher: DelayedPublisher,
         private readonly cacheService: RedisCacheService,
@@ -576,33 +580,38 @@ export class CheckingService {
     //         calculateProduct,
     //     };
     // }
-    //
-    // async prepareAccountsForProductCheckV1({ telegramId, nodeId }: PrepareProductCheckRequestDto): Promise<{
-    //     accounts: PreparedAccountInfo[];
-    // }> {
-    //     // 1. аккаунты по телеграму и ноде
-    //     const accountIds = await this.accountDiscountRepo.findAccountIdsByTelegramAndNodes(telegramId, nodeId);
-    //
-    //     if (!accountIds?.length) {
-    //         return { accounts: [] };
-    //     }
-    //
-    //     // 2. заказы за сегодня (map accountId -> count)
-    //     const ordersTodayMap = await this.orderRepository.countTodayByAccountIds(accountIds);
-    //
-    //     // 3. бонусы (map accountId -> bonusCount)
-    //     const bonusMap = await this.accountRep.getBonusCountByAccountIds(accountIds);
-    //
-    //     // 4. собрать итоговый список
-    //     const accounts: PreparedAccountInfo[] = accountIds.map(accountId => ({
-    //         accountId,
-    //         bonus: bonusMap[accountId] ?? 0,
-    //         ordersNumber: ordersTodayMap[accountId] ?? 0,
-    //     }));
-    //
-    //     return { accounts };
-    // }
-    //
+
+    async prepareAccountsForProductCheckV1({ telegramId, nodeId }: PrepareProductCheckRequestDto): Promise<{
+        accounts: PreparedAccountInfo[];
+    }> {
+        const user = await this.userService.getUserByTelegramId(telegramId);
+        if (!user) {
+            throw new NotFoundException('Пользователь не найден');
+        }
+
+        // 1. аккаунты по телеграму и ноде
+        const accountIds = await this.accountDiscountService.findAccountIdsByTelegramAndNodes(telegramId, nodeId);
+
+        if (!accountIds?.length) {
+            return { accounts: [] };
+        }
+
+        // 2. заказы за сегодня (map accountId -> count)
+        const ordersTodayMap = await this.orderService.countTodayByAccountIds(accountIds);
+
+        // 3. бонусы (map accountId -> bonusCount)
+        const bonusMap = await this.accountRep.getBonusCountByAccountIds(accountIds);
+
+        // 4. собрать итоговый список
+        const accounts: PreparedAccountInfo[] = accountIds.map(accountId => ({
+            accountId,
+            bonus: bonusMap[accountId] ?? 0,
+            ordersNumber: ordersTodayMap[accountId] ?? 0,
+        }));
+
+        return { accounts };
+    }
+
     // private getHttpStatus(err: any): number | undefined {
     //     return err?.response?.status ?? err?.response?.data?.statusCode;
     // }

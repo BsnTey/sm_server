@@ -49,6 +49,7 @@ import { Context } from '../../interfaces/telegram.context';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { RedisCacheService } from '../../../cache/cache.service';
 import { OrderState } from '../../interfaces/order.interface';
+import { OrderService } from '../../../order/order.service';
 
 const ORDER_TTL = 3600 * 2;
 
@@ -755,6 +756,7 @@ export class OrderGetOrders {
 
     constructor(
         private accountService: AccountService,
+        private orderService: OrderService,
         private telegramService: TelegramService,
         private configService: ConfigService,
         private cacheService: RedisCacheService,
@@ -765,7 +767,7 @@ export class OrderGetOrders {
         const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
         if (!account) return ctx.reply('Сессия истекла.');
 
-        const orders = await this.accountService.orderHistory(account.accountId);
+        const orders = await this.orderService.orderHistory(account.accountId);
         const keyboard = orderHistoryKeyboard(orders);
         const text = 'Имеющиеся заказы на аккаунте:';
         try {

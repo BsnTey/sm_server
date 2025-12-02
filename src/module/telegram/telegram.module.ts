@@ -58,6 +58,7 @@ import { CalculateModule } from '../calculate/calculate.module';
 import { BottModule } from '../bott/bott.module';
 import { TemplateModule } from '../template/template.module';
 import { MyDiscountUpdate } from './updates/myDiscount/myDiscount.update';
+import { OrderModule } from '../order/order.module';
 
 @Module({
     imports: [
@@ -72,6 +73,7 @@ import { MyDiscountUpdate } from './updates/myDiscount/myDiscount.update';
         CalculateModule,
         BottModule,
         TemplateModule,
+        OrderModule,
     ],
     providers: [
         TelegramService,

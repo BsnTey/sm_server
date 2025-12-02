@@ -19,6 +19,49 @@ export class RedisCacheService {
         return true;
     }
 
+    async setUntilEndOfDay<T>(key: string, value: T) {
+        const ttlSeconds = this.getSecondsUntilEndOfDayMsk();
+        const stringify = JSON.stringify(value);
+        await this.client.set(key, stringify, { EX: ttlSeconds });
+    }
+
+    async mget(keys: string[]): Promise<(string | null)[]> {
+        if (keys.length === 0) return [];
+        return this.client.mGet(keys);
+    }
+
+    /**
+     * Сохраняет множество ключей с одинаковым TTL (до конца дня по МСК)
+     */
+    async msetUntilEndOfDay(items: Record<string, any>) {
+        const keys = Object.keys(items);
+        if (keys.length === 0) return;
+
+        const ttlSeconds = this.getSecondsUntilEndOfDayMsk();
+        const multi = this.client.multi();
+
+        for (const [key, value] of Object.entries(items)) {
+            multi.set(key, JSON.stringify(value), { EX: ttlSeconds });
+        }
+
+        await multi.exec();
+    }
+
+    /**
+     * Вспомогательный метод для расчета секунд до полуночи по Москве
+     */
+    private getSecondsUntilEndOfDayMsk(): number {
+        const now = new Date();
+
+        const moscowTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
+
+        const nextMidnightMsk = new Date(moscowTime);
+        nextMidnightMsk.setDate(nextMidnightMsk.getDate() + 1);
+        nextMidnightMsk.setHours(0, 0, 0, 0);
+
+        return Math.max(1, Math.floor((nextMidnightMsk.getTime() - moscowTime.getTime()) / 1000));
+    }
+
     async get<T extends object>(key: string): Promise<T | null> {
         const result = await this.client.get(key);
         return result ? (JSON.parse(result) as T) : null;

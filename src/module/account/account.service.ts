@@ -11,7 +11,7 @@ import {
     IRefreshAccount,
     ResolvedCity,
 } from './interfaces/account.interface';
-import { CitySM, CourseStatus, LessonStatus, Order } from '@prisma/client';
+import { CitySM, CourseStatus, LessonStatus } from '@prisma/client';
 import { ProxyService } from '../proxy/proxy.service';
 import {
     ERROR_ACCESS_TOKEN_COURSE,
@@ -69,6 +69,7 @@ import { Cookie } from './interfaces/cookie.interface';
 import { Products } from './interfaces/products.interface';
 import { RetryOnProxyError } from './decorators/retry-on-proxy-error.decorator';
 import { RedisCacheService } from '../cache/cache.service';
+import { getAccountEntityKey } from '../cache/cache.keys';
 
 @Injectable()
 export class AccountService {
@@ -78,7 +79,7 @@ export class AccountService {
     private adminsId: string[] = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
     private durationTimeProxyBlock = this.configService.getOrThrow('TIME_DURATION_PROXY_BLOCK_IN_MIN');
 
-    private TTL_CASH_ACCOUNT = 20_000;
+    private TTL_CASH_ACCOUNT = 60;
 
     constructor(
         private configService: ConfigService,
@@ -231,10 +232,6 @@ export class AccountService {
 
     async findAccountByEmail(email: string) {
         return await this.accountRep.getEmail(email);
-    }
-
-    async findOrderNumber(orderNumber: string) {
-        return await this.accountRep.getOrder(orderNumber);
     }
 
     async setBanMp(accountId: string) {
@@ -400,10 +397,6 @@ export class AccountService {
         return `${part1}:${part2}:${part3}`;
     }
 
-    async addOrder(accountId: string, orderNumber: string, date: Date = new Date()): Promise<Order> {
-        return this.accountRep.addOrderNumber(accountId, orderNumber, date);
-    }
-
     async openForceRefresh(accountId: string) {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         await this.refreshForValidation(accountWithProxyEntity);
@@ -560,29 +553,34 @@ export class AccountService {
     }
 
     async getProxyUuid(accountId: string): Promise<string | null> {
-        const accountWithProxy = await this.accountRep.getAccountWithProxy(accountId);
-
-        if (!accountWithProxy) return null;
-
-        const entity = await this.getAndValidateOrSetProxyAccount(accountWithProxy);
-        return entity.proxy.uuid;
+        try {
+            const accountWithProxy = await this.rawLoadAccountCore(accountId);
+            return accountWithProxy.proxy.uuid;
+        } catch (e) {
+            return null;
+        }
     }
 
-    private async loadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
+    async rawLoadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
         const accountWithProxy = await this.accountRep.getAccountWithProxy(accountId);
 
         if (!accountWithProxy) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
 
-        const entity = await this.getAndValidateOrSetProxyAccount(accountWithProxy);
-        await this.validationToken(entity);
-        return entity;
+        return this.getAndValidateOrSetProxyAccount(accountWithProxy);
+    }
+
+    private async loadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
+        const accountWithProxy = await this.rawLoadAccountCore(accountId);
+        await this.validationToken(accountWithProxy);
+        return accountWithProxy;
     }
 
     async getAccountEntity(accountId: string): Promise<AccountWithProxyEntity> {
         const accountEntityFromCache = await this.cacheService.get<AccountWithProxyEntity>(accountId);
         if (!accountEntityFromCache) {
             const account = await this.loadAccountCore(accountId);
-            await this.cacheService.set(accountId, account, this.TTL_CASH_ACCOUNT);
+            const key = getAccountEntityKey(accountId);
+            await this.cacheService.set(key, account, this.TTL_CASH_ACCOUNT);
             return account;
         }
         return accountEntityFromCache;
@@ -630,7 +628,8 @@ export class AccountService {
 
         if (account.cityId !== city.cityId) {
             await this.setCityToAccount(accountId, city.cityId);
-            await this.cacheService.del(accountId);
+            const key = getAccountEntityKey(accountId);
+            await this.cacheService.del(key);
         }
 
         return city;
@@ -695,6 +694,8 @@ export class AccountService {
     async shortInfo(accountId: string): Promise<ShortInfoInterface> {
         const { response, account } = await this.shortInfoPrivate(accountId);
         await this.updateAccountBonusCountPrivate(accountId, response.info.totalAmount);
+        const key = getAccountEntityKey(accountId);
+        await this.cacheService.del(key);
         return {
             bonusCount: response.info.totalAmount,
             qrCode: response.info.clubCard.qrCode,
@@ -1033,43 +1034,9 @@ export class AccountService {
         return response.data.data.cart.version;
     }
 
-    async orderHistory(accountId: string) {
-        const data = await this.orderHistoryPrivate(accountId);
-        const orders = data?.data?.orders ?? [];
-        if (!Array.isArray(orders) || orders.length === 0) return data;
-
-        const byNumber = new Map<string, any>();
-        for (const o of orders) {
-            if (o?.number) byNumber.set(o.number, o);
-        }
-
-        // Парсер ISO-даты из API -> Date | undefined
-        const parseOrderDate = (raw: unknown): Date | undefined => {
-            if (typeof raw !== 'string') return undefined;
-            const d = new Date(raw);
-            return isNaN(d.getTime()) ? undefined : d;
-        };
-
-        const tasks = Array.from(byNumber.values()).map(async (order: any) => {
-            const orderNumber = order?.number as string | undefined;
-            if (!orderNumber) return;
-
-            const orderDate = parseOrderDate(order?.date);
-
-            try {
-                await this.addOrder(accountId, orderNumber, orderDate);
-            } catch (err) {
-                //ignore
-            }
-        });
-
-        await Promise.allSettled(tasks);
-        return data;
-    }
-
     @RetryOn401()
     @RetryOnProxyError()
-    private async orderHistoryPrivate(accountId: string): Promise<OrdersInterface> {
+    async orderHistory(accountId: string): Promise<OrdersInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v3/orderHistory`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);

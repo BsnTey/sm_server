@@ -6,9 +6,10 @@ import { TelegramModule } from '../telegram/telegram.module';
 import { AccountDiscountService } from './account-discount.service';
 import { AccountModule } from '../account/account.module';
 import { AccountDiscountRepository } from './account-discount.repository';
+import { OrderModule } from '../order/order.module';
 
 @Module({
-    imports: [UserModule, TelegramModule, AccountModule],
+    imports: [UserModule, TelegramModule, AccountModule, OrderModule],
     providers: [CheckingService, AccountDiscountService, AccountDiscountRepository],
     controllers: [CheckingController],
     exports: [CheckingService],

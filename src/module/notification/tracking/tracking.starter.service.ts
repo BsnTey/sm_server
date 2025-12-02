@@ -5,6 +5,7 @@ import { StartOrderTrackingRequestDto } from '../dto/start-order-tracking.dto';
 import { UserService } from '../../user/user.service';
 import { TrackOrderJob } from './tracking.types';
 import { AccountService } from '../../account/account.service';
+import { OrderService } from '../../order/order.service';
 
 @Injectable()
 export class TrackingStarterService {
@@ -13,6 +14,7 @@ export class TrackingStarterService {
     constructor(
         private readonly publisher: DelayedPublisher,
         private readonly accounts: AccountService,
+        private readonly orderService: OrderService,
         private readonly users: UserService,
     ) {}
 
@@ -32,7 +34,7 @@ export class TrackingStarterService {
 
         // первая проверка—через 5 секунд
         await this.publisher.publish(RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE, job, 5_000);
-        await this.accounts.orderHistory(dto.accountId);
+        await this.orderService.orderHistory(dto.accountId);
 
         return { accepted: true };
     }

@@ -12,7 +12,7 @@ import { RedisCacheService } from '../cache/cache.service';
 
 @Injectable()
 export class AccountDiscountService {
-    private TTL_CASH_DISCOUNT = 10_800_000;
+    private TTL_CASH_DISCOUNT = 3_600;
 
     constructor(
         private readonly accountDiscountRepository: AccountDiscountRepository,
@@ -82,6 +82,10 @@ export class AccountDiscountService {
         await this.cacheService.set(key, nodes, this.TTL_CASH_DISCOUNT);
 
         return { nodes };
+    }
+
+    async findAccountIdsByTelegramAndNodes(telegramId: string, nodeIds: string[]): Promise<string[]> {
+        return this.accountDiscountRepository.findAccountIdsByTelegramAndNodes(telegramId, nodeIds);
     }
 
     /**

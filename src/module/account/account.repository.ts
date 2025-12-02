@@ -74,12 +74,6 @@ export class AccountRepository {
         });
     }
 
-    async getOrder(orderNumber: string): Promise<Order | null> {
-        return this.prisma.order.findFirst({
-            where: { orderNumber },
-        });
-    }
-
     async getAccountWithProxy(accountId: string): Promise<IAccountWithProxyFromDB | null> {
         return this.prisma.account.findUnique({
             where: { accountId },
@@ -356,20 +350,6 @@ export class AccountRepository {
         await this.prisma.citySM.update({
             where: { cityId },
             data: { xLocation },
-        });
-    }
-
-    async addOrderNumber(accountId: string, orderNumber: string, date: Date): Promise<Order> {
-        return this.prisma.order.upsert({
-            where: { orderNumber },
-            create: {
-                orderNumber,
-                accountId,
-                date,
-            },
-            update: {
-                date,
-            },
         });
     }
 

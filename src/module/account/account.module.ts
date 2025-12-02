@@ -9,26 +9,20 @@ import { CourseService } from './course.service';
 import { CourseRepository } from './course.repository';
 import { DeviceInfoService } from './deviceInfo.service';
 import { DeviceInfoRepository } from './deviceInfo.repository';
-import { AccountDiscountRepository } from '../checking/account-discount.repository';
 import { CalculateModule } from '../calculate/calculate.module';
-import { OrderRepository } from './order.repository';
-import { AccountDiscountService } from '../checking/account-discount.service';
 
 @Module({
     controllers: [AccountController],
     providers: [
         AccountService,
         AccountRepository,
-        AccountDiscountRepository,
         SportmasterHeadersService,
         CourseService,
         CourseRepository,
-        OrderRepository,
         DeviceInfoService,
         DeviceInfoRepository,
-        AccountDiscountService,
     ],
-    exports: [AccountService, SportmasterHeadersService, CourseService, AccountDiscountService],
+    exports: [AccountService, SportmasterHeadersService, CourseService],
     imports: [ProxyModule, HttpModule, CalculateModule],
 })
 export class AccountModule {}

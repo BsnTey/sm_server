@@ -5,6 +5,7 @@ import { AxiosError } from 'axios';
 import { addDays, isBefore, parseISO } from 'date-fns';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { OrderService } from '../../../order/order.service';
 
 interface IOutputBonusDate {
     amount: number;
@@ -21,7 +22,10 @@ interface IBonusDetail {
 export class CheckingService {
     private readonly TIMEOUT = 15000;
 
-    constructor(private readonly accountService: AccountService) {}
+    constructor(
+        private readonly accountService: AccountService,
+        private readonly orderService: OrderService,
+    ) {}
 
     async checkingAccounts(accounts: string[]): Promise<string[]> {
         return this.checkAccounts(accounts, this.processCheckingAccount.bind(this));
@@ -80,7 +84,7 @@ export class CheckingService {
 
         try {
             const { bonusCount, bonusDetails } = await this.accountService.shortInfo(trimmedAccountId);
-            await this.accountService.orderHistory(trimmedAccountId);
+            await this.orderService.orderHistory(trimmedAccountId);
             let result = `${trimmedAccountId}: ${bonusCount}`;
             const uniqueBonuses = new Set<string>();
 

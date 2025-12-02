@@ -162,17 +162,17 @@ export class AccountDiscountRepository {
         });
         return rows.map(r => r.accountId);
     }
-    //
-    // async findAccountIdsByTelegramAndNodes(telegramId: string, nodeIds: string[]): Promise<string[]> {
-    //     if (!nodeIds?.length) return [];
-    //     const rows = await this.prisma.accountDiscount.findMany({
-    //         where: { telegramId, nodeId: { in: nodeIds } },
-    //         select: { accountId: true },
-    //         distinct: ['accountId'],
-    //     });
-    //     return rows.map(r => r.accountId);
-    // }
-    //
+
+    async findAccountIdsByTelegramAndNodes(telegramId: string, nodeIds: string[]): Promise<string[]> {
+        if (!nodeIds?.length) return [];
+        const rows = await this.prisma.accountDiscount.findMany({
+            where: { telegramId, nodeId: { in: nodeIds } },
+            select: { accountId: true },
+            distinct: ['accountId'],
+        });
+        return rows.map(r => r.accountId);
+    }
+
     // //функции для нового поиска
     // async findAccountsByTelegramUser(telegramId: string) {
     //     const records = await this.prisma.accountDiscountProduct.findMany({
