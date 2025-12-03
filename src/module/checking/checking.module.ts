@@ -7,9 +7,10 @@ import { AccountDiscountService } from './account-discount.service';
 import { AccountModule } from '../account/account.module';
 import { AccountDiscountRepository } from './account-discount.repository';
 import { OrderModule } from '../order/order.module';
+import { CalculateModule } from '../calculate/calculate.module';
 
 @Module({
-    imports: [UserModule, TelegramModule, AccountModule, OrderModule],
+    imports: [UserModule, TelegramModule, AccountModule, OrderModule, CalculateModule],
     providers: [CheckingService, AccountDiscountService, AccountDiscountRepository],
     controllers: [CheckingController],
     exports: [CheckingService],

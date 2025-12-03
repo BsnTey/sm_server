@@ -1,11 +1,11 @@
 import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { List, Products } from '../account/interfaces/products.interface';
-import { chunk, requestWithBackoff, startOfNextDayUTC } from './utils/set-products.utils';
+import { chunk, cmp, requestWithBackoff, startOfNextDayUTC } from './utils/set-products.utils';
 import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discount.dto';
 import { TgPersonalDiscountDto } from './dto/tg-personal-discount.dto';
 import { RABBIT_MQ_QUEUES } from '@common/broker/rabbitmq.queues';
 import { AccountDiscountsToInsert, NodeAccountDiscount, UpsertNodeDiscountInput } from './interfaces/account-discount.interface';
-import { keyNodeInput } from './cache-key/key';
+import { keyNodeInput, keyProductInfo } from './cache-key/key';
 import { DelayedPublisher } from '@common/broker/delayed.publisher';
 import { RedisCacheService } from '../cache/cache.service';
 import { AccountService } from '../account/account.service';
@@ -15,12 +15,12 @@ import { AccountDiscountService } from './account-discount.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { ProductBatchSaver } from './utils/product-batch-saver';
 import { PersonalDiscount } from '../account/interfaces/personal-discount.interface';
-import { DeleteAccountRequestDto } from './dto/delete-account.dto';
 import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
 import { PreparedAccountInfo } from './interfaces/extend-chrome.interface';
 import { OrderService } from '../order/order.service';
-import { CheckProductResultItem, Product } from './interfaces/my-discount.interface';
+import { CashedProduct, CheckProductResultItem, ResponseCheckProduct } from './interfaces/my-discount.interface';
 import { ProductApiResponse } from '../account/interfaces/product.interface';
+import { CalculateService } from '../calculate/calculate.service';
 
 interface AccountProxyItem {
     accountId: string;
@@ -33,11 +33,8 @@ export class CheckingService {
 
     private TTL_NODE_INPUT = 1000;
     private readonly MAX_CONCURRENCY = 5;
-    private readonly RABBIT_THREADS = 3; // Количество параллельных потоков RabbitMQ
-    private readonly PRODUCT_WRITE_CONCURRENCY = 5;
+    private readonly RABBIT_THREADS = 3;
     private readonly PAGE_SIZE = 100;
-    private readonly DB_CHUNK = 200;
-    private readonly PERSONAL_DISCOUNT_BATCH_SIZE = 5;
     private readonly PERSONAL_DISCOUNT_RATE_SECONDS = 80;
 
     constructor(
@@ -46,6 +43,7 @@ export class CheckingService {
         private accountDiscountService: AccountDiscountService,
         private orderService: OrderService,
         private userService: UserService,
+        private calculateService: CalculateService,
         private readonly publisher: DelayedPublisher,
         private readonly cacheService: RedisCacheService,
     ) {}
@@ -115,7 +113,7 @@ export class CheckingService {
         const { telegramId, personalDiscounts } = data;
 
         // 1. ЕДИНАЯ ТОЧКА ВХОДА: Получаем уже готовые, нарезанные чанки
-        const finalBatches = await this.createDistributionPlan(personalDiscounts);
+        const finalBatches = await this.createDistributionPlan(personalDiscounts, this.RABBIT_THREADS);
 
         // 2. Отправка (Transport Logic)
         const total = finalBatches.length;
@@ -138,14 +136,14 @@ export class CheckingService {
      * ОРКЕСТРАТОР: Фасад для подготовки данных.
      * Принимает сырые ID, возвращает готовую матрицу распределения.
      */
-    private async createDistributionPlan(accountIds: string[]): Promise<string[][]> {
+    private async createDistributionPlan(accountIds: string[], threads: number): Promise<string[][]> {
         // Шаг А: Обогащение данных (I/O операция)
         const accountProxies = await this.resolveProxiesForAccounts(accountIds);
 
         // Шаг Б: Алгоритмическое распределение (CPU операция)
         return this.distributeAccountsToChunks(
             accountProxies,
-            this.RABBIT_THREADS, // Шаг "прыжка" (кол-во потоков)
+            threads, // Шаг "прыжка" (кол-во потоков)
             this.MAX_CONCURRENCY, // Размер чанка
         );
     }
@@ -540,12 +538,10 @@ export class CheckingService {
         }
     }
 
-    //
-    //
-    // async getUserAccountIdsV2(telegramId: string): Promise<{ accountIds: string[] }> {
-    //     const accountIds = await this.accountDiscountRepo.findAccountsByTelegramUser(telegramId);
-    //     return { accountIds };
-    // }
+    async getUserAccountIdsV2(telegramId: string): Promise<{ accountIds: string[] }> {
+        const accountIds = await this.accountDiscountService.findAccountsByTelegramUser(telegramId);
+        return { accountIds };
+    }
 
     async prepareAccountsForProductCheckV1({ telegramId, nodeId }: PrepareProductCheckRequestDto): Promise<{
         accounts: PreparedAccountInfo[];
@@ -578,126 +574,114 @@ export class CheckingService {
         return { accounts };
     }
 
-    // async getAccountsForPersonalDiscountV2(
-    //     telegramId: string,
-    //     productId: string,
-    // ): Promise<{
-    //     ok: boolean;
-    //     product: { productId: string; node: string | null; percent: number };
-    //     processed: number;
-    //     results: PreparedAccountInfo[];
-    //     errors: ErrorItem[];
-    // }> {
-    //     // --- 1) Находим product + node ---
-    //     const info = await this.productService.getProductInfoWithProduct({
-    //         productId,
-    //     });
-    //
-    //     const node = info?.product?.node ?? null;
-    //     const percent = extractPercentFromNode(node);
-    //
-    //     const productObj = {
-    //         productId,
-    //         node,
-    //         percent,
-    //     };
-    //
-    //     // --- 2) Ищем аккаунты, на которых есть скидка по этому продукту ---
-    //     const accountIds = await this.accountDiscountRepo.findAccountsForProduct(telegramId, productId);
-    //
-    //     if (!accountIds.length) {
-    //         return {
-    //             ok: true,
-    //             product: productObj,
-    //             processed: 0,
-    //             results: [],
-    //             errors: [],
-    //         };
-    //     }
-    //
-    //     // --- 3) Предзагрузка бонусов и заказов ---
-    //     const [ordersTodayMap, bonusMap] = await Promise.all([
-    //         this.orderRepository.countTodayByAccountIds(accountIds),
-    //         this.accountRep.getBonusCountByAccountIds(accountIds),
-    //     ]);
-    //
-    //     const accounts: PreparedAccountInfo[] = accountIds.map(accountId => ({
-    //         accountId,
-    //         bonus: bonusMap[accountId] ?? 0,
-    //         ordersNumber: ordersTodayMap[accountId] ?? 0,
-    //     }));
-    //
-    //     accounts.sort(cmp);
-    //
-    //     const errors: ErrorItem[] = [];
-    //     const MAX_ROUNDS = 3;
-    //
-    //     // --- 4) Обновляем bonus у топ-3 для повышения точности сортировки ---
-    //     for (let round = 1; round <= MAX_ROUNDS; round++) {
-    //         const topN = Math.min(3, accounts.length);
-    //         if (topN === 0) break;
-    //
-    //         const topSlice = accounts.slice(0, topN);
-    //         const checks = await Promise.allSettled(topSlice.map(a => this.shortInfo(a.accountId)));
-    //
-    //         let mismatches = 0;
-    //
-    //         checks.forEach((res, idx) => {
-    //             const acc = topSlice[idx];
-    //             if (res.status === 'fulfilled') {
-    //                 const freshBonus = Number(res.value?.bonusCount ?? 0);
-    //
-    //                 if (Number.isFinite(freshBonus)) {
-    //                     if (freshBonus !== acc.bonus) mismatches++;
-    //
-    //                     const target = accounts.find(x => x.accountId === acc.accountId);
-    //                     if (target) target.bonus = freshBonus;
-    //                 }
-    //             } else {
-    //                 const msg = res.reason?.response?.data?.message ?? res.reason?.message ?? 'SHORTINFO_ERROR';
-    //
-    //                 errors.push({ accountId: acc.accountId, error: msg });
-    //             }
-    //         });
-    //
-    //         if (mismatches >= 2 && round < MAX_ROUNDS) {
-    //             accounts.sort(cmp);
-    //             continue;
-    //         }
-    //
-    //         break;
-    //     }
-    //
-    //     accounts.sort(cmp);
-    //
-    //     return {
-    //         ok: true,
-    //         product: productObj,
-    //         processed: accountIds.length,
-    //         results: accounts,
-    //         errors,
-    //     };
-    // }
+    async getAccountsForPersonalDiscountV3(
+        telegramId: string,
+        productId: string,
+    ): Promise<{
+        data: ResponseCheckProduct;
+    }> {
+        const accountIds = await this.accountDiscountService.findAccountsForProduct(telegramId, productId);
+
+        const results: CheckProductResultItem[] = [];
+        // --- Предзагрузка бонусов и заказов ---
+        const [ordersTodayMap, bonusMap] = await Promise.all([
+            this.orderService.countTodayByAccountIds(accountIds),
+            this.accountService.getBonusCountByAccountIds(accountIds),
+        ]);
+
+        const accounts: PreparedAccountInfo[] = accountIds.map(accountId => ({
+            accountId,
+            bonus: bonusMap[accountId] ?? 0,
+            ordersNumber: ordersTodayMap[accountId] ?? 0,
+        }));
+
+        accounts.sort(cmp);
+
+        const MAX_ROUNDS = 3;
+
+        // --- Обновляем bonus у топ-3 для повышения точности сортировки ---
+        for (let round = 1; round <= MAX_ROUNDS; round++) {
+            const topN = Math.min(3, accounts.length);
+            if (topN === 0) break;
+
+            const topSlice = accounts.slice(0, topN);
+            const checks = await Promise.allSettled(topSlice.map(a => this.accountService.shortInfo(a.accountId)));
+
+            let mismatches = 0;
+
+            checks.forEach((res, idx) => {
+                const acc = topSlice[idx];
+                if (res.status === 'fulfilled') {
+                    const freshBonus = Number(res.value?.bonusCount ?? 0);
+
+                    if (Number.isFinite(freshBonus)) {
+                        if (freshBonus !== acc.bonus) mismatches++;
+
+                        const target = accounts.find(x => x.accountId === acc.accountId);
+                        if (target) target.bonus = freshBonus;
+                    }
+                } else {
+                    const msg = res.reason?.response?.data?.message ?? res.reason?.message ?? 'Ошибка получения количества бонусов';
+
+                    results.push({ accountId: acc.accountId, error: msg });
+                }
+            });
+
+            if (mismatches >= 2 && round < MAX_ROUNDS) {
+                accounts.sort(cmp);
+                continue;
+            }
+
+            break;
+        }
+
+        let cachedProduct = await this.getFromCacheProduct(productId);
+
+        if (!cachedProduct) {
+            const attempts = Math.min(accounts.length, 3);
+
+            for (let i = 0; i < attempts; i++) {
+                try {
+                    const result = await this.accountService.getProductById(accounts[i].accountId, productId);
+
+                    if (result?.product) {
+                        cachedProduct = await this.cashedAndGetProductInfo(result.product);
+                    }
+
+                    if (cachedProduct) {
+                        break;
+                    }
+                } catch (error) {
+                    this.logger.warn(`Attempt ${i + 1} failed for account ${accounts[i].accountId}`);
+                }
+            }
+        }
+
+        accounts.sort(cmp);
+
+        let calcProd = null;
+        if (cachedProduct) {
+            calcProd = cachedProduct.calc;
+        }
+
+        return {
+            data: {
+                accountIds: results,
+                calcProd,
+            },
+        };
+    }
 
     async checkProductBatchForPersonalDiscount({ telegramId, productId, accountIds }: CheckProductBatchRequestDto): Promise<{
-        ok: boolean;
-        productId: string;
-        processed: number;
-        results: CheckProductResultItem[];
-        errors: CheckProductResultItem[];
+        data: ResponseCheckProduct;
     }> {
         const user = await this.userService.getUserByTelegramId(telegramId);
         if (!user) {
             throw new NotFoundException('Пользователь не найден');
         }
 
-        if (!accountIds?.length) {
-            return { ok: true, productId, processed: 0, results: [], errors: [] };
-        }
-
         const ordersTodayMap = await this.orderService.countTodayByAccountIds(accountIds);
         const results: CheckProductResultItem[] = [];
-        const errors: CheckProductResultItem[] = [];
 
         const [probeId, ...restIds] = accountIds;
 
@@ -709,7 +693,7 @@ export class CheckingService {
                 throw new NotFoundException('Не найден продукт');
             }
             const errorText = this.extractErrorMessage(e);
-            errors.push({ accountId: probeId, error: errorText });
+            results.push({ accountId: probeId, error: errorText });
         }
 
         const worker = async (accountId: string): Promise<void> => {
@@ -718,7 +702,7 @@ export class CheckingService {
                 if (result) results.push(result);
             } catch (err: any) {
                 const errorText = this.extractErrorMessage(err);
-                errors.push({ accountId, error: errorText });
+                results.push({ accountId, error: errorText });
             }
         };
 
@@ -727,12 +711,19 @@ export class CheckingService {
             await Promise.all(slice.map(id => worker(id)));
         }
 
+        let calcProd = null;
+        if (accountIds.length > 0) {
+            const calcProdFromCache = await this.getFromCacheProduct(productId);
+            if (calcProdFromCache) {
+                calcProd = calcProdFromCache.calc;
+            }
+        }
+
         return {
-            ok: true,
-            productId,
-            processed: accountIds.length,
-            results,
-            errors,
+            data: {
+                accountIds: results,
+                calcProd,
+            },
         };
     }
 
@@ -745,17 +736,18 @@ export class CheckingService {
         productId: string,
         ordersToday: number,
     ): Promise<CheckProductResultItem | null> {
-        // 1. Получаем продукт
         const productRes = await this.accountService.getProductById(accountId, productId);
         const product = productRes?.product;
 
         if (!product?.id) {
-            throw new Error('NO_PRODUCT_DATA');
+            throw new Error('Нет информации о продукте или не верный productId');
         }
 
         if (!this.hasMyDiscountInDiscountList(product)) {
             return null;
         }
+
+        this.cashedAndGetProductInfo(product);
 
         let bonusCount = 0;
         try {
@@ -796,34 +788,51 @@ export class CheckingService {
         const list = p?.personalPrice?.discountList ?? [];
         const item = list.find(x => x?.actionName?.toLowerCase() === 'оплата бонусами');
         const raw = item?.summa?.value;
-        // Безопасное преобразование
         return raw ? Number(raw) / 100 : 0;
     }
 
     private mapProduct(p: ProductApiResponse['product']) {
         const rawPrice = p?.personalPrice?.price?.value;
-        const priceOnKassa = rawPrice ? Number(rawPrice) / 100 : 0;
-
-        const percentMyDiscount = this.calcPercent(p);
+        const avaliablePriceOnKassa = rawPrice ? Number(rawPrice) / 100 : 0;
 
         return {
-            priceOnKassa,
-            percentMyDiscount,
-            bonusAmount: this.mapBonuses(p),
+            avaliablePriceOnKassa,
+            avaliableBonusForProduct: this.mapBonuses(p),
         };
     }
 
-    private calcPercent(p: ProductApiResponse['product']): number {
-        const list = p?.personalPrice?.discountList ?? [];
-        const value = list.find(x => x?.actionName?.toLowerCase() === 'моя скидка');
+    private getFromCacheProduct(productId: string): Promise<CashedProduct | null> {
+        const key = keyProductInfo(productId);
+        return this.cacheService.get<CashedProduct>(key);
+    }
 
-        const catalogVal = Number(p.price.catalog.value);
-        if (!value || !catalogVal) return 0;
+    private async setToCacheProduct(product: ProductApiResponse['product']): Promise<CashedProduct> {
+        const key = keyProductInfo(product.id);
+        const percentMyDiscount = this.calculateService.calcPercentMyDiscount(product);
 
-        const summaDiscount = Number(value.summa.value) / 100;
-        const priceCatalog = catalogVal / 100;
+        const priceCatalog = +product.price.catalog.value / 100;
+        const priceRetail = +product.price.retail.value / 100;
 
-        return Number(((summaDiscount / priceCatalog) * 100).toFixed(1));
+        const calc = this.calculateService.computeCalculateFromProduct(product, percentMyDiscount);
+
+        const cashedProduct = {
+            priceCatalog,
+            priceRetail,
+            calc,
+            percentMyDiscount,
+        };
+
+        this.cacheService.setUntilEndOfDay(key, cashedProduct);
+
+        return cashedProduct;
+    }
+
+    private async cashedAndGetProductInfo(product: ProductApiResponse['product']): Promise<CashedProduct> {
+        const cached = await this.getFromCacheProduct(product.id);
+        if (!cached) {
+            return this.setToCacheProduct(product);
+        }
+        return cached;
     }
 
     private buildResult(
@@ -834,7 +843,7 @@ export class CheckingService {
     ): CheckProductResultItem {
         const product = this.mapProduct(p);
         const info = {
-            bonuses,
+            bonusesOnAccount: bonuses,
             ordersToday,
             product,
         };

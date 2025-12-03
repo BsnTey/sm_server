@@ -87,7 +87,7 @@ export class CalculateUpdate {
                 const parts = value.split(' ');
 
                 if (parts.length > 1) {
-                    discountShop = /^\d+$/.test(parts[1]) ? parseInt(parts[1]) : 228;
+                    discountShop = /^\d+$/.test(parts[1]) ? parseInt(parts[1]) : 0;
                 }
 
                 if (parts[0].includes('и')) {
@@ -99,8 +99,14 @@ export class CalculateUpdate {
 
                 const currentPriceItem = this.calculateService.computeCurrentPrice(priceItem, discountShop);
 
+                const limit = {
+                    isConditionsMarker: false,
+                    limitPercent: isInventory ? 20 : 30,
+                    maxTotalDiscount: isInventory ? 30 : 50,
+                };
+
                 // Бонусы без промокода
-                const currentBonus = this.calculateService.computeBonus(priceItem, currentPriceItem, discountShop, isInventory);
+                const currentBonus = this.calculateService.computeMaxBonus(priceItem, currentPriceItem, discountShop, limit);
 
                 const priceDiscount = currentPriceItem - currentBonus;
                 priceWithoutDiscount += currentPriceItem;
@@ -109,11 +115,11 @@ export class CalculateUpdate {
                     priceItem,
                     currentPriceItem,
                     discountShop,
-                    isInventory,
+                    limit,
                     promoPercent,
                 );
 
-                const currentBonusPromo = this.calculateService.computeBonus(priceItem, currentPriceItemPromo, discountShop, isInventory);
+                const currentBonusPromo = this.calculateService.computeMaxBonus(priceItem, currentPriceItemPromo, discountShop, limit);
 
                 const priceDiscountPromo = currentPriceItemPromo - currentBonusPromo;
 

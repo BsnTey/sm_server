@@ -1,3 +1,8 @@
+export type ResponseCheckProduct = {
+    accountIds: CheckProductResultItem[];
+    calcProd: CalculateProduct | null;
+};
+
 export type CheckProductResultItem = {
     accountId: string;
     info?: Info;
@@ -5,13 +10,25 @@ export type CheckProductResultItem = {
 };
 
 export type Info = {
-    bonuses: number;
+    bonusesOnAccount: number;
     ordersToday: number;
-    product: Product;
+    product: ProductOnAccount;
 };
 
-export type Product = {
-    priceOnKassa: number;
+export type ProductOnAccount = {
+    avaliableBonusForProduct: number;
+    avaliablePriceOnKassa: number;
+};
+
+export type CashedProduct = {
+    priceCatalog: number;
+    priceRetail: number;
+    calc: CalculateProduct;
     percentMyDiscount: number;
-    bonusAmount: number;
+};
+
+export type CalculateProduct = {
+    calcPriceForProduct: number;
+    calcBonusForProduct: number;
+    percentMyDiscount: number;
 };

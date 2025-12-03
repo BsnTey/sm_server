@@ -173,22 +173,20 @@ export class AccountDiscountRepository {
         return rows.map(r => r.accountId);
     }
 
-    // //функции для нового поиска
-    // async findAccountsByTelegramUser(telegramId: string) {
-    //     const records = await this.prisma.accountDiscountProduct.findMany({
-    //         where: { telegramId },
-    //         select: { accountId: true },
-    //         distinct: ['accountId'],
-    //     });
-    //     return records.map(r => r.accountId);
-    // }
+    async findAccountsByTelegramUser(telegramId: string) {
+        const records = await this.prisma.accountDiscountProduct.findMany({
+            where: { telegramId },
+            select: { accountId: true },
+            distinct: ['accountId'],
+        });
+        return records.map(r => r.accountId);
+    }
 
-    //
-    // async findAccountsForProduct(telegramId: string, productId: string) {
-    //     const records = await this.prisma.accountDiscountProduct.findMany({
-    //         where: { productId, telegramId },
-    //         select: { accountId: true },
-    //     });
-    //     return records.map(r => r.accountId);
-    // }
+    async findAccountsForProduct(telegramId: string, productId: string) {
+        const records = await this.prisma.accountDiscountProduct.findMany({
+            where: { productId, telegramId },
+            select: { accountId: true },
+        });
+        return records.map(r => r.accountId);
+    }
 }

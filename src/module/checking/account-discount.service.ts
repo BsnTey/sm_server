@@ -7,7 +7,7 @@ import {
     NodePair,
     UpsertNodeDiscountInput,
 } from './interfaces/account-discount.interface';
-import { keyDiscountNodes } from './cache-key/key';
+import { keyDiscountAccount, keyDiscountNodes } from './cache-key/key';
 import { RedisCacheService } from '../cache/cache.service';
 
 @Injectable()
@@ -17,7 +17,7 @@ export class AccountDiscountService {
     constructor(
         private readonly accountDiscountRepository: AccountDiscountRepository,
         private readonly cacheService: RedisCacheService,
-    ) { }
+    ) {}
 
     async upsertNodeDiscount(node: UpsertNodeDiscountInput) {
         return this.accountDiscountRepository.upsertNodeDiscount(node);
@@ -92,21 +92,24 @@ export class AccountDiscountService {
      * Получить список accountId, у которых есть записи в account_discount_product
      * для данного telegramId.
      */
-    // async findAccountsByTelegramUser(telegramId: string): Promise<string[]> {
-    //     return this.accountDiscountRepository.findAccountsByTelegramUser(telegramId);
-    // }
-    //
-    // /**
-    //  * Удалить все данные по конкретному аккаунту и telegramId
-    //  * из account_discount_product. Возвращает количество удалённых строк.
-    //  */
+    async findAccountsByTelegramUser(telegramId: string): Promise<string[]> {
+        const key = keyDiscountAccount(telegramId);
+        const accountIdsCache = await this.cacheService.get<string[]>(key);
 
-    //
-    // /**
-    //  * Найти accountId, у которых есть скидочный продукт с данным productId
-    //  * для конкретного пользователя (telegramId).
-    //  */
-    // async findAccountsForProduct(telegramId: string, productId: string): Promise<string[]> {
-    //     return this.accountDiscountRepository.findAccountsForProduct(telegramId, productId);
-    // }
+        if (accountIdsCache) return accountIdsCache;
+
+        const accountIds = await this.accountDiscountRepository.findAccountsByTelegramUser(telegramId);
+
+        await this.cacheService.set(key, accountIds, this.TTL_CASH_DISCOUNT);
+
+        return accountIds;
+    }
+
+    /**
+     * Найти accountId, у которых есть скидочный продукт с данным productId
+     * для конкретного пользователя (telegramId).
+     */
+    async findAccountsForProduct(telegramId: string, productId: string): Promise<string[]> {
+        return this.accountDiscountRepository.findAccountsForProduct(telegramId, productId);
+    }
 }

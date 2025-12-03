@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { ProductApiResponse } from '../account/interfaces/product.interface';
+import { LimitPercent } from './calculate.interface';
+import { Marker } from '../account/interfaces/search-product.interface';
+import { CalculateProduct } from '../checking/interfaces/my-discount.interface';
 
 @Injectable()
 export class CalculateService {
     computeCurrentPrice(price: number, discountShop: number): number {
-        if (discountShop === 228) {
+        if (discountShop === 0) {
             return price;
         }
         let currentPriceItem = (1 - discountShop / 100) * price;
@@ -21,20 +24,19 @@ export class CalculateService {
     /**
      * Расчёт применимых бонусов (без промокода), с учётом ограничений для инвентаря.
      */
-    computeBonus(price: number, currentPriceItem: number, discountShop: number, isInventory = false): number {
+    computeMaxBonus(basePrice: number, priceAfterPromo: number, discountShop: number, limitPercent: LimitPercent): number {
         let currentBonus = 0;
 
         if (0 <= discountShop && discountShop < 50) {
-            // 20% для инвентаря, 30% — для обычных товаров
-            const bonusPercentage = isInventory ? 0.2 : 0.3;
-            currentBonus = currentPriceItem * bonusPercentage;
+            const bonusPercentage = limitPercent.limitPercent / 100;
+            currentBonus = priceAfterPromo * bonusPercentage;
 
-            // Ограничение максимальной общей скидки: 30% инвентарь / 50% обычные
-            const maxDiscountFactor = isInventory ? 0.3 : 0.5;
-            const maxDiscountItem = price * maxDiscountFactor;
+            // Ограничение максимальной общей скидки, цена где не может быть ниже
+            const maxDiscountFactor = limitPercent.maxTotalDiscount / 100;
+            const limitAllDiscount = basePrice * maxDiscountFactor;
 
-            if (currentPriceItem - currentBonus < price - maxDiscountItem) {
-                currentBonus = currentPriceItem - (price - maxDiscountItem);
+            if (basePrice - priceAfterPromo - currentBonus > limitAllDiscount) {
+                currentBonus = priceAfterPromo - limitAllDiscount;
             }
         }
         return Math.floor(currentBonus);
@@ -44,61 +46,98 @@ export class CalculateService {
      * Цена с промокодом (без бонусов). Процент промо — аргумент (например, 10 или 15).
      */
     computePriceWithPromoWithoutBonus(
-        price: number,
-        currentPriceItem: number,
+        basePrice: number,
+        retailPrice: number,
         discountShop: number,
-        isInventory = false,
-        promoPercent = 10,
+        limitPercent: LimitPercent,
+        discountPercent: number,
     ): number {
-        let calcPrice = currentPriceItem;
+        let calcPrice = retailPrice;
 
         if (0 <= discountShop && discountShop < 50) {
-            const factor = 1 - promoPercent / 100;
-            const priceWithPromo = currentPriceItem * factor;
+            // Ограничение максимальной общей скидки
+            const maxDiscountFactor = limitPercent.maxTotalDiscount / 100;
+            const maxDiscountItem = basePrice * maxDiscountFactor;
 
-            // Ограничение максимальной общей скидки: 30% инвентарь / 50% обычные
-            const maxDiscountFactor = isInventory ? 0.3 : 0.5;
-            const maxDiscountItem = price * maxDiscountFactor;
-
-            if (price - priceWithPromo > maxDiscountItem) {
-                calcPrice = price - maxDiscountItem;
+            const priceDiscountPromo = (basePrice * discountPercent) / 100;
+            if (maxDiscountItem > retailPrice - priceDiscountPromo) {
+                calcPrice = maxDiscountItem;
             } else {
-                calcPrice = priceWithPromo;
+                calcPrice = retailPrice - priceDiscountPromo;
             }
         }
         return Math.floor(calcPrice);
     }
 
-    computeCalculateProductFromProduct(
-        p: ProductApiResponse['product'],
-        isInventory: boolean,
-        promoPercent: number = 15,
-    ): { price: number; bonus: number } | null {
-        const catalog = Number(p?.price?.catalog?.value);
-        const retail = Number(p?.price?.retail?.value);
-        if (!isFinite(catalog) || !isFinite(retail) || catalog <= 0 || retail <= 0) {
-            return null;
+    private getLimitBonusPercent(markers: Marker[]): LimitPercent {
+        const conditionsMarkerInfo = markers.find(m => m.title === 'Условия бонусов');
+        const limitBonusMarker = markers.find(m => m.title && /До\s+\d+%\s+бонусами/i.test(m.title));
+
+        let limitPercent = 30;
+        let isConditionsMarker = false;
+        let maxTotalDiscount = 50;
+
+        if (limitBonusMarker?.description) {
+            const totalMatch = limitBonusMarker.description.match(/итоговая[^0-9]+не\s+более\s+(\d+)%/i);
+
+            if (totalMatch && totalMatch[1]) {
+                maxTotalDiscount = parseInt(totalMatch[1], 10);
+            }
         }
 
-        const basePrice = catalog / 100;
-        const retailPrice = retail / 100;
+        if (conditionsMarkerInfo?.description) {
+            const match = conditionsMarkerInfo.description.match(/списать бонусы до\s+(\d+)%/i);
+            if (match && match[1]) {
+                limitPercent = parseInt(match[1], 10);
+                isConditionsMarker = true;
+            }
+        } else if (limitBonusMarker) {
+            const match = limitBonusMarker.title.match(/(\d+)/);
+            if (match && match[1]) {
+                limitPercent = parseInt(match[1], 10);
+            }
+        }
 
-        let discountShop = Math.floor((1 - retailPrice / basePrice) * 100);
-        if (!isFinite(discountShop) || discountShop < 0) discountShop = 0;
-        if (discountShop > 100) discountShop = 100;
+        return {
+            isConditionsMarker,
+            limitPercent,
+            maxTotalDiscount,
+        };
+    }
 
-        const priceAfterPromo =
-            discountShop < 50
-                ? this.computePriceWithPromoWithoutBonus(basePrice, retailPrice, discountShop, isInventory, promoPercent)
-                : retailPrice;
+    computeCalculateFromProduct(p: ProductApiResponse['product'], promoPercent: number): CalculateProduct {
+        const catalog = Number(p.price.catalog.value);
+        const retail = Number(p.price.retail.value);
 
-        const bonus = this.computeBonus(basePrice, priceAfterPromo, discountShop, isInventory);
+        const basePrice = catalog / 100; //базовая цена
+        const retailPrice = retail / 100; //цена со скидкой от магазина (если есть)
+
+        const discountShop = Math.floor((1 - retailPrice / basePrice) * 100);
+
+        const limitPercent = this.getLimitBonusPercent(p.markers || []);
+
+        const priceAfterPromo = this.computePriceWithPromoWithoutBonus(basePrice, retailPrice, discountShop, limitPercent, promoPercent);
+        const bonus = this.computeMaxBonus(basePrice, priceAfterPromo, discountShop, limitPercent);
 
         const priceOnKassa = priceAfterPromo - bonus;
 
         return {
-            price: Math.floor(priceOnKassa),
-            bonus: Math.floor(bonus),
+            calcPriceForProduct: priceOnKassa,
+            calcBonusForProduct: bonus,
+            percentMyDiscount: promoPercent,
         };
+    }
+
+    calcPercentMyDiscount(p: ProductApiResponse['product']): number {
+        const list = p?.personalPrice?.discountList ?? [];
+        const value = list.find(x => x?.actionName?.toLowerCase() === 'моя скидка');
+
+        const catalogVal = Number(p.price.catalog.value);
+        if (!value || !catalogVal) return 0;
+
+        const summaDiscount = Number(value.summa.value) / 100;
+        const priceCatalog = catalogVal / 100;
+
+        return Number(((summaDiscount / priceCatalog) * 100).toFixed(1));
     }
 }
