@@ -113,7 +113,7 @@ export class CheckingService {
         const { telegramId, personalDiscounts } = data;
 
         // 1. ЕДИНАЯ ТОЧКА ВХОДА: Получаем уже готовые, нарезанные чанки
-        const finalBatches = await this.createDistributionPlan(personalDiscounts, this.RABBIT_THREADS);
+        const finalBatches = await this.createDistributionPlan(personalDiscounts, this.RABBIT_THREADS, this.MAX_CONCURRENCY);
 
         // 2. Отправка (Transport Logic)
         const total = finalBatches.length;
@@ -136,7 +136,7 @@ export class CheckingService {
      * ОРКЕСТРАТОР: Фасад для подготовки данных.
      * Принимает сырые ID, возвращает готовую матрицу распределения.
      */
-    private async createDistributionPlan(accountIds: string[], threads: number): Promise<string[][]> {
+    private async createDistributionPlan(accountIds: string[], threads: number, chunkSize: number): Promise<string[][]> {
         // Шаг А: Обогащение данных (I/O операция)
         const accountProxies = await this.resolveProxiesForAccounts(accountIds);
 
@@ -144,7 +144,7 @@ export class CheckingService {
         return this.distributeAccountsToChunks(
             accountProxies,
             threads, // Шаг "прыжка" (кол-во потоков)
-            this.MAX_CONCURRENCY, // Размер чанка
+            chunkSize,
         );
     }
 
@@ -545,6 +545,7 @@ export class CheckingService {
 
     async prepareAccountsForProductCheckV1({ telegramId, nodeId }: PrepareProductCheckRequestDto): Promise<{
         accounts: PreparedAccountInfo[];
+        chunkSize: number;
     }> {
         const user = await this.userService.getUserByTelegramId(telegramId);
         if (!user) {
@@ -555,7 +556,7 @@ export class CheckingService {
         const accountIds = await this.accountDiscountService.findAccountIdsByTelegramAndNodes(telegramId, nodeId);
 
         if (!accountIds?.length) {
-            return { accounts: [] };
+            return { accounts: [], chunkSize: this.MAX_CONCURRENCY };
         }
 
         // 2. заказы за сегодня (map accountId -> count)
@@ -571,7 +572,12 @@ export class CheckingService {
             ordersNumber: ordersTodayMap[accountId] ?? 0,
         }));
 
-        return { accounts };
+        accounts.sort(cmp);
+
+        return {
+            accounts,
+            chunkSize: this.MAX_CONCURRENCY,
+        };
     }
 
     async getAccountsForPersonalDiscountV3(
@@ -605,7 +611,7 @@ export class CheckingService {
             if (topN === 0) break;
 
             const topSlice = accounts.slice(0, topN);
-            const checks = await Promise.allSettled(topSlice.map(a => this.accountService.shortInfo(a.accountId)));
+            const checks = await Promise.allSettled(topSlice.map(a => this.accountService.shortInfoWithCache(a.accountId)));
 
             let mismatches = 0;
 
@@ -618,7 +624,10 @@ export class CheckingService {
                         if (freshBonus !== acc.bonus) mismatches++;
 
                         const target = accounts.find(x => x.accountId === acc.accountId);
-                        if (target) target.bonus = freshBonus;
+                        if (target) {
+                            target.bonus = freshBonus;
+                            results.push(target);
+                        }
                     }
                 } else {
                     const msg = res.reason?.response?.data?.message ?? res.reason?.message ?? 'Ошибка получения количества бонусов';
@@ -751,7 +760,7 @@ export class CheckingService {
 
         let bonusCount = 0;
         try {
-            const short = await this.accountService.shortInfo(accountId);
+            const short = await this.accountService.shortInfoWithCache(accountId);
             bonusCount = short.bonusCount || 0;
         } catch (e) {}
 

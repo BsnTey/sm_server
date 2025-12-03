@@ -69,7 +69,8 @@ import { Cookie } from './interfaces/cookie.interface';
 import { Products } from './interfaces/products.interface';
 import { RetryOnProxyError } from './decorators/retry-on-proxy-error.decorator';
 import { RedisCacheService } from '../cache/cache.service';
-import { getAccountEntityKey } from '../cache/cache.keys';
+import { getAccountEntityKey, getShortInfoKey } from '../cache/cache.keys';
+import { keyDiscountAccount } from '../checking/cache-key/key';
 
 @Injectable()
 export class AccountService {
@@ -80,6 +81,7 @@ export class AccountService {
     private durationTimeProxyBlock = this.configService.getOrThrow('TIME_DURATION_PROXY_BLOCK_IN_MIN');
 
     private TTL_CASH_ACCOUNT = 5000;
+    private TTL_CASH_SHORT_INFO = 20;
 
     constructor(
         private configService: ConfigService,
@@ -689,6 +691,19 @@ export class AccountService {
 
     async findCityBD(cityId: string) {
         return this.accountRep.findCitySM(cityId);
+    }
+
+    async shortInfoWithCache(accountId: string): Promise<ShortInfoInterface> {
+        const key = getShortInfoKey(accountId);
+        const accountIdCache = await this.cacheService.get<ShortInfoInterface>(key);
+
+        if (accountIdCache) return accountIdCache;
+
+        const shortInfo = await this.shortInfo(accountId);
+
+        await this.cacheService.set(key, shortInfo, this.TTL_CASH_SHORT_INFO);
+
+        return shortInfo;
     }
 
     async shortInfo(accountId: string): Promise<ShortInfoInterface> {

@@ -11,4 +11,5 @@ export const getStatisticsKey = () => `bott:getStatistics`;
 export const getUserByTelegramIdKey = (telegramId: string) => `user:getUserByTelegramId:${telegramId}`;
 export const getPrefsUserByTelegramIdKey = (telegramId: string) => `user:setNotificationPrefs:${telegramId}`;
 export const getAccountEntityKey = (accountId: string) => `acc:entity:${accountId}`;
+export const getShortInfoKey = (accountId: string) => `acc:shortInfo:${accountId}`;
 export const getOrdersTodayKey = (accountId: string) => `orders_today:${accountId}`;
