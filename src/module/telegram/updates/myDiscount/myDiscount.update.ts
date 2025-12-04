@@ -51,6 +51,11 @@ export class MyDiscountUpdate extends BaseUpdate {
             const foundProducts = await this.checkingService.findProductsByQueries(productsRaw);
 
             if (!foundProducts.length) {
+                const prod = await this.accountService.searchProductByAnonym();
+                //ищет продукты через поиск и выдает правильные артикулы
+            }
+
+            if (!foundProducts.length) {
                 await ctx.reply('❌ Моя скидка не проходит на этот товар, либо данные для поиска не верны');
                 return;
             }

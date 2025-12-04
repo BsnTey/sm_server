@@ -2,6 +2,7 @@ import { isAxiosError } from 'axios';
 import { Logger } from '@nestjs/common';
 import { IAccountWithProxy } from '../interfaces/account.interface';
 import { RedisCacheService } from '../../cache/cache.service';
+import { getAccountEntityKey } from '../../cache/cache.keys';
 
 // --- 1. Исправленный Троттлер ---
 
@@ -113,7 +114,8 @@ export function RetryOnProxyError(options: RetryOnProxyErrorOptions = {}): Metho
                     }
 
                     try {
-                        await self.cacheService.del(context.accountId);
+                        const key = getAccountEntityKey(context.accountId);
+                        await self.cacheService.del(key);
                     } catch (cacheErr) {
                         logger.error(`[RetryOnProxyError] Failed to clear cache:`, cacheErr);
                     }

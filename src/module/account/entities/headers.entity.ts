@@ -37,7 +37,7 @@ export class SportmasterHeadersService {
             Locale: this.locale,
             Country: this.country,
             'Device-Id': acc.deviceId,
-            'Account-Id': acc.accountId,
+            'X-Device-Id': acc.deviceId,
             'Installation-Id': acc.installationId,
             'City-Id': acc.cityId,
             Eutc: this.eutc,
@@ -52,6 +52,22 @@ export class SportmasterHeadersService {
         };
     }
 
+    getAnonymHeadersMobile(deviceId: string): ISportmasterRequestHeaders {
+        const timestamp = String(Math.floor(Date.now() / 1000));
+        return {
+            'User-Agent': this.userAgentMobile,
+            Host: this.host,
+            Locale: this.locale,
+            Country: this.country,
+            'Device-Id': deviceId,
+            'X-Device-Id': deviceId,
+            'Accept-Encoding': this.acceptEncoding,
+            'Content-Type': this.contentType,
+            Timestamp: timestamp,
+            'Aplaut-Build': this.aplautBuild,
+        };
+    }
+
     getHeadersRefreshMobile(url: string, acc: any): ISportmasterRequestHeaders {
         const timestamp = String(Math.floor(Date.now() / 1000));
         return {
@@ -60,7 +76,7 @@ export class SportmasterHeadersService {
             Locale: this.locale,
             Country: this.country,
             'Device-Id': acc.deviceId,
-            'Account-Id': acc.accountId,
+            'X-Device-Id': acc.deviceId,
             'Installation-Id': acc.installationId,
             'City-Id': acc.cityId,
             Eutc: this.eutc,

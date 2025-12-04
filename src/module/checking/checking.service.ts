@@ -45,7 +45,7 @@ export class CheckingService {
         private calculateService: CalculateService,
         private readonly publisher: DelayedPublisher,
         private readonly cacheService: RedisCacheService,
-    ) { }
+    ) {}
 
     //принимает с контроллера входящие аккаунты, сейвит в очередь на нарезку под прокси chunkingAccountForProxy
     async queueAccountsForPersonalDiscountV1(data: SetPersonalDiscountAccountRequestDto): Promise<{
@@ -788,7 +788,7 @@ export class CheckingService {
         try {
             const short = await this.accountService.shortInfoWithCache(accountId);
             bonusCount = short.bonusCount || 0;
-        } catch (e) { }
+        } catch (e) {}
 
         return this.buildResult(product, accountId, bonusCount, ordersToday);
     }
@@ -839,7 +839,10 @@ export class CheckingService {
         return Array.from(uniqueProducts.values());
     }
 
-    async findAccountsForProductsIntersection(telegramId: string, productIds: string[]): Promise<{
+    async findAccountsForProductsIntersection(
+        telegramId: string,
+        productIds: string[],
+    ): Promise<{
         accounts: PreparedAccountInfo[];
         productIds: string[];
     }> {
@@ -849,7 +852,7 @@ export class CheckingService {
 
         // 1. Get accounts for each product
         const accountsPerProduct = await Promise.all(
-            productIds.map(pid => this.accountDiscountService.findAccountsForProduct(telegramId, pid))
+            productIds.map(pid => this.accountDiscountService.findAccountsForProduct(telegramId, pid)),
         );
 
         // 2. Find intersection

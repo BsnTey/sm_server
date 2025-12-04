@@ -69,9 +69,8 @@ import { Cookie } from './interfaces/cookie.interface';
 import { Products } from './interfaces/products.interface';
 import { RetryOnProxyError } from './decorators/retry-on-proxy-error.decorator';
 import { RedisCacheService } from '../cache/cache.service';
-import { getAccountEntityKey, getShortInfoKey } from '../cache/cache.keys';
-import { keyDiscountAccount } from '../checking/cache-key/key';
-import { AnonymEntity } from './entities/anonym.entity';
+import { getAccountEntityKey, getAnonymAccountEntityKey, getShortInfoKey } from '../cache/cache.keys';
+import { AnonymResponse } from './interfaces/anonym.interface';
 
 @Injectable()
 export class AccountService {
@@ -412,6 +411,13 @@ export class AccountService {
         return { headers, httpsAgent };
     }
 
+    private async getAnonymHttpOptions(proxy: string, deviceId: string): Promise<any> {
+        const headers = this.sportmasterHeaders.getAnonymHeadersMobile(deviceId);
+        const httpsAgent = new SocksProxyAgent(proxy);
+
+        return { headers, httpsAgent };
+    }
+
     private async getHttpOptionsRefresh(url: string, accountWithProxy: AccountWithProxyEntity): Promise<any> {
         const headers = this.sportmasterHeaders.getHeadersRefreshMobile(url, accountWithProxy);
         const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
@@ -487,13 +493,19 @@ export class AccountService {
         await this.accountRep.updateCredentials(accountWithProxy.accountId, { accessToken: token });
     }
 
-    private async refreshPrivate(accountWithProxy: AccountWithProxyEntity) {
+    private async refreshPrivate(
+        accountWithProxy: AccountWithProxyEntity,
+    ): Promise<{ refreshTokensEntity: RefreshTokensEntity; accountWithProxy: AccountWithProxyEntity }> {
         const tokens = await this.refreshForValidation(accountWithProxy);
         const refreshTokensEntity = await this.updateTokensAccountPrivate(accountWithProxy.accountId, tokens);
         accountWithProxy.accessToken = refreshTokensEntity.accessToken;
         accountWithProxy.refreshToken = refreshTokensEntity.refreshToken;
         accountWithProxy.expiresInAccess = refreshTokensEntity.expiresInAccess;
-        return refreshTokensEntity;
+
+        const key = getAccountEntityKey(accountWithProxy.accountId);
+        await this.cacheService.del(key);
+
+        return { refreshTokensEntity, accountWithProxy };
     }
 
     async getAccountCredentials(accountId: string): Promise<GetAccountCredentialsResponseDto> {
@@ -532,8 +544,12 @@ export class AccountService {
     private async validationToken(accountWithProxy: AccountWithProxyEntity) {
         const isUpdate = accountWithProxy.updateTokensByTime();
         if (isUpdate) {
-            await this.refreshPrivate(accountWithProxy);
+            const newEntity = await this.refreshPrivate(accountWithProxy);
+            if (newEntity) {
+                accountWithProxy = newEntity.accountWithProxy;
+            }
         }
+        return accountWithProxy;
     }
 
     private async getAndValidateOrSetProxyAccount(
@@ -573,32 +589,88 @@ export class AccountService {
     }
 
     private async loadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
-        const accountWithProxy = await this.rawLoadAccountCore(accountId);
-        await this.validationToken(accountWithProxy);
+        let accountWithProxy = await this.rawLoadAccountCore(accountId);
+        const newEntity = await this.validationToken(accountWithProxy);
+        if (newEntity) {
+            accountWithProxy = newEntity;
+        }
         return accountWithProxy;
     }
 
     async getAccountEntity(accountId: string): Promise<AccountWithProxyEntity> {
-        const accountEntityFromCache = await this.cacheService.get<AccountWithProxyEntity>(accountId);
+        const key = getAccountEntityKey(accountId);
+        const accountEntityFromCache = await this.cacheService.get<AccountWithProxyEntity>(key);
         if (!accountEntityFromCache) {
             const account = await this.loadAccountCore(accountId);
-            const key = getAccountEntityKey(accountId);
             await this.cacheService.set(key, account, this.TTL_CASH_ACCOUNT);
             return account;
         }
         return accountEntityFromCache;
     }
 
-    async getAnonymEntity(): Promise<AccountWithProxyEntity> {
-        const account = await this.loadAccountCore(accountId);
+    async searchProductByAnonym(query: string) {
+        const MAX_ATTEMPTS = 3;
+        let lastError: any;
+
+        for (let i = 0; i < MAX_ATTEMPTS; i++) {
+            try {
+                const accountAnonymEntity = await this.getOrRefreshAnonymEntity();
+
+                return await this.searchProduct(accountAnonymEntity, query);
+            } catch (e: any) {
+                lastError = e;
+
+                this.logger.warn(`[searchProductByAnonym] Attempt ${i + 1}/${MAX_ATTEMPTS} failed. Resetting session. Error: ${e.message}`);
+
+                const key = getAnonymAccountEntityKey();
+                await this.cacheService.del(key);
+
+                if (i < MAX_ATTEMPTS - 1) {
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            }
+        }
+
+        throw lastError;
     }
 
-    async createAnonym(): Promise<boolean> {
-        const anonymAccount = new AnonymEntity();
+    async getOrRefreshAnonymEntity(): Promise<AccountWithProxyEntity> {
+        const key = getAnonymAccountEntityKey();
+        const cached = await this.cacheService.get<AccountWithProxyEntity>(key);
 
-        const deviceId = anonymAccount.deviceId;
+        if (cached) {
+            return cached;
+        }
+
+        const deviceId = crypto.randomUUID();
+
+        const proxyInfo = await this.proxyService.getRandomProxy();
+
+        try {
+            const { data } = await this.createAnonym(deviceId, proxyInfo.proxy);
+
+            const accessToken = data.token.accessToken;
+            const xUserId = data.profile.id;
+
+            const newEntity = new AccountWithProxyEntity({
+                accessToken,
+                xUserId,
+                deviceId,
+                proxy: proxyInfo,
+            });
+
+            await this.cacheService.setUntilEndOfDay(key, newEntity);
+            return newEntity;
+        } catch (e) {
+            throw e;
+        }
+    }
+
+    private async createAnonym(deviceId: string, proxyUrl: string): Promise<AnonymResponse> {
         const url = this.url + 'v1/auth/anonym';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+
+        const httpOptions = await this.getAnonymHttpOptions(proxyUrl, deviceId);
+
         const payload = {
             device: {
                 id: deviceId,
@@ -977,8 +1049,14 @@ export class AccountService {
 
     @RetryOn401()
     @RetryOnProxyError()
-    async searchProduct(accountId: string, article: string): Promise<SearchProductInterface> {
-        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+    async searchProduct(account: string | AccountWithProxyEntity, article: string): Promise<SearchProductInterface> {
+        let accountWithProxyEntity;
+        if (typeof account === 'string') {
+            accountWithProxyEntity = await this.getAccountEntity(account);
+        } else {
+            accountWithProxyEntity = account;
+        }
+
         const url = this.url + 'v2/products/search?limit=10&offset=0';
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
