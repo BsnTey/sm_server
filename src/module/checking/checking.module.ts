@@ -7,11 +7,12 @@ import { AccountModule } from '../account/account.module';
 import { AccountDiscountRepository } from './account-discount.repository';
 import { OrderModule } from '../order/order.module';
 import { CalculateModule } from '../calculate/calculate.module';
+import { AdminDiscountService } from './admin-discount.service';
 
 @Module({
     imports: [UserModule, AccountModule, OrderModule, CalculateModule],
-    providers: [CheckingService, AccountDiscountService, AccountDiscountRepository],
+    providers: [CheckingService, AccountDiscountService, AccountDiscountRepository, AdminDiscountService],
     controllers: [CheckingController],
-    exports: [CheckingService],
+    exports: [CheckingService, AccountDiscountService],
 })
 export class CheckingModule {}

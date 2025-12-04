@@ -7,12 +7,15 @@ import { AccountDiscountService } from './account-discount.service';
 import { TelegramIdParamsDto } from '../account/dto/telegramId.dto';
 import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
 import { ProductCheckingRequestDto } from './dto/product-checking.dto';
+import { HasZenno } from '@common/decorators/zenno.decorator';
+import { AdminDiscountService } from './admin-discount.service';
 
 @Controller('checking')
 export class CheckingController {
     constructor(
         private checkingService: CheckingService,
         private accountDiscountService: AccountDiscountService,
+        private adminDiscountService: AdminDiscountService,
     ) {}
 
     @Post('personal-discount/v1/set')
@@ -68,5 +71,27 @@ export class CheckingController {
     @HttpCode(200)
     async getUserAccountIdsV2(@Param() params: TelegramIdParamsDto) {
         return this.checkingService.getUserAccountIdsV2(params.telegramId);
+    }
+
+    // ===================== ADMIN ROUTES =====================
+
+    /**
+     * Полная очистка всех таблиц скидок + кеш Redis
+     */
+    @Delete('admin/full-cleanup')
+    @HttpCode(200)
+    @HasZenno()
+    async fullCleanup() {
+        return this.adminDiscountService.fullCleanup();
+    }
+
+    /**
+     * Обновление данных: сохранить аккаунты, очистить всё, заново загрузить
+     */
+    @Post('admin/refresh-all')
+    @HttpCode(200)
+    @HasZenno()
+    async refreshAllDiscountData() {
+        return this.adminDiscountService.refreshAllDiscountData();
     }
 }

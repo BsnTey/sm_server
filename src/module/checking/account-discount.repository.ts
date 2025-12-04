@@ -7,11 +7,52 @@ import {
     NodePair,
     UpsertNodeDiscountInput,
 } from './interfaces/account-discount.interface';
-import { DeleteAccountRequestDto } from './dto/delete-account.dto';
 
 @Injectable()
 export class AccountDiscountRepository {
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(private readonly prisma: PrismaService) {}
+
+    /**
+     * Полная очистка всех таблиц скидок с сбросом индексов
+     */
+    async fullCleanupAllDiscountData(): Promise<void> {
+        await this.prisma.$executeRawUnsafe(`
+        TRUNCATE TABLE 
+        "account_discount_product", 
+        "account_discount", 
+        "product_info", 
+        "node_product" 
+        RESTART IDENTITY CASCADE;
+    `);
+    }
+
+    /**
+     * Получить все уникальные telegramId из AccountDiscount
+     */
+    async findAllDistinctTelegramIds(): Promise<string[]> {
+        const rows = await this.prisma.accountDiscount.findMany({
+            select: { telegramId: true },
+            distinct: ['telegramId'],
+        });
+        return rows.map(r => r.telegramId);
+    }
+
+    /**
+     * Получить все аккаунты сгруппированные по telegramId
+     */
+    async findAllAccountsGroupedByTelegram(): Promise<Map<string, string[]>> {
+        const rows = await this.prisma.accountDiscount.findMany({
+            select: { telegramId: true, accountId: true },
+            distinct: ['telegramId', 'accountId'],
+        });
+        const map = new Map<string, string[]>();
+        for (const row of rows) {
+            const list = map.get(row.telegramId) || [];
+            list.push(row.accountId);
+            map.set(row.telegramId, list);
+        }
+        return map;
+    }
 
     async upsertNodeDiscount(node: UpsertNodeDiscountInput) {
         return this.prisma.nodeDiscount.upsert({
@@ -193,11 +234,7 @@ export class AccountDiscountRepository {
     async findProductsByVariant(query: string) {
         return this.prisma.productInfo.findMany({
             where: {
-                OR: [
-                    { productId: query },
-                    { sku: query },
-                    { article: { startsWith: query } },
-                ],
+                OR: [{ productId: query }, { sku: query }, { article: { startsWith: query } }],
             },
         });
     }

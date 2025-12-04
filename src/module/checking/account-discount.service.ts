@@ -17,7 +17,7 @@ export class AccountDiscountService {
     constructor(
         private readonly accountDiscountRepository: AccountDiscountRepository,
         private readonly cacheService: RedisCacheService,
-    ) { }
+    ) {}
 
     async upsertNodeDiscount(node: UpsertNodeDiscountInput) {
         return this.accountDiscountRepository.upsertNodeDiscount(node);
@@ -35,6 +35,20 @@ export class AccountDiscountService {
         const key = keyDiscountNodes(telegramId);
         await this.cacheService.del(key);
         return this.accountDiscountRepository.deleteAllByTelegramId(telegramId);
+    }
+
+    /**
+     * Полная очистка всех таблиц скидок
+     */
+    async fullCleanupAllDiscountData() {
+        return this.accountDiscountRepository.fullCleanupAllDiscountData();
+    }
+
+    /**
+     * Получить все аккаунты сгруппированные по telegramId
+     */
+    async findAllAccountsGroupedByTelegram(): Promise<Map<string, string[]>> {
+        return this.accountDiscountRepository.findAllAccountsGroupedByTelegram();
     }
 
     async createAccountDiscountsBatch(items: AccountDiscountsToInsert[]): Promise<void> {

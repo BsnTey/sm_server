@@ -1,12 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { RedisClientType } from 'redis';
 import { REDIS } from './cache.provider';
+import { DISCOUNT_CACHE_PREFIXES } from './cache.keys';
 
 @Injectable()
 export class RedisCacheService {
     private readonly ttlSeconds = 60;
 
-    constructor(@Inject(REDIS) private readonly client: RedisClientType) {}
+    constructor(@Inject(REDIS) private readonly client: RedisClientType) { }
 
     async set<T extends object>(key: string, value: T, ttlSeconds: number = this.ttlSeconds) {
         const stringify = JSON.stringify(value);
@@ -85,4 +86,14 @@ export class RedisCacheService {
             await this.client.del(keys);
         }
     }
+
+    /**
+     * Очистка всего кеша, связанного со скидками
+     */
+    async clearDiscountRelatedCache(): Promise<void> {
+        for (const prefix of DISCOUNT_CACHE_PREFIXES) {
+            await this.delByPrefix(prefix);
+        }
+    }
 }
+

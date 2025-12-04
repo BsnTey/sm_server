@@ -14,3 +14,13 @@ export const getAccountEntityKey = (accountId: string) => `acc:entity:${accountI
 export const getAnonymAccountEntityKey = () => `acc:anonymEntity`;
 export const getShortInfoKey = (accountId: string) => `acc:shortInfo:${accountId}`;
 export const getOrdersTodayKey = (accountId: string) => `orders_today:${accountId}`;
+
+// Discount-related cache key prefixes
+export const CACHE_PREFIX_DISCOUNT = 'discount:';
+export const CACHE_PREFIX_ACCOUNT = 'acc:';
+
+export const DISCOUNT_CACHE_PREFIXES = [
+    CACHE_PREFIX_DISCOUNT,
+    CACHE_PREFIX_ACCOUNT,
+] as const;
+
