@@ -59,6 +59,7 @@ import { BottModule } from '../bott/bott.module';
 import { TemplateModule } from '../template/template.module';
 import { MyDiscountUpdate } from './updates/myDiscount/myDiscount.update';
 import { OrderModule } from '../order/order.module';
+import { CheckingModule } from '../checking/checking.module';
 
 @Module({
     imports: [
@@ -74,6 +75,7 @@ import { OrderModule } from '../order/order.module';
         BottModule,
         TemplateModule,
         OrderModule,
+        CheckingModule,
     ],
     providers: [
         TelegramService,

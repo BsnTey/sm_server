@@ -11,7 +11,7 @@ import { DeleteAccountRequestDto } from './dto/delete-account.dto';
 
 @Injectable()
 export class AccountDiscountRepository {
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(private readonly prisma: PrismaService) { }
 
     async upsertNodeDiscount(node: UpsertNodeDiscountInput) {
         return this.prisma.nodeDiscount.upsert({
@@ -188,5 +188,17 @@ export class AccountDiscountRepository {
             select: { accountId: true },
         });
         return records.map(r => r.accountId);
+    }
+
+    async findProductsByVariant(query: string) {
+        return this.prisma.productInfo.findMany({
+            where: {
+                OR: [
+                    { productId: query },
+                    { sku: query },
+                    { article: { startsWith: query } },
+                ],
+            },
+        });
     }
 }

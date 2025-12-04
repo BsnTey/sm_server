@@ -71,6 +71,7 @@ import { RetryOnProxyError } from './decorators/retry-on-proxy-error.decorator';
 import { RedisCacheService } from '../cache/cache.service';
 import { getAccountEntityKey, getShortInfoKey } from '../cache/cache.keys';
 import { keyDiscountAccount } from '../checking/cache-key/key';
+import { AnonymEntity } from './entities/anonym.entity';
 
 @Injectable()
 export class AccountService {
@@ -586,6 +587,27 @@ export class AccountService {
             return account;
         }
         return accountEntityFromCache;
+    }
+
+    async getAnonymEntity(): Promise<AccountWithProxyEntity> {
+        const account = await this.loadAccountCore(accountId);
+    }
+
+    async createAnonym(): Promise<boolean> {
+        const anonymAccount = new AnonymEntity();
+
+        const deviceId = anonymAccount.deviceId;
+        const url = this.url + 'v1/auth/anonym';
+        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const payload = {
+            device: {
+                id: deviceId,
+                os: 'android',
+            },
+        };
+        const response = await this.httpService.post(url, payload, httpOptions);
+
+        return response.data;
     }
 
     private async resolveCityByUri(accountId: string, uri: string): Promise<ResolvedCity> {

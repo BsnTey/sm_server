@@ -8,6 +8,7 @@ import { AccountShortInfoWorker } from './workers/account-short-info.worker';
 import { PersonalDiscountInputWorker } from './workers/personal-discount-input.worker';
 import { PersonalDiscountChunkWorker } from './workers/personal-discount-chunk.worker';
 import { PersonalDiscountProductWorker } from './workers/personal-discount-product.worker';
+import { MessagesToTelegramWorker } from './workers/messages-to-telegram.worker';
 
 @Injectable()
 export class BrokerConsumer implements OnModuleInit {
@@ -20,7 +21,8 @@ export class BrokerConsumer implements OnModuleInit {
         private readonly personalDiscountInputWorker: PersonalDiscountInputWorker,
         private readonly personalDiscountChunkWorker: PersonalDiscountChunkWorker,
         private readonly personalDiscountProductWorker: PersonalDiscountProductWorker,
-    ) {}
+        private readonly messagesToTelegramWorker: MessagesToTelegramWorker,
+    ) { }
 
     async onModuleInit() {
         await this.channel.addSetup(async (channel: ConfirmChannel) => {
@@ -77,6 +79,16 @@ export class BrokerConsumer implements OnModuleInit {
             msg =>
                 this.safeHandle('PersonalDiscountProduct', msg, channel, RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_PRODUCT_QUEUE, 3, payload =>
                     this.personalDiscountProductWorker.process(payload),
+                ),
+            { noAck: false },
+        );
+
+        // 6. Messages to Telegram
+        await channel.consume(
+            RABBIT_MQ_QUEUES.MESSAGES_TO_TELEGRAM_QUEUE,
+            msg =>
+                this.safeHandle('MessagesToTelegram', msg, channel, RABBIT_MQ_QUEUES.MESSAGES_TO_TELEGRAM_QUEUE, 3, payload =>
+                    this.messagesToTelegramWorker.process(payload),
                 ),
             { noAck: false },
         );

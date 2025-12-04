@@ -11,10 +11,12 @@ import { PersonalDiscountInputWorker } from './workers/personal-discount-input.w
 import { CheckingModule } from '../../module/checking/checking.module';
 import { PersonalDiscountChunkWorker } from './workers/personal-discount-chunk.worker';
 import { PersonalDiscountProductWorker } from './workers/personal-discount-product.worker';
+import { MessagesToTelegramWorker } from './workers/messages-to-telegram.worker';
+import { TelegramModule } from '../../module/telegram/telegram.module';
 
 @Global()
 @Module({
-    imports: [ConfigModule, forwardRef(() => NotificationModule), AccountModule, CheckingModule],
+    imports: [ConfigModule, forwardRef(() => NotificationModule), AccountModule, CheckingModule, TelegramModule],
     providers: [
         brokerProvider,
         BrokerConsumer,
@@ -23,6 +25,7 @@ import { PersonalDiscountProductWorker } from './workers/personal-discount-produ
         PersonalDiscountInputWorker,
         PersonalDiscountChunkWorker,
         PersonalDiscountProductWorker,
+        MessagesToTelegramWorker,
     ],
     exports: [brokerProvider, DelayedPublisher],
 })

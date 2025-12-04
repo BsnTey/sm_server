@@ -17,7 +17,7 @@ export class AccountDiscountService {
     constructor(
         private readonly accountDiscountRepository: AccountDiscountRepository,
         private readonly cacheService: RedisCacheService,
-    ) {}
+    ) { }
 
     async upsertNodeDiscount(node: UpsertNodeDiscountInput) {
         return this.accountDiscountRepository.upsertNodeDiscount(node);
@@ -111,5 +111,9 @@ export class AccountDiscountService {
      */
     async findAccountsForProduct(telegramId: string, productId: string): Promise<string[]> {
         return this.accountDiscountRepository.findAccountsForProduct(telegramId, productId);
+    }
+
+    async findProductsByVariant(query: string) {
+        return this.accountDiscountRepository.findProductsByVariant(query);
     }
 }

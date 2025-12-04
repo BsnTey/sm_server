@@ -39,14 +39,13 @@ export class CheckingService {
 
     constructor(
         private accountService: AccountService,
-        private telegramService: TelegramService,
         private accountDiscountService: AccountDiscountService,
         private orderService: OrderService,
         private userService: UserService,
         private calculateService: CalculateService,
         private readonly publisher: DelayedPublisher,
         private readonly cacheService: RedisCacheService,
-    ) {}
+    ) { }
 
     //принимает с контроллера входящие аккаунты, сейвит в очередь на нарезку под прокси chunkingAccountForProxy
     async queueAccountsForPersonalDiscountV1(data: SetPersonalDiscountAccountRequestDto): Promise<{
@@ -262,7 +261,14 @@ export class CheckingService {
         }
 
         if (count === total) {
-            this.telegramService.sendMessage(+telegramId, `✅ Обновление персональных скидок для режима категорий завершено!`);
+            await this.publisher.publish(
+                RABBIT_MQ_QUEUES.MESSAGES_TO_TELEGRAM_QUEUE,
+                {
+                    telegramId: +telegramId,
+                    message: `✅ Обновление персональных скидок для режима категорий завершено!`,
+                },
+                0,
+            );
         }
     }
 
@@ -288,9 +294,13 @@ export class CheckingService {
             // А. Обработка ошибки запроса
             if (res.status === 'rejected') {
                 this.logger.error(`Ошибка получения скидок для ${accountId}`, res.reason?.message);
-                this.telegramService.sendMessage(
-                    +telegramId,
-                    `❗️ Ошибка получения скидок для аккаунта ${accountId}: ${res.reason?.message}`,
+                this.publisher.publish(
+                    RABBIT_MQ_QUEUES.MESSAGES_TO_TELEGRAM_QUEUE,
+                    {
+                        telegramId: +telegramId,
+                        message: `❗️ Ошибка получения скидок для аккаунта ${accountId}: ${res.reason?.message}`,
+                    },
+                    0,
                 );
                 return;
             }
@@ -415,7 +425,14 @@ export class CheckingService {
         this.logProcessingResults(telegramId, results, errors);
 
         if (count == total) {
-            this.telegramService.sendMessage(+telegramId, `✅ Обновление персональных скидок для быстрого режима завершено!`);
+            await this.publisher.publish(
+                RABBIT_MQ_QUEUES.MESSAGES_TO_TELEGRAM_QUEUE,
+                {
+                    telegramId: +telegramId,
+                    message: `✅ Обновление персональных скидок для быстрого режима завершено!`,
+                },
+                0,
+            );
         }
     }
 
@@ -534,7 +551,16 @@ export class CheckingService {
         );
 
         if (errors.length > 0) {
-            this.telegramService.sendMessage(+telegramId, `⚠️ Ошибки при загрузке товаров (${errors.length} акк).`);
+            if (errors.length > 0) {
+                this.publisher.publish(
+                    RABBIT_MQ_QUEUES.MESSAGES_TO_TELEGRAM_QUEUE,
+                    {
+                        telegramId: +telegramId,
+                        message: `⚠️ Ошибки при загрузке товаров (${errors.length} акк).`,
+                    },
+                    0,
+                );
+            }
         }
     }
 
@@ -762,7 +788,7 @@ export class CheckingService {
         try {
             const short = await this.accountService.shortInfoWithCache(accountId);
             bonusCount = short.bonusCount || 0;
-        } catch (e) {}
+        } catch (e) { }
 
         return this.buildResult(product, accountId, bonusCount, ordersToday);
     }
@@ -798,6 +824,64 @@ export class CheckingService {
         const item = list.find(x => x?.actionName?.toLowerCase() === 'оплата бонусами');
         const raw = item?.summa?.value;
         return raw ? Number(raw) / 100 : 0;
+    }
+
+    async findProductsByQueries(queries: string[]) {
+        const results = await Promise.all(queries.map(q => this.accountDiscountService.findProductsByVariant(q)));
+        // Flatten and deduplicate by productId
+        const allProducts = results.flat();
+        const uniqueProducts = new Map();
+        for (const p of allProducts) {
+            if (!uniqueProducts.has(p.productId)) {
+                uniqueProducts.set(p.productId, p);
+            }
+        }
+        return Array.from(uniqueProducts.values());
+    }
+
+    async findAccountsForProductsIntersection(telegramId: string, productIds: string[]): Promise<{
+        accounts: PreparedAccountInfo[];
+        productIds: string[];
+    }> {
+        if (!productIds.length) {
+            return { accounts: [], productIds: [] };
+        }
+
+        // 1. Get accounts for each product
+        const accountsPerProduct = await Promise.all(
+            productIds.map(pid => this.accountDiscountService.findAccountsForProduct(telegramId, pid))
+        );
+
+        // 2. Find intersection
+        // Start with the first list
+        let intersection = new Set(accountsPerProduct[0]);
+
+        for (let i = 1; i < accountsPerProduct.length; i++) {
+            const currentSet = new Set(accountsPerProduct[i]);
+            intersection = new Set([...intersection].filter(x => currentSet.has(x)));
+        }
+
+        const intersectionArray = Array.from(intersection);
+
+        if (!intersectionArray.length) {
+            return { accounts: [], productIds };
+        }
+
+        // 3. Enrich with bonuses and orders
+        const [ordersTodayMap, bonusMap] = await Promise.all([
+            this.orderService.countTodayByAccountIds(intersectionArray),
+            this.accountService.getBonusCountByAccountIds(intersectionArray),
+        ]);
+
+        const accounts: PreparedAccountInfo[] = intersectionArray.map(accountId => ({
+            accountId,
+            bonus: bonusMap[accountId] ?? 0,
+            ordersNumber: ordersTodayMap[accountId] ?? 0,
+        }));
+
+        accounts.sort(cmp);
+
+        return { accounts, productIds };
     }
 
     private mapProduct(p: ProductApiResponse['product']) {
