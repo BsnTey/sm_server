@@ -22,6 +22,9 @@ export class SportmasterHeadersService {
     private secFetchMode: string = 'cors';
     private secFetchDest: string = 'empty';
 
+    private xLocation: string =
+        'H4sIAAAAAAAAAL2Vz2rbQBDGX8XsKSEmaPXPkm9FUYmoLRlVDrSlCDVRg0C2QFYCJhjiJPTSgi89lRySS28F4ybUdWo/w+wbdWSTpk21diltLtrV7KDvx8y3oyOyHyaNJGpnpHpE4gAXRdmsKFSU5TKJkzapSpVNlWqyKPXKefLjsL0bdkj1xdGPN2uPVAmlsipKgqjr5C7PDlohnsFHuIYpO2HHMIQb9g73b+FriZ1h+Aqu74VhBhN2zE7h8+JLtaAbpjne7X6hJ2jCndo8biR7uZrt2L7h1OvOluU98587tkl6vfLvuLKqcHDPYcb6MIERDJcjiGIxQv2R4ToGyhcpC7osV1Yrl9ZYn51gMW5gzN7AcB3TszBNoyxJu4svVURBv09QRMkplGe6ruU5bhGloum6zoG8yCERc8wGBUyyoimoSOlyKIEDZThN2ytEohVJkdUHLBzlMT7dthp10/a45hL0ys/u5JLiJnf/CEH7MIUhG5TgC5JP58b7u27LPGjT3bEMc8mFoBrlMl/Chw2htNb0jA1pfYXdKMduVn2ZuqKuuhQzGM1XLJNPfTj3keoS3vu/lBQfU3Y6nzXjEnzL0+FqBbBUDLxl1qwd0+XPEI1S8Y/aPMCO4qDDudYvYQyNCZP/xCRRRRYfcrqoHL81LONJs+E3HGvJRdHQrrwpfJF3+BP2F83xb4r1Mv+l7QZZlLSLR/3taS08DGM8drxt08V41DGS9usobYUomKUHYZkEh0EUB6+iOMq6RnzQyXIy0ko6abhPet8Be1cRK1gHAAA=';
+
     private host: string = this.configService.getOrThrow('HOST_DONOR');
     private hostSite: string = 'www.' + this.configService.getOrThrow('HOST_DONOR_SITE');
     private xRequestedWith: string = this.configService.getOrThrow('X_REQUESTED_WITH');
@@ -42,7 +45,7 @@ export class SportmasterHeadersService {
             'City-Id': acc.cityId,
             Eutc: this.eutc,
             'x-user-id': acc.xUserId,
-            'X-Location': acc.citySM.xLocation,
+            'X-Location': acc?.citySM?.xLocation ?? this.xLocation,
             Authorization: acc.accessToken,
             'Accept-Encoding': this.acceptEncoding,
             'Content-Type': this.contentType,

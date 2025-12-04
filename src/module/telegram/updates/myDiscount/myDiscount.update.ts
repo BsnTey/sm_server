@@ -46,25 +46,82 @@ export class MyDiscountUpdate extends BaseUpdate {
             return;
         }
 
+        const isOnlyDigits = (s: string) => /^\d+$/.test(s);
+
         try {
             // 1. Search for products by variants
             const foundProducts = await this.checkingService.findProductsByQueries(productsRaw);
 
-            if (!foundProducts.length) {
-                const prod = await this.accountService.searchProductByAnonym();
-                //ищет продукты через поиск и выдает правильные артикулы
+            // 2. Track which queries were found
+            const foundQueries = new Set<string>();
+            for (const p of foundProducts) {
+                for (const q of productsRaw) {
+                    if (p.productId === q || p.sku === q || (p.article && p.article.startsWith(q))) {
+                        foundQueries.add(q);
+                    }
+                }
             }
+            // Unfound alphanumeric articles (can search via API)
+            const unfoundQueries = productsRaw.filter(q => !foundQueries.has(q) && !isOnlyDigits(q));
+            // Unfound numeric productIds (cannot search via API - just report not found)
+            const unfoundProductIds = productsRaw.filter(q => !foundQueries.has(q) && isOnlyDigits(q));
 
+            // 3. If nothing found, search via API
             if (!foundProducts.length) {
+                const articlesToSearch = productsRaw.filter(q => !isOnlyDigits(q));
+
+                if (articlesToSearch.length > 0) {
+                    const suggestions: Array<{ productId: string; name: string }> = [];
+
+                    for (const article of articlesToSearch) {
+                        try {
+                            const searchResult = await this.accountService.searchProductByAnonym(article);
+                            for (const item of searchResult.data.list.slice(0, 5)) {
+                                suggestions.push({ productId: item.id, name: item.name });
+                            }
+                        } catch (e) {
+                            this.logger.warn(`Failed to search by article: ${article}`);
+                        }
+                    }
+
+                    if (suggestions.length > 0) {
+                        const lines: string[] = [];
+                        lines.push('🔍 <b>Возможно, вы имели в виду:</b>');
+                        lines.push('');
+                        for (const s of suggestions.slice(0, 10)) {
+                            lines.push(`• <code>${s.productId}</code> — ${s.name}`);
+                        }
+                        lines.push('');
+                        lines.push('Пожалуйста, выполните поиск по номеру продукта (цифровому артикулу).');
+                        await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
+                        return;
+                    }
+                }
+
                 await ctx.reply('❌ Моя скидка не проходит на этот товар, либо данные для поиска не верны');
                 return;
             }
 
             const productIds = foundProducts.map(p => p.productId);
 
-            // 2. Try to find intersection (accounts that have discount for ALL products)
+            // 4. Multiple products - try intersection with total price/bonus
             if (productIds.length > 1) {
                 const intersection = await this.checkingService.findAccountsForProductsIntersection(telegramId, productIds);
+
+                // Calculate total price and bonus for all products
+                let totalPrice = 0;
+                let totalBonus = 0;
+                for (const productId of productIds) {
+                    try {
+                        const result = await this.checkingService.getAccountsForPersonalDiscountV3(telegramId, productId);
+                        if (result.data.calcProd) {
+                            totalPrice += result.data.calcProd.calcPriceForProduct;
+                            totalBonus += result.data.calcProd.calcBonusForProduct;
+                        }
+                    } catch (e) {
+                        this.logger.warn(`Failed to get calc for product ${productId}`);
+                    }
+                }
 
                 if (intersection.accounts.length > 0) {
                     const lines: string[] = [];
@@ -72,9 +129,14 @@ export class MyDiscountUpdate extends BaseUpdate {
                     lines.push('');
                     lines.push('📦 Товары:');
                     for (const p of foundProducts) {
-                        lines.push(`- ${p.article || p.sku || p.productId} (${p.productId})`);
+                        lines.push(`- ${p.article || p.sku || p.productId} (<code>${p.productId}</code>)`);
                     }
                     lines.push('');
+                    if (totalPrice > 0) {
+                        lines.push(`💰 Общая возможная цена на кассе: <b>${totalPrice}</b> ₽`);
+                        lines.push(`🎯 Общие требуемые бонусы: <b>${totalBonus}</b>`);
+                        lines.push('');
+                    }
                     lines.push(`✅ Найдено ${intersection.accounts.length} аккаунт(ов), где есть скидка на ВСЕ эти товары.`);
                     lines.push('👇 Топ-10 аккаунтов:');
                     lines.push('');
@@ -82,15 +144,79 @@ export class MyDiscountUpdate extends BaseUpdate {
                     const topAccounts = intersection.accounts.slice(0, 10);
                     for (const acc of topAccounts) {
                         const ordersPart = acc.ordersNumber > 0 ? ` (${acc.ordersNumber})` : '';
-                        lines.push(`• <code>${acc.accountId}</code>${ordersPart} — бонусов: ${acc.bonus}`);
+                        const hasEnoughBonus = totalBonus > 0 && acc.bonus >= totalBonus;
+                        const prefix = hasEnoughBonus ? '✅' : '•';
+                        lines.push(`${prefix} <code>${acc.accountId}</code>${ordersPart} — бонусов: ${acc.bonus}`);
                     }
 
                     await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
-                    return;
+                } else {
+                    // No intersection found
+                    const lines: string[] = [];
+                    lines.push('ℹ️ Не найдено аккаунтов с персональной скидкой на ВСЕ указанные товары.');
+                    lines.push('');
+                    lines.push('📦 Найденные товары:');
+                    for (const p of foundProducts) {
+                        lines.push(`- ${p.article || p.sku || p.productId} (<code>${p.productId}</code>)`);
+                    }
+                    await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
                 }
+
+                // 5. Search unfound articles via API and show suggestions
+                if (unfoundQueries.length > 0) {
+                    const suggestions: Array<{ productId: string; name: string; query: string }> = [];
+
+                    for (const article of unfoundQueries) {
+                        try {
+                            const searchResult = await this.accountService.searchProductByAnonym(article);
+                            for (const item of searchResult.data.list.slice(0, 3)) {
+                                suggestions.push({ productId: item.id, name: item.name, query: article });
+                            }
+                        } catch (e) {
+                            this.logger.warn(`Failed to search by article: ${article}`);
+                        }
+                    }
+
+                    if (suggestions.length > 0) {
+                        const lines: string[] = [];
+                        lines.push('');
+                        lines.push('⚠️ <b>Не найдено в базе:</b>');
+                        for (const q of unfoundQueries) {
+                            lines.push(`- ${q}`);
+                        }
+                        lines.push('');
+                        lines.push('🔍 <b>Возможные варианты:</b>');
+                        for (const s of suggestions.slice(0, 10)) {
+                            lines.push(`• <code>${s.productId}</code> — ${s.name}`);
+                        }
+                        lines.push('');
+                        lines.push('Отправьте повторно все номера продуктов (цифровые артикулы) для полной проверки.');
+                        await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
+                    } else {
+                        const lines: string[] = [];
+                        lines.push('');
+                        lines.push('⚠️ <b>Не найдено:</b>');
+                        for (const q of unfoundQueries) {
+                            lines.push(`- ${q}`);
+                        }
+                        await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
+                    }
+                }
+
+                // Show message for unfound numeric productIds
+                if (unfoundProductIds.length > 0) {
+                    const lines: string[] = [];
+                    lines.push('❌ <b>Моя скидка не проходит на товар(ы):</b>');
+                    for (const pid of unfoundProductIds) {
+                        lines.push(`- <code>${pid}</code>`);
+                    }
+                    await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
+                }
+
+                return;
             }
 
-            // 3. If no intersection or single product, show results for each product separately
+            // 6. Single product - show detailed results
             for (const productInfo of foundProducts) {
                 const { productId } = productInfo;
 
@@ -98,8 +224,8 @@ export class MyDiscountUpdate extends BaseUpdate {
                 const accounts = result.data.accountIds;
                 const calc = result.data.calcProd;
 
-                // Filter out errors if any
-                const validAccounts = accounts.filter(a => !a.error) as any[]; // TODO: Fix type if needed
+                // Deduplicate accounts by accountId
+                const validAccounts = [...new Map(accounts.filter(a => !a.error).map(a => [a.accountId, a])).values()] as any[];
 
                 const lines: string[] = [];
                 lines.push('🔎 Результаты проверки товара:');
@@ -129,6 +255,57 @@ export class MyDiscountUpdate extends BaseUpdate {
                     }
                 }
 
+                await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
+            }
+
+            // 7. Show suggestions for unfound articles (single product case)
+            if (unfoundQueries.length > 0) {
+                const suggestions: Array<{ productId: string; name: string }> = [];
+
+                for (const article of unfoundQueries) {
+                    try {
+                        const searchResult = await this.accountService.searchProductByAnonym(article);
+                        for (const item of searchResult.data.list.slice(0, 3)) {
+                            suggestions.push({ productId: item.id, name: item.name });
+                        }
+                    } catch (e) {
+                        this.logger.warn(`Failed to search by article: ${article}`);
+                    }
+                }
+
+                if (suggestions.length > 0) {
+                    const lines: string[] = [];
+                    lines.push('');
+                    lines.push('⚠️ <b>Не найдено в базе:</b>');
+                    for (const q of unfoundQueries) {
+                        lines.push(`- ${q}`);
+                    }
+                    lines.push('');
+                    lines.push('🔍 <b>Возможные варианты:</b>');
+                    for (const s of suggestions.slice(0, 10)) {
+                        lines.push(`• <code>${s.productId}</code> — ${s.name}`);
+                    }
+                    lines.push('');
+                    lines.push('Отправьте повторно все номера продуктов (цифровые артикулы) для полной проверки.');
+                    await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
+                } else {
+                    const lines: string[] = [];
+                    lines.push('');
+                    lines.push('⚠️ <b>Не найдено:</b>');
+                    for (const q of unfoundQueries) {
+                        lines.push(`- ${q}`);
+                    }
+                    await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
+                }
+            }
+
+            // 8. Show message for unfound numeric productIds
+            if (unfoundProductIds.length > 0) {
+                const lines: string[] = [];
+                lines.push('❌ <b>Моя скидка не проходит на товар(ы):</b>');
+                for (const pid of unfoundProductIds) {
+                    lines.push(`- <code>${pid}</code>`);
+                }
                 await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
             }
         } catch (e) {
