@@ -523,7 +523,8 @@ export class AccountService {
         accountWithProxy.accessToken = refreshTokensEntity.accessToken;
         accountWithProxy.refreshToken = refreshTokensEntity.refreshToken;
         accountWithProxy.expiresInAccess = refreshTokensEntity.expiresInAccess;
-        return refreshTokensEntity;
+        await this.cacheManager.del(accountWithProxy.accountId);
+        return { refreshTokensEntity, accountWithProxy };
     }
 
     async getAccountCredentials(accountId: string): Promise<GetAccountCredentialsResponseDto> {
@@ -561,7 +562,7 @@ export class AccountService {
     private async validationToken(accountWithProxy: AccountWithProxyEntity) {
         const isUpdate = accountWithProxy.updateTokensByTime();
         if (isUpdate) {
-            await this.refreshPrivate(accountWithProxy);
+            return this.refreshPrivate(accountWithProxy);
         }
     }
 
@@ -594,8 +595,11 @@ export class AccountService {
     }
 
     private async loadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
-        const accountWithProxy = await this.rawLoadAccountCore(accountId);
-        await this.validationToken(accountWithProxy);
+        let accountWithProxy = await this.rawLoadAccountCore(accountId);
+        const newEntity = await this.validationToken(accountWithProxy);
+        if (newEntity) {
+            accountWithProxy = newEntity.accountWithProxy;
+        }
         return accountWithProxy;
     }
 
