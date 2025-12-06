@@ -5,11 +5,11 @@ import { OrderStatus, UserTelegram } from '@prisma/client';
 import { UserTelegramEntity } from './entities/user-telegram.entity';
 import { CitySMEntity } from '../account/entities/citySM.entity';
 import { RedisCacheService } from '../cache/cache.service';
-import { getPrefsUserByTelegramIdKey, getUserByTelegramIdKey } from '../cache/cache.keys';
+import { getUserByTelegramIdKey } from '../cache/cache.keys';
 
 @Injectable()
 export class UserService {
-    private TTL_USER = 3_600;
+    private TTL_USER = 60;
 
     constructor(
         private readonly userRepository: UserRepository,

@@ -14,15 +14,12 @@ export class ApiAdapter {
     static parseCalculatorInput(product: ProductApiResponse['product']): CalculatorInput {
         const markers = product.markers || [];
 
-        // Цены (конверсия из копеек в рубли)
         const catalog = product.price.catalog.value / 100;
         const retail = product.price.retail.value / 100;
 
-        // Моя скидка
         const myDiscountItem = product.personalPrice?.discountList?.find(x => x.actionName?.toLowerCase() === 'моя скидка');
         const myDiscountValue = myDiscountItem ? myDiscountItem.summa.value / 100 : 0;
 
-        // Флаги (определение плашек по title маркера)
         const flags = {
             isBestPrice: markers.some(m => m.title === 'Лучшая цена'),
             isFinalPrice: markers.some(m => m.title === 'Финальная цена'),
@@ -30,11 +27,13 @@ export class ApiAdapter {
             isPriceReduced: markers.some(m => m.title === 'Цена снижена'),
             isSpecialCondition: markers.some(m => m.title === 'Особые условия'),
             isBonusCondition: markers.some(m => m.title === 'Условия бонусов'),
-            isBonus20: markers.some(m => m.title?.includes('бонусами')),
+            isBonus20: markers.some(m => {
+                const t = (m.title || '').toLowerCase();
+                return t.includes('бонусами') && !t.includes('вернем') && !t.includes('начислим');
+            }),
         };
 
-        // Ограничения (парсинг из description маркеров)
-        const constraints = this.parseConstraints(markers);
+        const constraints = this.parseConstraints(markers, flags);
 
         return {
             prices: { catalog, retail, myDiscountValue },
@@ -46,14 +45,16 @@ export class ApiAdapter {
     /**
      * Парсит ограничения из маркеров товара
      */
-    private static parseConstraints(markers: Marker[]): {
+    private static parseConstraints(
+        markers: Marker[],
+        flags: { isBonus20: boolean; isFinalPrice: boolean; isBestPrice: boolean },
+    ): {
         explicitBonusLimitPercent: number | null;
         explicitTotalLimitPercent: number | null;
     } {
         let explicitBonusLimitPercent: number | null = null;
         let explicitTotalLimitPercent: number | null = null;
 
-        // 1. Условия бонусов (строгое ограничение)
         const conditionsMarker = markers.find(m => m.title === 'Условия бонусов');
         if (conditionsMarker?.description) {
             const match = conditionsMarker.description.match(/до\s+(\d+)%/i);
@@ -62,33 +63,48 @@ export class ApiAdapter {
             }
         }
 
-        // 2. Особые условия
-        const specialMarker = markers.find(m => m.title === 'Особые условия');
-        if (specialMarker?.description) {
-            const match = specialMarker.description.match(/(\d+)%/);
-            if (match?.[1] && explicitBonusLimitPercent === null) {
-                explicitBonusLimitPercent = parseInt(match[1], 10);
+        if (explicitBonusLimitPercent === null) {
+            const specialMarker = markers.find(m => m.title === 'Особые условия');
+            if (specialMarker?.description) {
+                const match = specialMarker.description.match(/(\d+)%/);
+                if (match?.[1]) {
+                    explicitBonusLimitPercent = parseInt(match[1], 10);
+                }
             }
         }
 
-        // 3. Стандартная плашка бонусов "До X% бонусами"
         if (explicitBonusLimitPercent === null) {
-            const bonusMarker = markers.find(m => m.title?.includes('бонусами'));
-            if (bonusMarker) {
-                // Лимит бонусов из заголовка
-                const bonusMatch = bonusMarker.title?.match(/(\d+)%/);
-                if (bonusMatch?.[1]) {
-                    explicitBonusLimitPercent = parseInt(bonusMatch[1], 10);
-                }
+            for (const m of markers) {
+                const title = m.title || '';
 
-                // Общий лимит из описания "не более X%"
-                if (bonusMarker.description) {
-                    const totalMatch = bonusMarker.description.match(/не\s+более\s+(\d+)%/i);
-                    if (totalMatch?.[1]) {
-                        explicitTotalLimitPercent = parseInt(totalMatch[1], 10);
+                if (/вернем|начислим|кэшбэк/i.test(title)) continue;
+
+                if (title.toLowerCase().includes('бонусами')) {
+                    const bonusMatch = title.match(/До\s+(\d+)%/i);
+                    if (bonusMatch?.[1]) {
+                        explicitBonusLimitPercent = parseInt(bonusMatch[1], 10);
+
+                        if (m.description) {
+                            const totalMatch = m.description.match(/не\s+более\s+(\d+)%/i);
+                            if (totalMatch?.[1]) {
+                                explicitTotalLimitPercent = parseInt(totalMatch[1], 10);
+                            }
+                        }
+                        break;
                     }
                 }
             }
+        }
+
+        if (flags.isBonus20 && explicitBonusLimitPercent === null) {
+            explicitBonusLimitPercent = 20;
+            if (explicitTotalLimitPercent === null) {
+                explicitTotalLimitPercent = 30;
+            }
+        }
+
+        if (flags.isFinalPrice || flags.isBestPrice) {
+            explicitBonusLimitPercent = 0;
         }
 
         return { explicitBonusLimitPercent, explicitTotalLimitPercent };

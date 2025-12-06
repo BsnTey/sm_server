@@ -6,13 +6,12 @@ import { OrderStatusTiming } from '../account/constants/order.constant';
 import { StartOrderTrackingRequestDto } from './dto/start-order-tracking.dto';
 import { TrackingStarterService } from './tracking/tracking.starter.service';
 import { RedisCacheService } from '../cache/cache.service';
-import { UserTelegramEntity } from '../user/entities/user-telegram.entity';
-import { getUserByTelegramIdKey } from '../cache/cache.keys';
+import { getPrefsUserByTelegramIdKey } from '../cache/cache.keys';
 
 @Injectable()
 export class NotificationService {
     private readonly logger = new Logger(NotificationService.name);
-    private TTL_USER_PREFS = 3_600;
+    private TTL_USER_PREFS = 60;
 
     constructor(
         private readonly users: UserService,
@@ -24,7 +23,7 @@ export class NotificationService {
         const user = await this.users.getUserByTelegramId(tgId);
         if (!user) throw new NotFoundException('User not found');
 
-        const key = getUserByTelegramIdKey(tgId);
+        const key = getPrefsUserByTelegramIdKey(tgId);
         const cachedPrefs = await this.cacheService.get<$Enums.OrderStatus[]>(key);
         if (cachedPrefs) {
             return cachedPrefs;
@@ -43,7 +42,7 @@ export class NotificationService {
     }
 
     async setPreferences(tgId: string, dto: UpdatingPreferenceStatusRequestDto) {
-        const key = getUserByTelegramIdKey(tgId);
+        const key = getPrefsUserByTelegramIdKey(tgId);
         await this.cacheService.del(key);
         const user = await this.users.getUserByTelegramId(tgId);
         if (!user) throw new NotFoundException('User not found');
