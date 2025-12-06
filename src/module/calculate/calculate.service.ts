@@ -51,10 +51,11 @@ export class CalculateService {
         discountShop: number,
         limitPercent: LimitPercent,
         discountPercent: number,
+        discountFlag: boolean,
     ): number {
         let calcPrice = retailPrice;
 
-        if (0 <= discountShop && discountShop < 50) {
+        if ((0 <= discountShop && discountShop < 50) || discountFlag) {
             // Ограничение максимальной общей скидки
             const maxDiscountFactor = limitPercent.maxTotalDiscount / 100;
             const maxDiscountItem = basePrice * maxDiscountFactor;
@@ -105,7 +106,7 @@ export class CalculateService {
         };
     }
 
-    computeCalculateFromProduct(p: ProductApiResponse['product'], promoPercent: number): CalculateProduct {
+    computeCalculateFromProduct(p: ProductApiResponse['product'], promoPercent: number, discountFlag: boolean): CalculateProduct {
         const catalog = Number(p.price.catalog.value);
         const retail = Number(p.price.retail.value);
 
@@ -116,7 +117,14 @@ export class CalculateService {
 
         const limitPercent = this.getLimitBonusPercent(p.markers || []);
 
-        const priceAfterPromo = this.computePriceWithPromoWithoutBonus(basePrice, retailPrice, discountShop, limitPercent, promoPercent);
+        const priceAfterPromo = this.computePriceWithPromoWithoutBonus(
+            basePrice,
+            retailPrice,
+            discountShop,
+            limitPercent,
+            promoPercent,
+            discountFlag,
+        );
         const bonus = this.computeMaxBonus(basePrice, priceAfterPromo, discountShop, limitPercent);
 
         const priceOnKassa = priceAfterPromo - bonus;

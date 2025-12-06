@@ -27,13 +27,18 @@ export class AccountDiscountService {
         await this.accountDiscountRepository.ensureNodesExist(nodes);
     }
 
-    async deleteAccountDiscountsBatch(accountIds: string[], telegramId: string): Promise<void> {
+    async deleteAccountDiscountsBatch(accountIds: string[], telegramId: string): Promise<{ status: string }> {
         await this.accountDiscountRepository.deleteAccountDiscountsBatch(accountIds, telegramId);
+        const key = keyDiscountAccount(telegramId);
+        await this.cacheService.del(key);
+        return { status: 'ok' };
     }
 
     async deleteAllByTelegramId(telegramId: string): Promise<number> {
         const key = keyDiscountNodes(telegramId);
+        const key2 = keyDiscountAccount(telegramId);
         await this.cacheService.del(key);
+        await this.cacheService.del(key2);
         return this.accountDiscountRepository.deleteAllByTelegramId(telegramId);
     }
 
@@ -52,6 +57,10 @@ export class AccountDiscountService {
     }
 
     async createAccountDiscountsBatch(items: AccountDiscountsToInsert[]): Promise<void> {
+        const key = keyDiscountNodes(items[0].telegramId);
+        const key2 = keyDiscountAccount(items[0].telegramId);
+        await this.cacheService.del(key);
+        await this.cacheService.del(key2);
         await this.accountDiscountRepository.createAccountDiscountsBatch(items);
     }
 
@@ -93,7 +102,9 @@ export class AccountDiscountService {
 
         const nodes = await this.accountDiscountRepository.findDistinctNodePairsByTelegram(telegramId);
 
-        await this.cacheService.set(key, nodes, this.TTL_CASH_DISCOUNT);
+        if (nodes.length > 0) {
+            await this.cacheService.set(key, nodes, this.TTL_CASH_DISCOUNT);
+        }
 
         return { nodes };
     }
@@ -106,17 +117,19 @@ export class AccountDiscountService {
      * Получить список accountId, у которых есть записи в account_discount_product
      * для данного telegramId.
      */
-    async findAccountsByTelegramUser(telegramId: string): Promise<string[]> {
+    async findAccountsByTelegramUser(telegramId: string): Promise<{ accountIds: string[] }> {
         const key = keyDiscountAccount(telegramId);
-        const accountIdsCache = await this.cacheService.get<string[]>(key);
+        const accountIdsCache = await this.cacheService.get<{ accountIds: string[] }>(key);
 
         if (accountIdsCache) return accountIdsCache;
 
         const accountIds = await this.accountDiscountRepository.findAccountsByTelegramUser(telegramId);
 
-        await this.cacheService.set(key, accountIds, this.TTL_CASH_DISCOUNT);
+        if (accountIds.length > 0) {
+            await this.cacheService.set(key, accountIds, this.TTL_CASH_DISCOUNT);
+        }
 
-        return accountIds;
+        return { accountIds };
     }
 
     /**

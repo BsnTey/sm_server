@@ -7,7 +7,7 @@ import { DISCOUNT_CACHE_PREFIXES } from './cache.keys';
 export class RedisCacheService {
     private readonly ttlSeconds = 60;
 
-    constructor(@Inject(REDIS) private readonly client: RedisClientType) { }
+    constructor(@Inject(REDIS) private readonly client: RedisClientType) {}
 
     async set<T extends object>(key: string, value: T, ttlSeconds: number = this.ttlSeconds) {
         const stringify = JSON.stringify(value);
@@ -65,7 +65,18 @@ export class RedisCacheService {
 
     async get<T extends object>(key: string): Promise<T | null> {
         const result = await this.client.get(key);
-        return result ? (JSON.parse(result) as T) : null;
+
+        if (!result) {
+            return null;
+        }
+
+        const parsed = JSON.parse(result);
+
+        if (Array.isArray(parsed) && parsed.length === 0) {
+            return null;
+        }
+
+        return parsed as T;
     }
 
     async del(key: string) {
@@ -96,4 +107,3 @@ export class RedisCacheService {
         }
     }
 }
-

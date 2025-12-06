@@ -2,8 +2,8 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
 const DeleteAccountRequestSchema = z.object({
-    telegramId: z.string().min(1, 'telegramId обязателен'),
-    accountId: z.string().min(1, 'номер аккаунта обязателен'),
+    telegramId: z.string(),
+    accountId: z.string(),
 });
 
 const DeleteAccountResponseSchema = z.object({});

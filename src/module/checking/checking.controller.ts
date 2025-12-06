@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, HttpCode, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, HttpCode, Patch, Post, Query } from '@nestjs/common';
 import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discount.dto';
 import { CheckingService } from './checking.service';
 import { TgPersonalDiscountDto } from './dto/tg-personal-discount.dto';
@@ -30,15 +30,15 @@ export class CheckingController {
         return this.checkingService.updatePersonalDiscountByTelegram(data);
     }
 
-    @Delete('personal-discount/all')
+    @Delete('personal-discount/all/:telegramId')
     @HttpCode(200)
-    async deleteAllByTelegramId(@Body() data: TgPersonalDiscountDto) {
+    async deleteAllByTelegramId(@Query() data: TgPersonalDiscountDto) {
         return this.accountDiscountService.deleteAllByTelegramId(data.telegramId);
     }
 
     @Delete('personal-discount/single')
     @HttpCode(200)
-    async delSingleDiscountByAccountId(@Body() data: DeleteAccountRequestDto) {
+    async delSingleDiscountByAccountId(@Query() data: DeleteAccountRequestDto) {
         const delAccountIds = [data.accountId];
         return this.accountDiscountService.deleteAccountDiscountsBatch(delAccountIds, data.telegramId);
     }
@@ -70,7 +70,7 @@ export class CheckingController {
     @Get('personal-discount/v1/accounts/:telegramId')
     @HttpCode(200)
     async getUserAccountIdsV2(@Param() params: TelegramIdParamsDto) {
-        return this.checkingService.getUserAccountIdsV2(params.telegramId);
+        return this.accountDiscountService.findAccountsByTelegramUser(params.telegramId);
     }
 
     // ===================== ADMIN ROUTES =====================

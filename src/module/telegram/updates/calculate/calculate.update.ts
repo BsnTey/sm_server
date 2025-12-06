@@ -111,12 +111,15 @@ export class CalculateUpdate {
                 const priceDiscount = currentPriceItem - currentBonus;
                 priceWithoutDiscount += currentPriceItem;
 
+                const discountFlag = false;
+
                 const currentPriceItemPromo = this.calculateService.computePriceWithPromoWithoutBonus(
                     priceItem,
                     currentPriceItem,
                     discountShop,
                     limit,
                     promoPercent,
+                    discountFlag,
                 );
 
                 const currentBonusPromo = this.calculateService.computeMaxBonus(priceItem, currentPriceItemPromo, discountShop, limit);

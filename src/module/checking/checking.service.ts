@@ -12,7 +12,6 @@ import { AccountService } from '../account/account.service';
 import { UserService } from '../user/user.service';
 import { PersonalDiscountChunkWorkerPayload } from './interfaces/queqe.interface';
 import { AccountDiscountService } from './account-discount.service';
-import { TelegramService } from '../telegram/telegram.service';
 import { ProductBatchSaver } from './utils/product-batch-saver';
 import { PersonalDiscount } from '../account/interfaces/personal-discount.interface';
 import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dto/check-product.prepare.dto';
@@ -564,11 +563,6 @@ export class CheckingService {
         }
     }
 
-    async getUserAccountIdsV2(telegramId: string): Promise<{ accountIds: string[] }> {
-        const accountIds = await this.accountDiscountService.findAccountsByTelegramUser(telegramId);
-        return { accountIds };
-    }
-
     async prepareAccountsForProductCheckV1({ telegramId, nodeId }: PrepareProductCheckRequestDto): Promise<{
         accounts: PreparedAccountInfo[];
         chunkSize: number;
@@ -606,15 +600,11 @@ export class CheckingService {
         };
     }
 
-    async getAccountsForPersonalDiscountV3(
-        telegramId: string,
-        productId: string,
-    ): Promise<{
-        data: ResponseCheckProduct;
-    }> {
+    async getAccountsForPersonalDiscountV3(telegramId: string, productId: string): Promise<{ data: ResponseCheckProduct }> {
         const accountIds = await this.accountDiscountService.findAccountsForProduct(telegramId, productId);
 
-        const results: CheckProductResultItem[] = [];
+        const errors = new Map<string, string>();
+
         // --- Предзагрузка бонусов и заказов ---
         const [ordersTodayMap, bonusMap] = await Promise.all([
             this.orderService.countTodayByAccountIds(accountIds),
@@ -652,13 +642,11 @@ export class CheckingService {
                         const target = accounts.find(x => x.accountId === acc.accountId);
                         if (target) {
                             target.bonus = freshBonus;
-                            results.push(target);
                         }
                     }
                 } else {
                     const msg = res.reason?.response?.data?.message ?? res.reason?.message ?? 'Ошибка получения количества бонусов';
-
-                    results.push({ accountId: acc.accountId, error: msg });
+                    errors.set(acc.accountId, msg);
                 }
             });
 
@@ -692,12 +680,42 @@ export class CheckingService {
             }
         }
 
-        accounts.sort(cmp);
-
         let calcProd = null;
         if (cachedProduct) {
             calcProd = cachedProduct.calc;
         }
+
+        accounts.sort(cmp);
+
+        const results: CheckProductResultItem[] = accounts.map(acc => {
+            const errorMsg = errors.get(acc.accountId);
+            if (errorMsg) {
+                return { accountId: acc.accountId, error: errorMsg };
+            }
+
+            const requiredBonus = calcProd?.calcBonusForProduct ?? 0;
+            const basePrice = calcProd?.calcPriceForProduct ?? 0;
+
+            const countDelta = requiredBonus - acc.bonus;
+
+            let avaliablePriceOnKassa = basePrice;
+
+            if (countDelta > 0) {
+                avaliablePriceOnKassa += countDelta;
+            }
+
+            return {
+                accountId: acc.accountId,
+                info: {
+                    bonusesOnAccount: acc.bonus,
+                    ordersToday: acc.ordersNumber,
+                    product: {
+                        avaliableBonusForProduct: Math.min(requiredBonus, acc.bonus),
+                        avaliablePriceOnKassa: avaliablePriceOnKassa,
+                    },
+                },
+            };
+        });
 
         return {
             data: {
@@ -909,7 +927,7 @@ export class CheckingService {
         const priceCatalog = +product.price.catalog.value / 100;
         const priceRetail = +product.price.retail.value / 100;
 
-        const calc = this.calculateService.computeCalculateFromProduct(product, percentMyDiscount);
+        const calc = this.calculateService.computeCalculateFromProduct(product, percentMyDiscount, Boolean(percentMyDiscount));
 
         const cashedProduct = {
             priceCatalog,
