@@ -1,6 +1,5 @@
 import { PreparedAccountInfo } from '../interfaces/extend-chrome.interface';
 
-const PROXY_MIN_INTERVAL_MS = 450; // ~2.2 RPS на прокси
 const PAGE_MICRO_DELAY_MS = 1000; // микро-пауза между страницами (с джиттером)
 const RETRY_MAX_ATTEMPTS = 5;
 
@@ -10,21 +9,9 @@ const jitter = (ms: number, spread = 0.35) => {
     return Math.max(0, ms - d + Math.random() * (2 * d));
 };
 
-// простейший per-proxy троттлер: гарантирует minInterval между запросами с одного прокси
-const lastHit = new Map<string, number>(); // proxyId -> ts
-export async function throttleProxy(proxyId: string, minIntervalMs = PROXY_MIN_INTERVAL_MS) {
-    const now = Date.now();
-    const last = lastHit.get(proxyId) ?? 0;
-    const wait = last + minIntervalMs - now;
-    if (wait > 0) await sleep(wait);
-    lastHit.set(proxyId, Date.now());
-}
-
-export async function requestWithBackoff<T>(proxyId: string, doRequest: () => Promise<T>, maxAttempts = RETRY_MAX_ATTEMPTS): Promise<T> {
+export async function requestWithBackoff<T>(doRequest: () => Promise<T>, maxAttempts = RETRY_MAX_ATTEMPTS): Promise<T> {
     let attempt = 1;
-    // маленькая защита на каждый запрос: троттлинг per-proxy
     while (true) {
-        await throttleProxy(proxyId);
         try {
             const res = await doRequest();
             // лёгкая пауза между страницами, чтобы «человечнее» выглядеть

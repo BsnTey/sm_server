@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { aproveShopKeyboard, comebackShopSelection } from '../../keyboards/make-order.keyboard';
-import { AddressSuggestList, IAccountCashing } from '../../../account/interfaces/account.interface';
+import { AddressSuggestList } from '../../../account/interfaces/account.interface';
+import { OrderState } from '../../interfaces/order.interface';
 
 export type FormatGeo = {
     id: string;
@@ -12,7 +13,7 @@ export type FormatGeo = {
 export class MakeOrderService {
     constructor() {}
 
-    async approveShop(account: IAccountCashing, shopId: string) {
+    async approveShop(account: OrderState, shopId: string) {
         const accessItemsPickupAvailability = account.accessItemsPickupAvailability;
         const shop = accessItemsPickupAvailability?.data.list.find(shop => String(shop.shop.shopNumber) === shopId);
 

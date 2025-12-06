@@ -11,7 +11,7 @@ type StatsRow = {
 
 @Injectable()
 export class PaymentRepository {
-    constructor(private prisma: PrismaService) {}
+    constructor(private prisma: PrismaService) { }
 
     private statusSQL(status?: StatusPayment) {
         if (status) return Prisma.sql`AND p.status::text = ${status}`;
@@ -137,104 +137,81 @@ export class PaymentRepository {
         });
     }
 
-    async getStatsDaily(from: Date, toInclusive: Date, status?: StatusPayment) {
+    async getStatsDaily(from: string, toExclusive: string, status?: StatusPayment) {
         return this.prisma.$queryRaw<StatsRow[]>(Prisma.sql`
-    WITH series AS (
-      SELECT gs::date AS bucket
-      FROM generate_series(
-        date_trunc('day', ${from}::timestamp),
-        date_trunc('day', ${toInclusive}::timestamp) - interval '1 day',
-        interval '1 day'
-      ) AS gs
-    ),
-    agg AS (
-      SELECT date_trunc('day', p.completed_at)::date AS bucket,
-             COUNT(*)::int                          AS count,
-             COALESCE(SUM(p.amount), 0)             AS sum_amount
-      FROM "payment_order" p
-      WHERE p.completed_at IS NOT NULL
-        AND p.completed_at >= ${from}
-        AND p.completed_at <=  ${toInclusive}
-        ${this.statusSQL(status)}
-      GROUP BY 1
-    )
-    SELECT s.bucket, COALESCE(a.count, 0) AS count, COALESCE(a.sum_amount, 0) AS sum_amount
-    FROM series s
-    LEFT JOIN agg a ON a.bucket = s.bucket
-    ORDER BY s.bucket ASC
-  `);
+            WITH series AS (
+                SELECT gs::date AS bucket
+                FROM generate_series(
+                    ${from}::timestamp,
+                    -- ВАЖНО: Отнимаем 1 день от верхней границы, чтобы получить последнюю нужную дату
+                    -- Если toExclusive = '2025-12-02', то (toExclusive - 1 day) = '2025-12-01'.
+                    -- generate_series ВКЛЮЧАЕТ конечную точку, поэтому список будет по 01 число.
+                    ${toExclusive}::timestamp - interval '1 day',
+                    interval '1 day'
+                ) AS gs
+            ),
+            agg AS (
+                SELECT date_trunc('day', p.completed_at)::date AS bucket,
+                       COUNT(*)::int                          AS count,
+                       COALESCE(SUM(p.amount), 0)             AS sum_amount
+                FROM "payment_order" p
+                WHERE p.completed_at IS NOT NULL
+                  AND p.completed_at >= ${from}::timestamp
+                  AND p.completed_at <  ${toExclusive}::timestamp -- Строго меньше следующего дня
+                  ${this.statusSQL(status)}
+                GROUP BY 1
+            )
+            SELECT 
+                s.bucket, 
+                COALESCE(a.count, 0) AS count, 
+                COALESCE(a.sum_amount, 0) AS sum_amount
+            FROM series s
+            LEFT JOIN agg a ON a.bucket = s.bucket
+            ORDER BY s.bucket ASC
+        `);
     }
 
-    private async getMonthlyBounds(status?: StatusPayment) {
-        const [row] = await this.prisma.$queryRaw<
-            Array<{
-                min_bucket: Date | null;
-                max_bucket: Date | null;
-            }>
-        >(Prisma.sql`
-      SELECT date_trunc('month', MIN(p.completed_at)) AS min_bucket,
-             date_trunc('month', MAX(p.completed_at)) AS max_bucket
-      FROM "payment_order" p
-      WHERE p.completed_at IS NOT NULL
-        ${this.statusSQL(status)}
-    `);
-
-        const now = new Date();
-        if (!row?.min_bucket || !row?.max_bucket) {
-            const from = new Date(now);
-            from.setMonth(now.getMonth() - 11, 1);
-            from.setHours(0, 0, 0, 0);
-
-            const to = new Date(now);
-            to.setMonth(now.getMonth() + 1, 1);
-            to.setHours(0, 0, 0, 0);
-
-            return { from, to };
-        }
-
-        const from = new Date(row.min_bucket);
-        const to = new Date(row.max_bucket);
-        to.setMonth(to.getMonth() + 1, 1); // правая граница — начало след. месяца
-        return { from, to };
-    }
-
-    async getStatsMonthly(fromMonthStart: Date, toMonthStartNext: Date, status?: StatusPayment) {
+    async getStatsMonthly(fromMonthStart: string, toMonthStartNext: string, status?: StatusPayment) {
         return this.prisma.$queryRaw<StatsRow[]>(Prisma.sql`
-    WITH series AS (
-      SELECT date_trunc('month', gs)::date AS bucket
-      FROM generate_series(
-        date_trunc('month', ${fromMonthStart}::timestamp),
-        date_trunc('month', ${toMonthStartNext}::timestamp) - interval '1 month',
-        interval '1 month'
-      ) AS gs
-    ),
-    agg AS (
-      SELECT date_trunc('month', p.completed_at)::date AS bucket,
-             COUNT(*)::int                            AS count,
-             COALESCE(SUM(p.amount), 0)               AS sum_amount
-      FROM "payment_order" p
-      WHERE p.completed_at IS NOT NULL
-        AND p.completed_at >= ${fromMonthStart}
-        AND p.completed_at <  ${toMonthStartNext}
-        ${this.statusSQL(status)}
-      GROUP BY 1
-    )
-    SELECT s.bucket, COALESCE(a.count, 0) AS count, COALESCE(a.sum_amount, 0) AS sum_amount
-    FROM series s
-    LEFT JOIN agg a ON a.bucket = s.bucket
-    ORDER BY s.bucket ASC
-  `);
+            WITH series AS (
+                SELECT date_trunc('month', gs)::date AS bucket
+                FROM generate_series(
+                    ${fromMonthStart}::timestamp,
+                    -- Аналогично: отнимаем 1 месяц, чтобы получить дату внутри последнего нужного месяца
+                    ${toMonthStartNext}::timestamp - interval '1 month',
+                    interval '1 month'
+                ) AS gs
+            ),
+            agg AS (
+                SELECT date_trunc('month', p.completed_at)::date AS bucket,
+                       COUNT(*)::int                            AS count,
+                       COALESCE(SUM(p.amount), 0)               AS sum_amount
+                FROM "payment_order" p
+                WHERE p.completed_at IS NOT NULL
+                  AND p.completed_at >= ${fromMonthStart}::timestamp
+                  AND p.completed_at <  ${toMonthStartNext}::timestamp
+                  ${this.statusSQL(status)}
+                GROUP BY 1
+            )
+            SELECT 
+                s.bucket, 
+                COALESCE(a.count, 0) AS count, 
+                COALESCE(a.sum_amount, 0) AS sum_amount
+            FROM series s
+            LEFT JOIN agg a ON a.bucket = s.bucket
+            ORDER BY s.bucket ASC
+        `);
     }
 
-    async getStatsTotals(from: Date, toInclusive: Date, status?: StatusPayment) {
+    async getStatsTotals(from: string, toExclusive: string, status?: StatusPayment) {
         const [row] = await this.prisma.$queryRaw<Array<{ count: number; sum_amount: number }>>(Prisma.sql`
-    SELECT COUNT(*)::int AS count, COALESCE(SUM(p.amount), 0) AS sum_amount
-    FROM "payment_order" p
-    WHERE p.completed_at IS NOT NULL
-      AND p.completed_at >= ${from}
-      AND p.completed_at <=  ${toInclusive}
-      ${this.statusSQL(status)}
-  `);
+            SELECT COUNT(*)::int AS count, COALESCE(SUM(p.amount), 0) AS sum_amount
+            FROM "payment_order" p
+            WHERE p.completed_at IS NOT NULL
+              AND p.completed_at >= ${from}::timestamp
+              AND p.completed_at <  ${toExclusive}::timestamp
+              ${this.statusSQL(status)}
+        `);
         return row ?? { count: 0, sum_amount: 0 };
     }
 }

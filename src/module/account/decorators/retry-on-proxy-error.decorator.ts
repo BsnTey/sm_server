@@ -1,16 +1,51 @@
 import { isAxiosError } from 'axios';
-
 import { Logger } from '@nestjs/common';
-import { Cache } from 'cache-manager';
 import { IAccountWithProxy } from '../interfaces/account.interface';
+import { RedisCacheService } from '../../cache/cache.service';
+import { getAccountEntityKey } from '../../cache/cache.keys';
+
+// --- 1. Исправленный Троттлер ---
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+// Храним время (timestamp), когда прокси станет свободным
+const proxyAvailability = new Map<string, number>();
+
+/**
+ * Гарантирует последовательное выполнение запросов с интервалом.
+ * Бронирует слот времени синхронно, предотвращая гонку.
+ */
+export async function throttleProxy(proxyId: string, minIntervalMs: number) {
+    if (!proxyId || minIntervalMs <= 0) return;
+
+    const now = Date.now();
+
+    // 1. Смотрим, когда прокси освободится. Если записи нет или она в прошлом, берем now.
+    let scheduledTime = proxyAvailability.get(proxyId) ?? 0;
+    if (scheduledTime < now) {
+        scheduledTime = now;
+    }
+
+    // 2. СРАЗУ обновляем время доступности для СЛЕДУЮЩЕГО запроса.
+    // Это происходит синхронно, никто не успеет вклиниться.
+    proxyAvailability.set(proxyId, scheduledTime + minIntervalMs);
+
+    // 3. Вычисляем, сколько нужно подождать текущему запросу
+    const wait = scheduledTime - now;
+
+    // 4. Ждем своей очереди
+    if (wait > 0) {
+        await sleep(wait);
+    }
+}
+
+// --- 2. Интерфейсы ---
 
 export interface IProxyRetryableService {
     logger: Logger;
-    cacheManager: Cache;
+    cacheService: RedisCacheService;
 
-    accountRep: {
-        getAccountWithProxy(accountId: string): Promise<IAccountWithProxy | null>;
-    };
+    getAccountEntity(accountId: string): Promise<IAccountWithProxy>;
 
     proxyService: {
         updateProxy(uuid: string, dto: { blockedAt?: Date | null }): Promise<any>;
@@ -20,10 +55,14 @@ export interface IProxyRetryableService {
 interface RetryOnProxyErrorOptions {
     maxAttempts?: number;
     blockMinutes?: number;
+    minProxyIntervalMs?: number;
 }
 
+// --- 3. Декоратор ---
+const PROXY_MIN_INTERVAL_MS = 450; // ~2.2 RPS на прокси
+
 export function RetryOnProxyError(options: RetryOnProxyErrorOptions = {}): MethodDecorator {
-    const { maxAttempts = 5, blockMinutes = 10 } = options;
+    const { maxAttempts = 5, blockMinutes = 60, minProxyIntervalMs = PROXY_MIN_INTERVAL_MS } = options;
 
     return (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {
         const originalMethod = descriptor.value;
@@ -31,15 +70,19 @@ export function RetryOnProxyError(options: RetryOnProxyErrorOptions = {}): Metho
 
         descriptor.value = async function (...args: any[]) {
             const self = this as unknown as IProxyRetryableService;
-
             const logger = self.logger || new Logger(`${target.constructor.name}:${methodName}`);
-
             const firstArg = args[0] as AccountLike;
 
             let lastError: any;
 
+            // Получаем контекст до цикла попыток
+            const context = await resolveAccountContext(self, firstArg);
+
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
+                    // --- Троттлинг ---
+                    await throttleProxy(context.proxyUuid, minProxyIntervalMs);
+
                     if (attempt > 1) {
                         logger.log(`[RetryOnProxyError] Attempt ${attempt}/${maxAttempts} for '${methodName}'.`);
                     }
@@ -59,55 +102,25 @@ export function RetryOnProxyError(options: RetryOnProxyErrorOptions = {}): Metho
                     );
 
                     if (attempt >= maxAttempts) {
-                        logger.error(`[RetryOnProxyError] Max attempts reached for '${methodName}'. Giving up.`);
                         break;
                     }
 
-                    // --- Пытаемся получить accountId и proxy ---
-                    let accountId: string | undefined;
-                    let proxyUuid: string | undefined;
-                    let proxyStr: string | undefined;
+                    try {
+                        const blockedAt = new Date();
+                        await self.proxyService.updateProxy(context.proxyUuid, { blockedAt });
+                        logger.warn(`[RetryOnProxyError] Proxy blocked uuid=${context.proxyUuid} for ~${blockMinutes} min.`);
+                    } catch (blockErr) {
+                        logger.error(`[RetryOnProxyError] Failed to block proxy:`, blockErr);
+                    }
 
                     try {
-                        const ctx = await resolveAccountContext(self, firstArg);
-                        accountId = ctx.accountId;
-                        proxyUuid = ctx.proxyUuid;
-                        proxyStr = ctx.proxyStr;
-                    } catch (ctxErr) {
-                        logger.error(`[RetryOnProxyError] Failed to resolve account context for '${methodName}':`, ctxErr);
+                        const key = getAccountEntityKey(context.accountId);
+                        await self.cacheService.del(key);
+                    } catch (cacheErr) {
+                        logger.error(`[RetryOnProxyError] Failed to clear cache:`, cacheErr);
                     }
-
-                    // 1) Блокируем proxy, если есть uuid
-                    if (proxyUuid) {
-                        try {
-                            const blockedAt = new Date();
-                            await self.proxyService.updateProxy(proxyUuid, { blockedAt });
-                            logger.warn(
-                                `[RetryOnProxyError] Proxy blocked (uuid=${proxyUuid}, proxy=${proxyStr ?? ''}), blockedAt=${blockedAt.toISOString()} (~${blockMinutes} min).`,
-                            );
-                        } catch (blockErr) {
-                            logger.error(`[RetryOnProxyError] Failed to block proxy (uuid=${proxyUuid}):`, blockErr);
-                        }
-                    } else {
-                        logger.warn(`[RetryOnProxyError] Proxy uuid not found in context, cannot block proxy.`);
-                    }
-
-                    // 2) Чистим кеш по accountId (если он вообще есть)
-                    if (accountId) {
-                        try {
-                            await self.cacheManager.del(accountId);
-                            logger.log(`[RetryOnProxyError] Cache cleared for accountId=${accountId}.`);
-                        } catch (cacheErr) {
-                            logger.error(`[RetryOnProxyError] Failed to clear cache for accountId=${accountId}:`, cacheErr);
-                        }
-                    } else {
-                        logger.warn(`[RetryOnProxyError] accountId not found in context, cannot clear cache.`);
-                    }
-
-                    // идём на следующую попытку
                 }
             }
-
             throw lastError;
         };
 
@@ -115,84 +128,45 @@ export function RetryOnProxyError(options: RetryOnProxyErrorOptions = {}): Metho
     };
 }
 
-type AccountLike =
-    | string
-    | {
-          accountId?: string;
-          proxy?: { uuid?: string; proxy?: string | null } | null;
-      };
+// --- 4. Вспомогательные функции ---
+
+type AccountLike = string | { accountId?: string; proxy?: { uuid?: string; proxy?: string | null } | null };
 
 interface AccountContext {
-    accountId?: string;
-    proxyUuid?: string;
-    proxyStr?: string;
+    accountId: string;
+    proxyUuid: string;
+    proxyStr: string;
 }
 
 async function resolveAccountContext(self: IProxyRetryableService, firstArg: AccountLike): Promise<AccountContext> {
-    // 1. Если строка — это accountId
     if (typeof firstArg === 'string') {
         const accountId = firstArg;
-        const accountWithProxy = await self.accountRep.getAccountWithProxy(accountId);
-
+        const accountWithProxy = await self.getAccountEntity(accountId);
         return {
             accountId,
-            proxyUuid: accountWithProxy?.proxy?.uuid,
-            proxyStr: accountWithProxy?.proxy?.proxy ?? undefined,
+            proxyUuid: accountWithProxy.proxy.uuid,
+            proxyStr: accountWithProxy?.proxy.proxy,
         };
     }
 
-    // 2. Если объект (AccountWithProxyEntity / IAccountWithProxy / похожий)
     if (firstArg && typeof firstArg === 'object') {
         const obj = firstArg as any;
-        const accountId: string | undefined = obj.accountId;
+        const accountId: string = obj.accountId;
+        const proxyUuid: string = obj.proxy.uuid;
+        const proxyStr: string = obj.proxy.proxy;
 
-        const proxyUuid: string | undefined = obj.proxy?.uuid;
-        const proxyStr: string | undefined = obj.proxy?.proxy ?? undefined;
-
-        // если у объекта есть и accountId, и proxy — можно не ходить в БД
-        if (accountId && proxyUuid) {
-            return { accountId, proxyUuid, proxyStr };
-        }
-
-        // если есть только accountId — дотаскиваем proxy из БД
-        if (accountId) {
-            const accountWithProxy = await self.accountRep.getAccountWithProxy(accountId);
-            return {
-                accountId,
-                proxyUuid: accountWithProxy?.proxy?.uuid,
-                proxyStr: accountWithProxy?.proxy?.proxy ?? undefined,
-            };
-        }
+        return { accountId, proxyUuid, proxyStr };
     }
-
-    return {};
+    throw new Error('Cannot resolve account context from first argument');
 }
 
 function isProxyRelatedError(error: any): boolean {
     if (!error) return false;
-
     if (isAxiosError(error)) {
         const msg = (error.message || '').toLowerCase();
-
-        if (msg.includes('proxy')) return true;
-        if (msg.includes('socks5')) return true;
-        if (msg.includes('tunneling socket')) return true;
-
-        if (error.code === 'ECONNABORTED') return true;
-        if (error.code === 'ETIMEDOUT') return true;
+        if (['proxy', 'socks5', 'tunneling socket'].some(w => msg.includes(w))) return true;
+        if (['ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET'].includes(error.code || '')) return true;
     }
-
-    if (error instanceof Error && error.message) {
-        const msg = error.message.toLowerCase();
-        if (msg.includes('proxy')) return true;
-        if (msg.includes('socks5')) return true;
-    }
-
-    if (typeof error === 'string') {
-        const msg = error.toLowerCase();
-        if (msg.includes('proxy')) return true;
-        if (msg.includes('socks5')) return true;
-    }
-
-    return false;
+    const msg = (error?.message || String(error)).toLowerCase();
+    return msg.includes('proxy') || msg.includes('socks5');
 }

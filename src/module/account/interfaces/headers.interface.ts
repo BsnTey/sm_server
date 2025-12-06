@@ -3,6 +3,7 @@ interface IRequestHeaders {
     Locale: string;
     Country: string;
     'Device-Id': string;
+    'X-Device-Id': string;
     'Account-Id': string;
     'Installation-Id': string;
     'City-Id': string;

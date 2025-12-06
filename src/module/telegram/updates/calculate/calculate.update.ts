@@ -9,6 +9,9 @@ import { ICalculateCash } from '../../interfaces/calculate.interface';
 import { CalculateService } from '../../../calculate/calculate.service';
 import { CommissionType } from '@prisma/client';
 import { TemplateService } from '../../../template/template.service';
+import { RedisCacheService } from '../../../cache/cache.service';
+
+const CALC_TTL = 3600;
 
 @Scene(CALCULATE_BONUS.scene)
 export class CalculateUpdate {
@@ -16,7 +19,8 @@ export class CalculateUpdate {
         private telegramService: TelegramService,
         private calculateServiceTelegram: TemplateService,
         private calculateService: CalculateService,
-    ) {}
+        private cacheService: RedisCacheService,
+    ) { }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -56,7 +60,6 @@ export class CalculateUpdate {
         try {
             const prices: string[] = inputPrices.split(/\r?\n/);
 
-            // Процент промо вводим как аргумент (здесь 10%, потом можно менять на 15 или брать из внешнего сервиса)
             const promoPercent = 10;
 
             let totalDiscountPromo = 0;
@@ -83,7 +86,7 @@ export class CalculateUpdate {
                 const parts = value.split(' ');
 
                 if (parts.length > 1) {
-                    discountShop = /^\d+$/.test(parts[1]) ? parseInt(parts[1]) : 228;
+                    discountShop = /^\d+$/.test(parts[1]) ? parseInt(parts[1]) : 0;
                 }
 
                 if (parts[0].includes('и')) {
@@ -93,25 +96,21 @@ export class CalculateUpdate {
 
                 const priceItem = parseInt(parts[0], 10);
 
-                const currentPriceItem = this.calculateService.computeCurrentPrice(priceItem, discountShop);
-
-                // Бонусы без промокода
-                const currentBonus = this.calculateService.computeBonus(priceItem, currentPriceItem, discountShop, isInventory);
-
-                const priceDiscount = currentPriceItem - currentBonus;
-                priceWithoutDiscount += currentPriceItem;
-
-                const currentPriceItemPromo = this.calculateService.computePriceWithPromoWithoutBonus(
-                    priceItem,
-                    currentPriceItem,
-                    discountShop,
+                // Используем новый единый калькулятор
+                const { bonusOnly, withPromo } = this.calculateService.calculateFromManualInput(priceItem, discountShop, {
                     isInventory,
-                    promoPercent,
-                );
+                    promoCodePercent: promoPercent,
+                });
 
-                const currentBonusPromo = this.calculateService.computeBonus(priceItem, currentPriceItemPromo, discountShop, isInventory);
+                const currentPriceItem = bonusOnly.finalPrice + bonusOnly.usedBonusesRub;
+                const currentBonus = bonusOnly.usedBonusesRub;
+                const priceDiscount = bonusOnly.finalPrice;
 
-                const priceDiscountPromo = currentPriceItemPromo - currentBonusPromo;
+                const currentPriceItemPromo = withPromo.finalPrice + withPromo.usedBonusesRub;
+                const currentBonusPromo = withPromo.usedBonusesRub;
+                const priceDiscountPromo = withPromo.finalPrice;
+
+                priceWithoutDiscount += currentPriceItem;
 
                 totalPrice += priceDiscount;
                 totalDiscount += currentBonus;
@@ -142,7 +141,7 @@ export class CalculateUpdate {
                 totalSumOnKassa: totalPricePromo,
             };
 
-            await this.telegramService.setDataCache<ICalculateCash>(String(telegramId), calculationResult);
+            await this.cacheService.set(`calc_result:${telegramId}`, calculationResult, CALC_TTL);
 
             const templates = await this.calculateServiceTelegram.getUserTemplates(String(telegramId));
 
@@ -173,7 +172,7 @@ export class CalculateUpdate {
 
     @Action('go_to_calculate_show')
     async goToCalculateShow(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const calculationResult = await this.telegramService.getDataFromCache<any>(String(telegramId));
+        const calculationResult = await this.cacheService.get<ICalculateCash>(`calc_result:${telegramId}`);
 
         if (!calculationResult || !calculationResult.outputPrices) {
             await ctx.reply('Данные расчета не найдены. Пожалуйста, сделайте новый расчет.');
@@ -203,7 +202,7 @@ export class CalculateUpdate {
             return;
         }
 
-        const calculationResult = await this.telegramService.getDataFromCache<ICalculateCash>(String(telegramId));
+        const calculationResult = await this.cacheService.get<ICalculateCash>(`calc_result:${telegramId}`);
 
         if (!calculationResult) {
             await ctx.reply('Данные расчета не найдены. Пожалуйста, сделайте новый расчет.');
@@ -265,3 +264,4 @@ function applyTemplate(template: string, totalPrice: number, commission: number)
         .replace(/{commission}/g, commission.toString())
         .replace(/\/n/g, '\n');
 }
+

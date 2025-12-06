@@ -12,7 +12,6 @@ export type PrepareProductCheckRequest = z.infer<typeof CheckProductRequestSchem
 export const CheckProductBatchRequestSchema = z.object({
     telegramId: z.string(),
     productId: z.string(),
-    isInventory: z.boolean(),
     accountIds: z.array(z.string()).min(1).max(50),
 });
 

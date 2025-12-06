@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { AccountService } from '../../../account/account.service';
-import { UserService } from '../../../user/user.service';
 import { TelegramService } from '../../telegram.service';
 import { ProfileFamilyResponse, StatusFamilyMember } from '../../../account/interfaces/profile-family.interface';
 import { InviteMemberFamily, MemberFamily } from '../../../account/interfaces/family-invite.interface';
@@ -14,12 +13,13 @@ import {
 } from '../../keyboards/family.keyboard';
 import { PhoneName } from '../../interfaces/person.interface';
 import { UserRole } from '@prisma/client';
+import { RedisCacheService } from '../../../cache/cache.service';
 
 @Injectable()
 export class FamilyService {
     constructor(
         private readonly accountService: AccountService,
-        private readonly userService: UserService,
+        private readonly cacheService: RedisCacheService,
         private readonly telegramService: TelegramService,
     ) {}
 
@@ -208,11 +208,5 @@ export class FamilyService {
 
         await this.accountService.familyAnswer(accountId, familyResponse.family!.id, accept);
         return { accepted: accept };
-    }
-
-    async getAccountIdByTelegram(telegramId: string) {
-        const account = await this.telegramService.getFromCache(telegramId);
-        if (!account?.accountId) throw new NotFoundException('Информация устарела. Попробуйте заново');
-        return account.accountId;
     }
 }

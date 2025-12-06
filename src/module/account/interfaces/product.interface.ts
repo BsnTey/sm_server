@@ -160,17 +160,3 @@ interface BreadCrumb {
     displayCode: string;
     image: string;
 }
-
-export type CheckProductResultItem = {
-    accountId: string;
-    discountRate?: number;
-    price?: number;
-    bonuses?: number;
-    bonusCount?: number;
-    ordersToday?: number;
-    calculateProduct?: {
-        price: number;
-        bonus: number;
-    };
-    error?: string;
-};

@@ -585,21 +585,17 @@ export class AccountService {
         return accountWithProxyEntity;
     }
 
-    async rawLoadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
+    private async loadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
         const accountWithProxy = await this.accountRep.getAccountWithProxy(accountId);
 
         if (!accountWithProxy) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
 
-        return this.getAndValidateOrSetProxyAccount(accountWithProxy);
+        const entity = await this.getAndValidateOrSetProxyAccount(accountWithProxy);
+        await this.validationToken(entity);
+        return entity;
     }
 
-    private async loadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
-        const accountWithProxy = await this.rawLoadAccountCore(accountId);
-        await this.validationToken(accountWithProxy);
-        return accountWithProxy;
-    }
-
-    async getAccountEntity(accountId: string): Promise<AccountWithProxyEntity> {
+    private async getAccountEntity(accountId: string): Promise<AccountWithProxyEntity> {
         const accountEntityFromCache = await this.cacheManager.get<AccountWithProxyEntity>(accountId);
         if (!accountEntityFromCache) {
             const account = await this.loadAccountCore(accountId);
@@ -1112,7 +1108,6 @@ export class AccountService {
             productId,
         });
 
-        //@ts-ignore
         const node = info?.product?.node ?? null;
         const percent = extractPercentFromNode(node);
 

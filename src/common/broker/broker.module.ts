@@ -6,13 +6,27 @@ import { ConfigModule } from '@nestjs/config';
 import { DelayedPublisher } from '@common/broker/delayed.publisher';
 import { NotificationModule } from '../../module/notification/notification.module';
 import { AccountModule } from '../../module/account/account.module';
-import { PersonalDiscountWorker } from './workers/personal-discount.worker';
 import { AccountShortInfoWorker } from './workers/account-short-info.worker';
+import { PersonalDiscountInputWorker } from './workers/personal-discount-input.worker';
+import { CheckingModule } from '../../module/checking/checking.module';
+import { PersonalDiscountChunkWorker } from './workers/personal-discount-chunk.worker';
+import { PersonalDiscountProductWorker } from './workers/personal-discount-product.worker';
+import { MessagesToTelegramWorker } from './workers/messages-to-telegram.worker';
+import { TelegramModule } from '../../module/telegram/telegram.module';
 
 @Global()
 @Module({
-    imports: [ConfigModule, forwardRef(() => NotificationModule), AccountModule],
-    providers: [brokerProvider, BrokerConsumer, DelayedPublisher, PersonalDiscountWorker, AccountShortInfoWorker],
+    imports: [ConfigModule, forwardRef(() => NotificationModule), AccountModule, CheckingModule, TelegramModule],
+    providers: [
+        brokerProvider,
+        BrokerConsumer,
+        DelayedPublisher,
+        AccountShortInfoWorker,
+        PersonalDiscountInputWorker,
+        PersonalDiscountChunkWorker,
+        PersonalDiscountProductWorker,
+        MessagesToTelegramWorker,
+    ],
     exports: [brokerProvider, DelayedPublisher],
 })
 export class BrokerModule implements OnApplicationShutdown {

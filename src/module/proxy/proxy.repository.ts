@@ -4,7 +4,7 @@ import { PrismaService } from '@common/database/prisma.service';
 
 @Injectable()
 export class ProxyRepository {
-    constructor(private prisma: PrismaService) {}
+    constructor(private prisma: PrismaService) { }
 
     async getAllAvailableProxy(currentTime: Date, timeBlockedMinute: number = 5): Promise<Proxy[]> {
         const timeBlockedAgo = new Date();
@@ -61,6 +61,16 @@ export class ProxyRepository {
                 createdAt: true,
                 updatedAt: true,
             },
+        });
+    }
+
+    async clearAll() {
+        return this.prisma.proxy.deleteMany();
+    }
+
+    async createMany(data: { proxy: string; expiresAt: Date }[]) {
+        return this.prisma.proxy.createMany({
+            data,
         });
     }
 }

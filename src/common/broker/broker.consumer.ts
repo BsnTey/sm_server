@@ -4,8 +4,11 @@ import { RABBIT_MQ } from './broker.provider';
 import { RABBIT_MQ_QUEUES } from '@common/broker/rabbitmq.queues';
 import { ConfirmChannel, ConsumeMessage } from 'amqplib';
 import { OrderTrackingWorker } from '../../module/notification/tracking/tracking.worker';
-import { PersonalDiscountWorker } from './workers/personal-discount.worker';
 import { AccountShortInfoWorker } from './workers/account-short-info.worker';
+import { PersonalDiscountInputWorker } from './workers/personal-discount-input.worker';
+import { PersonalDiscountChunkWorker } from './workers/personal-discount-chunk.worker';
+import { PersonalDiscountProductWorker } from './workers/personal-discount-product.worker';
+import { MessagesToTelegramWorker } from './workers/messages-to-telegram.worker';
 
 @Injectable()
 export class BrokerConsumer implements OnModuleInit {
@@ -13,38 +16,92 @@ export class BrokerConsumer implements OnModuleInit {
 
     constructor(
         @Inject(RABBIT_MQ) private readonly channel: ChannelWrapper,
-        private readonly worker: OrderTrackingWorker,
-        private readonly personalDiscountWorker: PersonalDiscountWorker,
+        private readonly orderTrackingWorker: OrderTrackingWorker,
         private readonly accountShortInfoWorker: AccountShortInfoWorker,
-    ) {}
+        private readonly personalDiscountInputWorker: PersonalDiscountInputWorker,
+        private readonly personalDiscountChunkWorker: PersonalDiscountChunkWorker,
+        private readonly personalDiscountProductWorker: PersonalDiscountProductWorker,
+        private readonly messagesToTelegramWorker: MessagesToTelegramWorker,
+    ) { }
 
     async onModuleInit() {
-        await this.registerHandlers();
-    }
-
-    private async registerHandlers() {
-        await this.channel.addSetup(async (raw: ConfirmChannel) => {
-            await raw.consume(
-                RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE,
-                msg => this.safeHandle('OrderTrackingWorker', msg, raw, payload => this.worker.process(payload)),
-                { noAck: false },
-            );
-
-            await raw.consume(
-                RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_QUEUE,
-                msg => this.safeHandle('PersonalDiscountWorker', msg, raw, payload => this.personalDiscountWorker.process(payload)),
-                { noAck: false },
-            );
-
-            await raw.consume(
-                RABBIT_MQ_QUEUES.ACCOUNT_SHORT_INFO_QUEUE,
-                msg => this.safeHandle('AccountShortInfoWorker', msg, raw, payload => this.accountShortInfoWorker.process(payload)),
-                { noAck: false },
-            );
+        await this.channel.addSetup(async (channel: ConfirmChannel) => {
+            await this.registerHandlers(channel);
         });
     }
 
-    private async safeHandle(label: string, msg: ConsumeMessage | null, raw: ConfirmChannel, handler: (payload: Buffer) => Promise<void>) {
+    private async registerHandlers(channel: ConfirmChannel) {
+        // 1. Order Tracking
+        await channel.consume(
+            RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE,
+            msg =>
+                this.safeHandle('OrderTracking', msg, channel, RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE, 3, payload =>
+                    this.orderTrackingWorker.process(payload),
+                ),
+            { noAck: false },
+        );
+
+        // 2. Account Short Info
+        await channel.consume(
+            RABBIT_MQ_QUEUES.ACCOUNT_SHORT_INFO_QUEUE,
+            msg =>
+                this.safeHandle('AccountShortInfo', msg, channel, RABBIT_MQ_QUEUES.ACCOUNT_SHORT_INFO_QUEUE, 3, payload =>
+                    this.accountShortInfoWorker.process(payload),
+                ),
+            { noAck: false },
+        );
+
+        // 4. Personal Discount Chunk
+        await channel.consume(
+            RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_CHUNK_QUEUE,
+            msg =>
+                this.safeHandle('PersonalDiscountChunk', msg, channel, RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_CHUNK_QUEUE, 3, payload =>
+                    this.personalDiscountChunkWorker.process(payload),
+                ),
+            { noAck: false },
+        );
+
+        // 3. Personal Discount Input
+        await channel.prefetch(1);
+        await channel.consume(
+            RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_INPUT_QUEUE,
+            msg =>
+                this.safeHandle('PersonalDiscountInput', msg, channel, RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_INPUT_QUEUE, 3, payload =>
+                    this.personalDiscountInputWorker.process(payload),
+                ),
+            { noAck: false },
+        );
+
+        // 5. Personal Discount Product
+        await channel.prefetch(4);
+        await channel.consume(
+            RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_PRODUCT_QUEUE,
+            msg =>
+                this.safeHandle('PersonalDiscountProduct', msg, channel, RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_PRODUCT_QUEUE, 3, payload =>
+                    this.personalDiscountProductWorker.process(payload),
+                ),
+            { noAck: false },
+        );
+
+        // 6. Messages to Telegram
+        await channel.consume(
+            RABBIT_MQ_QUEUES.MESSAGES_TO_TELEGRAM_QUEUE,
+            msg =>
+                this.safeHandle('MessagesToTelegram', msg, channel, RABBIT_MQ_QUEUES.MESSAGES_TO_TELEGRAM_QUEUE, 3, payload =>
+                    this.messagesToTelegramWorker.process(payload),
+                ),
+            { noAck: false },
+        );
+    }
+
+    private async safeHandle(
+        label: string,
+        msg: ConsumeMessage | null,
+        raw: ConfirmChannel,
+        queueName: string,
+        maxAttempts: number,
+        handler: (payload: Buffer) => Promise<void>,
+    ) {
         if (!msg) return;
 
         try {
@@ -52,10 +109,35 @@ export class BrokerConsumer implements OnModuleInit {
             try {
                 raw.ack(msg);
             } catch (ackErr) {
-                this.logger.error(`${label}: failed to ack (channel probably closed)`, ackErr);
+                this.logger.error(`${label}: failed to ack success (channel probably closed)`, ackErr);
             }
         } catch (e) {
-            this.logger.error(`${label} failed, ack anyway (no retries here):`, e);
+            const headers = msg.properties.headers || {};
+            const currentRetry = (headers['x-retry-count'] as number) || 0;
+            const attempt = currentRetry + 1;
+
+            if (attempt < maxAttempts) {
+                this.logger.warn(
+                    `${label} failed (attempt ${attempt}/${maxAttempts}). Retrying... Error: ${e instanceof Error ? e.message : e}`,
+                );
+
+                try {
+                    // 1. Отправляем сообщение заново в конец очереди с обновленным счетчиком
+                    const newHeaders = { ...headers, 'x-retry-count': attempt };
+
+                    raw.sendToQueue(queueName, msg.content, {
+                        headers: newHeaders,
+                        persistent: msg.properties.deliveryMode === 2,
+                    });
+                    raw.ack(msg);
+                    return;
+                } catch (publishErr) {
+                    this.logger.error(`${label}: failed to republish retry message`, publishErr);
+                }
+            }
+
+            // Если попыток не осталось или переопубликация упала
+            this.logger.error(`${label} failed completely after ${attempt} attempt(s). Giving up. Error:`, e);
             try {
                 raw.ack(msg);
             } catch (ackErr) {

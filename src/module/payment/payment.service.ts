@@ -27,7 +27,7 @@ export class PaymentService {
         private paymentRepository: PaymentRepository,
         private bottService: BottService,
         private configService: ConfigService,
-    ) {}
+    ) { }
 
     async changeUserBalance(id: string, telegramId: string, amount: number, isPositive: boolean = true) {
         let searchId;
@@ -228,49 +228,68 @@ export class PaymentService {
         return new PaymentOrderEntity(paymentOrderModel);
     }
 
-    startOfDay(d: Date) {
-        const x = new Date(d);
-        x.setHours(0, 0, 0, 0);
-        return x;
+    private parseDateLocal(dateStr: string | Date): Date {
+        if (dateStr instanceof Date) return new Date(dateStr.setHours(0, 0, 0, 0));
+
+        const d = new Date(dateStr);
+
+        const inputAsString = typeof dateStr === 'string' ? dateStr : d.toISOString().split('T')[0];
+        const [year, month, day] = inputAsString.split('-').map(Number);
+
+        return new Date(year, month - 1, day, 0, 0, 0, 0);
     }
-    addDays(d: Date, n: number) {
+
+    private addDays(d: Date, n: number): Date {
         const x = new Date(d);
         x.setDate(x.getDate() + n);
         return x;
     }
-    startOfMonth(d: Date) {
+
+    private startOfMonth(d: Date): Date {
         const x = new Date(d);
         x.setDate(1);
         x.setHours(0, 0, 0, 0);
         return x;
     }
-    addMonths(d: Date, n: number) {
+
+    private addMonths(d: Date, n: number): Date {
         const x = new Date(d);
         x.setMonth(x.getMonth() + n, 1);
-        return this.startOfMonth(x);
+        x.setHours(0, 0, 0, 0);
+        return x;
     }
-    toISODate(d: Date) {
-        return d.toISOString().slice(0, 10);
+
+    private toISODate(d: Date): string {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
     async getPaymentStats(params: { dayFrom?: Date; dayTo?: Date; monthFrom?: Date; monthTo?: Date; status?: StatusPayment }) {
         const now = new Date();
 
-        // ---- ДНИ: дефолт последние 7 дат, включая сегодня ----
-        const df = this.startOfDay(params.dayFrom ?? this.addDays(now, -6));
-        const dt = this.addDays(new Date(params.dayTo ?? now), 1);
+        const dFrom = this.parseDateLocal(params.dayFrom ?? this.addDays(now, -6));
 
-        // ---- МЕСЯЦЫ: дефолт последние 12 месяцев, включая текущий ----
-        const thisMonth = this.startOfMonth(now);
-        const mf = this.startOfMonth(params.monthFrom ?? this.addMonths(thisMonth, -11));
-        const mt = this.startOfMonth(params.monthTo ?? thisMonth);
-        const mToExclusive = this.addMonths(mt, 1);
+        const dToRaw = params.dayTo ? this.parseDateLocal(params.dayTo) : this.parseDateLocal(now);
+
+        const sqlDayFrom = dFrom;
+        const sqlDayToExclusive = this.addDays(dToRaw, 1);
+
+        const mFromRaw = params.monthFrom ? this.parseDateLocal(params.monthFrom) : this.addMonths(now, -11);
+        const mToRaw = params.monthTo ? this.parseDateLocal(params.monthTo) : now;
+
+        const mFrom = this.startOfMonth(mFromRaw);
+        const mTo = this.startOfMonth(mToRaw);
+
+        const sqlMonthFrom = mFrom;
+        const sqlMonthToExclusive = this.addMonths(mTo, 1);
 
         const [byDay, byMonth, totalsDay, totalsMonth] = await Promise.all([
-            this.paymentRepository.getStatsDaily(df, dt, params.status),
-            this.paymentRepository.getStatsMonthly(mf, mToExclusive, params.status),
-            this.paymentRepository.getStatsTotals(df, dt, params.status),
-            this.paymentRepository.getStatsTotals(mf, mToExclusive, params.status),
+            this.paymentRepository.getStatsDaily(this.toISODate(sqlDayFrom), this.toISODate(sqlDayToExclusive), params.status),
+            this.paymentRepository.getStatsMonthly(this.toISODate(sqlMonthFrom), this.toISODate(sqlMonthToExclusive), params.status),
+            this.paymentRepository.getStatsTotals(this.toISODate(sqlDayFrom), this.toISODate(sqlDayToExclusive), params.status),
+            this.paymentRepository.getStatsTotals(this.toISODate(sqlMonthFrom), this.toISODate(sqlMonthToExclusive), params.status),
         ]);
 
         const byDayOut = byDay.map(r => ({
@@ -280,15 +299,21 @@ export class PaymentService {
         }));
 
         const byMonthOut = byMonth.map(r => ({
-            month: this.toISODate(r.bucket).slice(0, 7),
+            month: this.toISODate(r.bucket).slice(0, 7), // YYYY-MM
             count: r.count,
             sumAmount: Number(r.sum_amount) || 0,
         }));
 
         return {
             range: {
-                day: { from: this.toISODate(df), to: this.toISODate(dt) },
-                month: { from: this.toISODate(mf), to: this.toISODate(mt) },
+                day: {
+                    from: this.toISODate(dFrom),
+                    to: this.toISODate(dToRaw),
+                },
+                month: {
+                    from: this.toISODate(mFrom),
+                    to: this.toISODate(mTo),
+                },
             },
             byDay: byDayOut,
             byMonth: byMonthOut,

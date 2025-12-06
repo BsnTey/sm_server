@@ -2,7 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { Account, CourseStatus, Order, Prisma } from '@prisma/client';
 import { PrismaService } from '@common/database/prisma.service';
 import { AccountEntity } from './entities/account.entity';
-import { IAccountWithProxy, ICourseTokens, IEmailFromDb, IRefreshDataAccount, IUpdateAccount } from './interfaces/account.interface';
+import {
+    IAccountWithProxy,
+    IAccountWithProxyFromDB,
+    ICourseTokens,
+    IEmailFromDb,
+    IRefreshDataAccount,
+    IUpdateAccount,
+} from './interfaces/account.interface';
 import { CitySMEntity } from './entities/citySM.entity';
 
 @Injectable()
@@ -67,13 +74,7 @@ export class AccountRepository {
         });
     }
 
-    async getOrder(orderNumber: string): Promise<Order | null> {
-        return this.prisma.order.findFirst({
-            where: { orderNumber },
-        });
-    }
-
-    async getAccountWithProxy(accountId: string): Promise<IAccountWithProxy | null> {
+    async getAccountWithProxy(accountId: string): Promise<IAccountWithProxyFromDB | null> {
         return this.prisma.account.findUnique({
             where: { accountId },
             include: {
@@ -84,6 +85,7 @@ export class AccountRepository {
     }
 
     async setProxyAccount(accountId: string, proxyUuid: string): Promise<IAccountWithProxy> {
+        //@ts-ignore
         return this.prisma.account.update({
             where: {
                 accountId,
@@ -109,6 +111,17 @@ export class AccountRepository {
                 cookie: true,
             },
         });
+    }
+
+    async getProxyUuid(accountId: string): Promise<string | null> {
+        const result = await this.prisma.account.findUnique({
+            where: { accountId },
+            select: {
+                proxyUuid: true,
+            },
+        });
+
+        return result?.proxyUuid ?? null;
     }
 
     async getAccountEmail(accountId: string): Promise<IEmailFromDb | null> {
@@ -337,20 +350,6 @@ export class AccountRepository {
         await this.prisma.citySM.update({
             where: { cityId },
             data: { xLocation },
-        });
-    }
-
-    async addOrderNumber(accountId: string, orderNumber: string, date: Date): Promise<Order> {
-        return this.prisma.order.upsert({
-            where: { orderNumber },
-            create: {
-                orderNumber,
-                accountId,
-                date,
-            },
-            update: {
-                date,
-            },
         });
     }
 

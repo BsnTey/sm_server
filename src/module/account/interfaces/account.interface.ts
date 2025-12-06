@@ -72,8 +72,13 @@ export interface IAccountCashing {
     potentialOrder?: string;
 }
 
-export interface IAccountWithProxy extends Account {
+export interface IAccountWithProxyFromDB extends Account {
     proxy: Proxy | null;
+    citySM: CitySM;
+}
+
+export interface IAccountWithProxy extends Account {
+    proxy: Proxy;
     citySM: CitySM;
 }
 

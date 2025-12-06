@@ -12,6 +12,9 @@ import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { ERROR_ACCESS, ERROR_FOUND_USER } from '../../constants/error.constant';
 import { UserRole } from '@prisma/client';
 import { BottPurchaseService } from '../../../bott/bott-purchase.service';
+import { RedisCacheService } from '../../../cache/cache.service';
+
+const FAMILY_TTL = 3600;
 
 @Scene(FAMILY_PRIVELEGIE)
 @UseFilters(TelegrafExceptionFilter)
@@ -58,6 +61,10 @@ export class FamilyUserUpdate extends BaseUpdate {
 @Scene(FAMILY.scene)
 @UseFilters(TelegrafExceptionFilter)
 export class FamilyUpdate extends BaseUpdate {
+    constructor(private cacheService: RedisCacheService) {
+        super();
+    }
+
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: Context) {
         await ctx.reply('🔑 Пришлите номер вашего аккаунта:');
@@ -74,7 +81,7 @@ export class FamilyUpdate extends BaseUpdate {
         @Sender() sender: SenderTelegram,
         @Ctx() ctx: WizardContext,
     ) {
-        await this.telegramService.setTelegramAccountCache(String(sender.id), accountId);
+        await this.cacheService.set(`family_acc:${sender.id}`, { accountId }, FAMILY_TTL);
         await ctx.scene.enter(FAMILY_INPUT_SCENE);
     }
 }
@@ -83,14 +90,19 @@ export class FamilyUpdate extends BaseUpdate {
 @UseFilters(TelegrafExceptionFilter)
 export class FamilyInputAccountUpdate extends BaseUpdate {
     private readonly logger = new Logger(FamilyInputAccountUpdate.name);
-    constructor(private readonly familyService: FamilyService) {
+    constructor(
+        private readonly familyService: FamilyService,
+        private cacheService: RedisCacheService,
+    ) {
         super();
     }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: Context, @Sender() sender: SenderTelegram) {
         const telegramId = String(sender.id);
-        const accountId = await this.familyService.getAccountIdByTelegram(telegramId);
+        const account = await this.cacheService.get<{ accountId: string }>(`family_acc:${telegramId}`);
+        if (!account?.accountId) throw new NotFoundException('Информация устарела. Попробуйте заново');
+        const accountId = account.accountId;
         const user = await this.userService.getUserByTelegramId(String(telegramId));
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
 
@@ -130,7 +142,9 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
         const [, familyId, memberId] = ctx.match[0].split('_');
 
         const telegramId = String(sender.id);
-        const accountId = await this.familyService.getAccountIdByTelegram(telegramId);
+        const account = await this.cacheService.get<{ accountId: string }>(`family_acc:${telegramId}`);
+        if (!account?.accountId) throw new NotFoundException('Информация устарела. Попробуйте заново');
+        const accountId = account.accountId;
 
         this.logger.log(`Пользователь ${sender.first_name} - ${sender.id} запросил исключить из семьи accountId ${accountId}`);
 
@@ -153,7 +167,9 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
     @Action('leave_family')
     async leaveFamily(@Ctx() ctx: WizardContext, @Sender() sender: SenderTelegram) {
         const telegramId = String(sender.id);
-        const accountId = await this.familyService.getAccountIdByTelegram(telegramId);
+        const account = await this.cacheService.get<{ accountId: string }>(`family_acc:${telegramId}`);
+        if (!account?.accountId) throw new NotFoundException('Информация устарела. Попробуйте заново');
+        const accountId = account.accountId;
 
         this.logger.log(`Пользователь ${sender.first_name} - ${sender.id} запросил развалить семью для accountId ${accountId}`);
 
@@ -177,7 +193,9 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
     @Action('accept_family')
     async onAccept(@Ctx() ctx: Context, @Sender() sender: SenderTelegram) {
         const telegramId = String(sender.id);
-        const accountId = await this.familyService.getAccountIdByTelegram(telegramId);
+        const account = await this.cacheService.get<{ accountId: string }>(`family_acc:${telegramId}`);
+        if (!account?.accountId) throw new NotFoundException('Информация устарела. Попробуйте заново');
+        const accountId = account.accountId;
 
         this.logger.log(
             `Пользователь ${sender.first_name} - ${sender.id} запросил подтвердить его приглашение в семью для accountId ${accountId}`,
@@ -198,7 +216,9 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
     @Action('reject_family')
     async onReject(@Ctx() ctx: Context, @Sender() sender: SenderTelegram) {
         const telegramId = String(sender.id);
-        const accountId = await this.familyService.getAccountIdByTelegram(telegramId);
+        const account = await this.cacheService.get<{ accountId: string }>(`family_acc:${telegramId}`);
+        if (!account?.accountId) throw new NotFoundException('Информация устарела. Попробуйте заново');
+        const accountId = account.accountId;
 
         this.logger.log(
             `Пользователь ${sender.first_name} - ${sender.id} запросил отклонить его приглашение из семьи для accountId ${accountId}`,
@@ -224,6 +244,7 @@ export class FamilyInviteUpdate extends BaseUpdate {
     constructor(
         private readonly familyService: FamilyService,
         private readonly bottPurchaseService: BottPurchaseService,
+        private cacheService: RedisCacheService,
     ) {
         super();
     }
@@ -246,12 +267,16 @@ export class FamilyInviteUpdate extends BaseUpdate {
     ) {
         const telegramId = String(sender.id);
 
+        const account = await this.cacheService.get<{ accountId: string }>(`family_acc:${telegramId}`);
+        if (!account?.accountId) throw new NotFoundException('Информация устарела. Попробуйте заново');
+        const accountIdOwner = account.accountId;
+
         const user = await this.userService.getUserByTelegramId(telegramId);
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
 
         try {
             if (user.role == UserRole.User || user.role == UserRole.Admin) {
-                await this.doInvited(ctx, sender, accountIdInvited, user.role);
+                await this.doInvited(ctx, sender, accountIdInvited, accountIdOwner, user.role);
             }
             if (user.role == UserRole.Seller) {
                 const access = await this.checkingAccess(accountIdInvited);
@@ -267,7 +292,7 @@ export class FamilyInviteUpdate extends BaseUpdate {
                 if (!access) {
                     await ctx.reply('❌ Доступ к аккаунту был приобретен более 24 часов назад или с промокодом. Приглашение невозможно.');
                 } else {
-                    await this.doInvited(ctx, sender, accountIdInvited, user.role);
+                    await this.doInvited(ctx, sender, accountIdInvited, accountIdOwner, user.role);
                 }
             }
             return;
@@ -297,9 +322,8 @@ export class FamilyInviteUpdate extends BaseUpdate {
         return isWithin24h && noPromo;
     }
 
-    private async doInvited(ctx: Context, sender: SenderTelegram, accountIdInvited: string, userRole: UserRole) {
+    private async doInvited(ctx: Context, sender: SenderTelegram, accountIdInvited: string, accountIdOwner: string, userRole: UserRole) {
         let success = false;
-        const accountIdOwner = await this.familyService.getAccountIdByTelegram(String(sender.id));
 
         this.logger.log(`Пользователь ${sender.first_name} - ${sender.id} запросил принять его в семью по accountId ${accountIdOwner}`);
 
@@ -327,7 +351,7 @@ export class FamilyInviteUpdate extends BaseUpdate {
             await this.familyService.inviteMember(accountIdOwner, namePhoneInvited);
             success = true;
         } catch (e: any) {
-            throw new Error(e?.message || 'Что то пошло не так при добавлении участника');
+            throw new Error(e?.response?.data?.error?.message || 'Что то пошло не так при добавлении участника');
         }
 
         await ctx.reply('✅ Приглашение выслано. Проверьте информацию');

@@ -11,6 +11,9 @@ import { qrCodeUpdateKeyboard } from '../../keyboards/qr-code.keyboard';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { UserService } from '../../../user/user.service';
+import { RedisCacheService } from '../../../cache/cache.service';
+
+const QR_TTL = 3600;
 
 @Scene(QR_CODE.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -20,6 +23,7 @@ export class QrCodeUpdate {
         private accountService: AccountService,
         private userService: UserService,
         private telegramService: TelegramService,
+        private cacheService: RedisCacheService,
     ) {}
 
     @SceneEnter()
@@ -40,7 +44,7 @@ export class QrCodeUpdate {
         @Sender() { id: telegramId }: any,
         @Ctx() ctx: WizardContext,
     ) {
-        await this.telegramService.setTelegramAccountCache(String(telegramId), accountId);
+        await this.cacheService.set(`qr_acc:${telegramId}`, { accountId }, QR_TTL);
         const { qrCode, bonusCount } = await this.accountService.shortInfo(accountId);
 
         const qrCodeBuff = await this.qrCodeService.generateQrCode(qrCode);
@@ -51,7 +55,9 @@ export class QrCodeUpdate {
 
     @Action('update_qrcode')
     async updateQrCode(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        const account = await this.telegramService.getFromCache(String(telegramId));
+        const account = await this.cacheService.get<{ accountId: string }>(`qr_acc:${telegramId}`);
+        if (!account) return ctx.reply('Сессия истекла.');
+
         const { qrCode } = await this.accountService.shortInfo(account.accountId);
         const qrCodeBuff = await this.qrCodeService.generateQrCode(qrCode);
         const keyboard = qrCodeUpdateKeyboard.reply_markup;

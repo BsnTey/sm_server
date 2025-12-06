@@ -15,7 +15,7 @@ export class OrderTrackingWorker {
     private urlSite = this.configService.getOrThrow('API_DONOR_SITE');
 
     constructor(
-        private readonly accounts: AccountService,
+        private readonly accountService: AccountService,
         private readonly users: UserService,
         private readonly publisher: DelayedPublisher,
         private readonly telegram: TelegramService,
@@ -77,7 +77,7 @@ export class OrderTrackingWorker {
         // 1) тянем статус
         let resp: any;
         try {
-            resp = await this.accounts.orderInfo(accountId, orderNumber);
+            resp = await this.accountService.orderInfo(accountId, orderNumber);
         } catch (e) {
             // ошибка апи — сообщаем и выходим без репаблиша
             await this.notifyError(+telegramId, orderNumber);

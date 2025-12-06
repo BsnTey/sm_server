@@ -309,16 +309,15 @@ model FortuneCoupon {
   @@map("fortune_surprise")
 }
 
+//модель для категории для ручного поиска по продукту, где пользователь определяет категории сам
 model AccountDiscount {
-  id         String   @id @default(cuid())
-  accountId  String   @map("account_id")
-  telegramId String   @map("telegram_id")
-  nodeId     String   @map("node_id")
-  nodeName   String   @map("node_name")
-  dateEnd    DateTime @map("date_end")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         String       @id @default(cuid())
+  accountId  String       @map("account_id")
+  telegramId String       @map("telegram_id")
+  nodeId     String       @map("node_id")
+  node       NodeDiscount @relation(fields: [nodeId], references: [nodeId])
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
 
   @@unique([accountId, nodeId, telegramId], name: "account_node_telegram_unique")
   @@index([telegramId, accountId])
@@ -327,15 +326,16 @@ model AccountDiscount {
   @@map("account_discount")
 }
 
+//модель для быстрого поиска аккаунтов по продукту у пользователя
 model AccountDiscountProduct {
-  id         Int      @id @default(autoincrement())
-  productId  String   @map("product_id") @db.VarChar(32)
-  telegramId String   @map("telegram_id") @db.VarChar(32)
-  accountId  String   @map("account_id")
-  dateEnd    DateTime @map("date_end")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         Int          @id @default(autoincrement())
+  productId  String       @map("product_id") @db.VarChar(32)
+  telegramId String       @map("telegram_id") @db.VarChar(32)
+  accountId  String       @map("account_id")
+  nodeId     String       @map("node_id")
+  node       NodeDiscount @relation(fields: [nodeId], references: [nodeId])
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
 
   @@unique([productId, telegramId, accountId], name: "productId_telegramId_accountId")
   @@index([productId, telegramId])
@@ -344,17 +344,21 @@ model AccountDiscountProduct {
   @@map("account_discount_product")
 }
 
-model Product {
-  productId String @id @map("product_id") @db.VarChar(32)
-  node      String
+//модель ноды для информации
+model NodeDiscount {
+  nodeId                 String                   @id @map("node_id")
+  nodeName               String                   @map("node_name")
+  url                    String
+  dateEnd                DateTime                 @map("date_end")
+  createdAt              DateTime                 @default(now()) @map("created_at")
+  updatedAt              DateTime                 @updatedAt @map("updated_at")
+  AccountDiscountProduct AccountDiscountProduct[]
+  AccountDiscount        AccountDiscount[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  productInfo ProductInfo[]
-
-  @@map("product")
+  @@map("node_product")
 }
+
+//для поиска productId по артикулу и sku через Телеграм
 
 model ProductInfo {
   id        Int     @id @default(autoincrement())
@@ -365,8 +369,6 @@ model ProductInfo {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  product Product @relation(fields: [productId], references: [productId])
-
   @@unique([productId, article, sku], name: "unique_product_variant")
   @@index([productId])
   @@index([article])
@@ -375,10 +377,9 @@ model ProductInfo {
 }
 
 model AccountPurchase {
-  id          String @id
-  orderNumber String @map("order_number")
-  lineIndex   Int    @default(1) @map("line_index")
-
+  id              String   @id
+  orderNumber     String   @map("order_number")
+  lineIndex       Int      @default(1) @map("line_index")
   accountId       String   @map("account_id")
   buyerTelegramId String   @map("buyer_telegram_id")
   amount          Int

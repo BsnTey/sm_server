@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ProxyRepository } from './proxy.repository';
 import { ProxyEntity } from './entities/proxy.entity';
 import { ERROR_FREE_PROXY } from './error/error.constant';
+import { CreateProxiesDto } from './dto/create-proxies.dto';
 
 @Injectable()
 export class ProxyService implements OnModuleInit {
@@ -49,8 +50,13 @@ export class ProxyService implements OnModuleInit {
         return this.proxyRepository.update(uuid, dto);
     }
 
-    async blockProxy(uuid: string): Promise<void> {
-        this.logger.warn(`Blocking proxy ${uuid} due to connection error.`);
-        await this.updateProxy(uuid, { blockedAt: new Date() });
+    async clearAllProxies() {
+        this.logger.warn('Clearing all proxies from the database.');
+        return this.proxyRepository.clearAll();
+    }
+
+    async addProxies(dto: CreateProxiesDto) {
+        this.logger.log(`Adding ${dto.proxies.length} new proxies.`);
+        return this.proxyRepository.createMany(dto.proxies);
     }
 }

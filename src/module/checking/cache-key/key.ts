@@ -5,3 +5,11 @@ export function keyDiscountNodes(telegramId: string): string {
 export function keyDiscountAccount(telegramId: string): string {
     return `discount:accounts:${telegramId}`;
 }
+
+export function keyNodeInput(nodeId: string): string {
+    return `discount:nodeInput:${nodeId}`;
+}
+
+export function keyProductInfo(productId: string): string {
+    return `discount:productInfo:${productId}`;
+}

@@ -11,6 +11,7 @@ import { FORTUNE_BOT_SCENE, MAKE_DEPOSIT_SCENE, MY_DISCOUNT_SCENE, PROFILE_GET_I
 import { UserService } from '../../../user/user.service';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
+import { OrderService } from '../../../order/order.service';
 
 @Scene(PROFILE.scene)
 @UseFilters(TelegrafExceptionFilter)
@@ -87,7 +88,7 @@ export class ProfileUpdate {
 @UseFilters(TelegrafExceptionFilter)
 export class GetInfoOrderUpdate {
     constructor(
-        private accountService: AccountService,
+        private orderService: OrderService,
         private userService: UserService,
         private telegramService: TelegramService,
     ) {}
@@ -106,7 +107,7 @@ export class GetInfoOrderUpdate {
     async inputAccounts(@Message('text') numberOrder: string, @Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         const user = await this.userService.getUserByTelegramId(String(telegramId));
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
-        const order = await this.accountService.findOrderNumber(numberOrder);
+        const order = await this.orderService.findOrderNumber(numberOrder);
         if (order) {
             await ctx.reply(order.accountId, getMainMenuKeyboard(user.role));
         } else {
