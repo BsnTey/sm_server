@@ -20,6 +20,7 @@ import { OrderService } from '../order/order.service';
 import { CashedProduct, CheckProductResultItem, ResponseCheckProduct } from './interfaces/my-discount.interface';
 import { ProductApiResponse } from '../account/interfaces/product.interface';
 import { CalculateService } from '../calculate/calculate.service';
+import { ApiAdapter } from '../calculate/api.adapter';
 
 interface AccountProxyItem {
     accountId: string;
@@ -63,8 +64,7 @@ export class CheckingService {
             throw new HttpException('Не предоставлено валидных аккаунтов', HttpStatus.BAD_REQUEST);
         }
 
-        //делаем обнуление сразу перед новой загрузкой
-        await this.accountDiscountService.deleteAllByTelegramId(data.telegramId);
+        await this.accountDiscountService.deleteAccountDiscountsBatch(uniqueAccountIds, String(data.telegramId));
 
         await this.publisher.publish(
             RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_INPUT_QUEUE,
@@ -605,7 +605,6 @@ export class CheckingService {
 
         const errors = new Map<string, string>();
 
-        // --- Предзагрузка бонусов и заказов ---
         const [ordersTodayMap, bonusMap] = await Promise.all([
             this.orderService.countTodayByAccountIds(accountIds),
             this.accountService.getBonusCountByAccountIds(accountIds),
@@ -922,12 +921,12 @@ export class CheckingService {
 
     private async setToCacheProduct(product: ProductApiResponse['product']): Promise<CashedProduct> {
         const key = keyProductInfo(product.id);
-        const percentMyDiscount = this.calculateService.calcPercentMyDiscount(product);
+        const percentMyDiscount = ApiAdapter.calcMyDiscountPercent(product);
 
         const priceCatalog = +product.price.catalog.value / 100;
         const priceRetail = +product.price.retail.value / 100;
 
-        const calc = this.calculateService.computeCalculateFromProduct(product, percentMyDiscount, Boolean(percentMyDiscount));
+        const calc = this.calculateService.computeCalculateFromProduct(product);
 
         const cashedProduct = {
             priceCatalog,

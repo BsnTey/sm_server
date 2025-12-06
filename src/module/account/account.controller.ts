@@ -197,6 +197,7 @@ export class AccountController {
         return this.accountService.getCoursesList(params.accountId);
     }
 
+    //deprecated, используется в таблицах
     @Get('checking/:accountId')
     @HttpCode(200)
     async getBonusAccount(@Param() params: AccountIdParamsDto): Promise<any> {

@@ -111,12 +111,14 @@ export class MyDiscountUpdate extends BaseUpdate {
                 // Calculate total price and bonus for all products
                 let totalPrice = 0;
                 let totalBonus = 0;
+                let totalMyDiscount = 0;
                 for (const productId of productIds) {
                     try {
                         const result = await this.checkingService.getAccountsForPersonalDiscountV3(telegramId, productId);
                         if (result.data.calcProd) {
                             totalPrice += result.data.calcProd.calcPriceForProduct;
                             totalBonus += result.data.calcProd.calcBonusForProduct;
+                            totalMyDiscount += result.data.calcProd.usedMyDiscountRub;
                         }
                     } catch (e) {
                         this.logger.warn(`Failed to get calc for product ${productId}`);
@@ -135,6 +137,8 @@ export class MyDiscountUpdate extends BaseUpdate {
                     if (totalPrice > 0) {
                         lines.push(`💰 Общая возможная цена на кассе: <b>${totalPrice}</b> ₽`);
                         lines.push(`🎯 Общие требуемые бонусы: <b>${totalBonus}</b>`);
+                        const totalDiscount = totalBonus + totalMyDiscount;
+                        lines.push(`💎 Общая скидка (баллы + моя скидка): <b>${totalDiscount}</b> ₽`);
                         lines.push('');
                     }
                     lines.push(`✅ Найдено ${intersection.accounts.length} аккаунт(ов), где есть скидка на ВСЕ эти товары.`);
@@ -225,7 +229,8 @@ export class MyDiscountUpdate extends BaseUpdate {
                 const calc = result.data.calcProd;
 
                 // Deduplicate accounts by accountId
-                const validAccounts = [...new Map(accounts.filter(a => !a.error).map(a => [a.accountId, a])).values()] as any[];
+                const validAccounts = [...new Map(accounts.filter(a => !a.error).map(a => [a.accountId, a])).values()];
+                const errorAccounts = accounts.filter(a => a.error);
 
                 const lines: string[] = [];
                 lines.push('🔎 Результаты проверки товара:');
@@ -235,6 +240,8 @@ export class MyDiscountUpdate extends BaseUpdate {
                 if (calc) {
                     lines.push(`💰 Возможная цена на кассе: <b>${calc.calcPriceForProduct}</b> ₽`);
                     lines.push(`🎯 Требуемые бонусы: <b>${calc.calcBonusForProduct}</b>`);
+                    const totalDiscount = calc.calcBonusForProduct + calc.usedMyDiscountRub;
+                    lines.push(`💎 Общая скидка (баллы + моя скидка): <b>${totalDiscount}</b> ₽`);
                 }
 
                 if (!validAccounts.length) {
@@ -248,10 +255,26 @@ export class MyDiscountUpdate extends BaseUpdate {
 
                     const topAccounts = validAccounts.slice(0, 10);
                     for (const acc of topAccounts) {
-                        const ordersPart = acc.ordersNumber > 0 ? ` (${acc.ordersNumber})` : '';
-                        const hasEnoughBonus = !!(calc && calc.calcBonusForProduct > 0 && acc.bonus >= calc.calcBonusForProduct);
+                        const ordersPart = Boolean(acc.info?.ordersToday) ? ` (${acc.info?.ordersToday})` : '';
+                        const hasEnoughBonus = !!(
+                            calc &&
+                            calc.calcBonusForProduct > 0 &&
+                            (acc.info?.bonusesOnAccount ?? 0) >= calc.calcBonusForProduct
+                        );
                         const prefix = hasEnoughBonus ? '✅' : '•';
-                        lines.push(`${prefix} <code>${acc.accountId}</code>${ordersPart} — бонусов: ${acc.bonus}`);
+                        lines.push(`${prefix} <code>${acc.accountId}</code>${ordersPart} — бонусов: ${acc.info?.bonusesOnAccount}`);
+                    }
+                }
+
+                // Показываем ошибки аккаунтов
+                if (errorAccounts.length > 0) {
+                    lines.push('');
+                    lines.push(`⚠️ Ошибки на ${errorAccounts.length} аккаунт(ах):`);
+                    for (const acc of errorAccounts.slice(0, 5)) {
+                        lines.push(`• <code>${acc.accountId}</code> — ${acc.error}`);
+                    }
+                    if (errorAccounts.length > 5) {
+                        lines.push(`... и ещё ${errorAccounts.length - 5}`);
                     }
                 }
 

@@ -30,5 +30,6 @@ export type CashedProduct = {
 export type CalculateProduct = {
     calcPriceForProduct: number;
     calcBonusForProduct: number;
+    usedMyDiscountRub: number;
     percentMyDiscount: number;
 };

@@ -20,7 +20,7 @@ export class CalculateUpdate {
         private calculateServiceTelegram: TemplateService,
         private calculateService: CalculateService,
         private cacheService: RedisCacheService,
-    ) {}
+    ) { }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -60,7 +60,6 @@ export class CalculateUpdate {
         try {
             const prices: string[] = inputPrices.split(/\r?\n/);
 
-            // Процент промо вводим как аргумент (здесь 10%, потом можно менять на 15 или брать из внешнего сервиса)
             const promoPercent = 10;
 
             let totalDiscountPromo = 0;
@@ -97,34 +96,21 @@ export class CalculateUpdate {
 
                 const priceItem = parseInt(parts[0], 10);
 
-                const currentPriceItem = this.calculateService.computeCurrentPrice(priceItem, discountShop);
+                // Используем новый единый калькулятор
+                const { bonusOnly, withPromo } = this.calculateService.calculateFromManualInput(priceItem, discountShop, {
+                    isInventory,
+                    promoCodePercent: promoPercent,
+                });
 
-                const limit = {
-                    isConditionsMarker: false,
-                    limitPercent: isInventory ? 20 : 30,
-                    maxTotalDiscount: isInventory ? 30 : 50,
-                };
+                const currentPriceItem = bonusOnly.finalPrice + bonusOnly.usedBonusesRub;
+                const currentBonus = bonusOnly.usedBonusesRub;
+                const priceDiscount = bonusOnly.finalPrice;
 
-                // Бонусы без промокода
-                const currentBonus = this.calculateService.computeMaxBonus(priceItem, currentPriceItem, discountShop, limit);
+                const currentPriceItemPromo = withPromo.finalPrice + withPromo.usedBonusesRub;
+                const currentBonusPromo = withPromo.usedBonusesRub;
+                const priceDiscountPromo = withPromo.finalPrice;
 
-                const priceDiscount = currentPriceItem - currentBonus;
                 priceWithoutDiscount += currentPriceItem;
-
-                const discountFlag = false;
-
-                const currentPriceItemPromo = this.calculateService.computePriceWithPromoWithoutBonus(
-                    priceItem,
-                    currentPriceItem,
-                    discountShop,
-                    limit,
-                    promoPercent,
-                    discountFlag,
-                );
-
-                const currentBonusPromo = this.calculateService.computeMaxBonus(priceItem, currentPriceItemPromo, discountShop, limit);
-
-                const priceDiscountPromo = currentPriceItemPromo - currentBonusPromo;
 
                 totalPrice += priceDiscount;
                 totalDiscount += currentBonus;
@@ -278,3 +264,4 @@ function applyTemplate(template: string, totalPrice: number, commission: number)
         .replace(/{commission}/g, commission.toString())
         .replace(/\/n/g, '\n');
 }
+

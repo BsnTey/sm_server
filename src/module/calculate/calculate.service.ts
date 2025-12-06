@@ -1,151 +1,102 @@
 import { Injectable } from '@nestjs/common';
 import { ProductApiResponse } from '../account/interfaces/product.interface';
-import { LimitPercent } from './calculate.interface';
-import { Marker } from '../account/interfaces/search-product.interface';
 import { CalculateProduct } from '../checking/interfaces/my-discount.interface';
+import { ApiAdapter } from './api.adapter';
+import { SportmasterCalculator } from './sportmaster-calculator';
+import { CalculationMode, CalculationResult, CalculatorInput } from './calculator.types';
 
+/**
+ * Сервис-обёртка для использования калькулятора в NestJS.
+ * Предоставляет удобные методы для работы с API-данными.
+ */
 @Injectable()
 export class CalculateService {
-    computeCurrentPrice(price: number, discountShop: number): number {
-        if (discountShop === 0) {
-            return price;
-        }
-        let currentPriceItem = (1 - discountShop / 100) * price;
-
-        if (discountShop % 5 !== 0) {
-            const lastNumberPrice = currentPriceItem % 100;
-            const roundPrice = Math.floor(currentPriceItem / 100) * 100;
-            currentPriceItem = lastNumberPrice < 50 ? roundPrice - 1 : roundPrice + 99;
-        }
-
-        return Math.floor(currentPriceItem);
+    /**
+     * Получить расчёт для всех режимов (BONUS_ONLY, PROMO_CODE, MY_DISCOUNT)
+     */
+    getCalculationAll(product: ProductApiResponse['product']): Record<CalculationMode, CalculationResult> {
+        const input = ApiAdapter.parseCalculatorInput(product);
+        return SportmasterCalculator.calculateAll(input);
     }
 
     /**
-     * Расчёт применимых бонусов (без промокода), с учётом ограничений для инвентаря.
+     * Получить расчёт для конкретного режима
      */
-    computeMaxBonus(basePrice: number, priceAfterPromo: number, discountShop: number, limitPercent: LimitPercent): number {
-        let currentBonus = 0;
-
-        if (0 <= discountShop && discountShop < 50) {
-            const bonusPercentage = limitPercent.limitPercent / 100;
-            currentBonus = priceAfterPromo * bonusPercentage;
-
-            // Ограничение максимальной общей скидки, цена где не может быть ниже
-            const maxDiscountFactor = limitPercent.maxTotalDiscount / 100;
-            const limitAllDiscount = basePrice * maxDiscountFactor;
-
-            if (basePrice - priceAfterPromo - currentBonus > limitAllDiscount) {
-                currentBonus = priceAfterPromo - limitAllDiscount;
-            }
-        }
-        return Math.floor(currentBonus);
+    getCalculation(product: ProductApiResponse['product'], mode: CalculationMode): CalculationResult {
+        const input = ApiAdapter.parseCalculatorInput(product);
+        return SportmasterCalculator.calculate(input, mode);
     }
 
     /**
-     * Цена с промокодом (без бонусов). Процент промо — аргумент (например, 10 или 15).
+     * Расчёт с "Моей скидкой" — основной метод для checking.service
      */
-    computePriceWithPromoWithoutBonus(
-        basePrice: number,
-        retailPrice: number,
-        discountShop: number,
-        limitPercent: LimitPercent,
-        discountPercent: number,
-        discountFlag: boolean,
-    ): number {
-        let calcPrice = retailPrice;
+    computeCalculateFromProduct(product: ProductApiResponse['product']): CalculateProduct {
+        const input = ApiAdapter.parseCalculatorInput(product);
+        const percentMyDiscount = ApiAdapter.calcMyDiscountPercent(product);
 
-        if ((0 <= discountShop && discountShop < 50) || discountFlag) {
-            // Ограничение максимальной общей скидки
-            const maxDiscountFactor = limitPercent.maxTotalDiscount / 100;
-            const maxDiscountItem = basePrice * maxDiscountFactor;
-
-            const priceDiscountPromo = (basePrice * discountPercent) / 100;
-            if (maxDiscountItem > retailPrice - priceDiscountPromo) {
-                calcPrice = maxDiscountItem;
-            } else {
-                calcPrice = retailPrice - priceDiscountPromo;
-            }
-        }
-        return Math.floor(calcPrice);
-    }
-
-    private getLimitBonusPercent(markers: Marker[]): LimitPercent {
-        const conditionsMarkerInfo = markers.find(m => m.title === 'Условия бонусов');
-        const limitBonusMarker = markers.find(m => m.title && /До\s+\d+%\s+бонусами/i.test(m.title));
-
-        let limitPercent = 30;
-        let isConditionsMarker = false;
-        let maxTotalDiscount = 50;
-
-        if (limitBonusMarker?.description) {
-            const totalMatch = limitBonusMarker.description.match(/итоговая[^0-9]+не\s+более\s+(\d+)%/i);
-
-            if (totalMatch && totalMatch[1]) {
-                maxTotalDiscount = parseInt(totalMatch[1], 10);
-            }
-        }
-
-        if (conditionsMarkerInfo?.description) {
-            const match = conditionsMarkerInfo.description.match(/списать бонусы до\s+(\d+)%/i);
-            if (match && match[1]) {
-                limitPercent = parseInt(match[1], 10);
-                isConditionsMarker = true;
-            }
-        } else if (limitBonusMarker) {
-            const match = limitBonusMarker.title.match(/(\d+)/);
-            if (match && match[1]) {
-                limitPercent = parseInt(match[1], 10);
-            }
-        }
+        // Если есть "Моя скидка", используем режим MY_DISCOUNT, иначе BONUS_ONLY
+        const mode = input.prices.myDiscountValue > 0 ? CalculationMode.MY_DISCOUNT : CalculationMode.BONUS_ONLY;
+        const result = SportmasterCalculator.calculate(input, mode);
 
         return {
-            isConditionsMarker,
-            limitPercent,
-            maxTotalDiscount,
+            calcPriceForProduct: result.finalPrice,
+            calcBonusForProduct: result.usedBonusesRub,
+            usedMyDiscountRub: result.usedMyDiscountRub,
+            percentMyDiscount,
         };
     }
 
-    computeCalculateFromProduct(p: ProductApiResponse['product'], promoPercent: number, discountFlag: boolean): CalculateProduct {
-        const catalog = Number(p.price.catalog.value);
-        const retail = Number(p.price.retail.value);
+    /**
+     * Расчёт для Telegram-бота с ручным вводом (без API данных)
+     */
+    calculateFromManualInput(
+        catalogPrice: number,
+        discountShopPercent: number,
+        options: {
+            isInventory?: boolean;
+            promoCodePercent?: number;
+        } = {},
+    ): { bonusOnly: CalculationResult; withPromo: CalculationResult } {
+        const { isInventory = false, promoCodePercent = 10 } = options;
 
-        const basePrice = catalog / 100; //базовая цена
-        const retailPrice = retail / 100; //цена со скидкой от магазина (если есть)
+        // Вычисляем retail цену
+        let retail = catalogPrice;
+        if (discountShopPercent > 0) {
+            retail = catalogPrice * (1 - discountShopPercent / 100);
+            // Округление как в старом коде
+            if (discountShopPercent % 5 !== 0) {
+                const lastNumberPrice = retail % 100;
+                const roundPrice = Math.floor(retail / 100) * 100;
+                retail = lastNumberPrice < 50 ? roundPrice - 1 : roundPrice + 99;
+            }
+            retail = Math.floor(retail);
+        }
 
-        const discountShop = Math.floor((1 - retailPrice / basePrice) * 100);
-
-        const limitPercent = this.getLimitBonusPercent(p.markers || []);
-
-        const priceAfterPromo = this.computePriceWithPromoWithoutBonus(
-            basePrice,
-            retailPrice,
-            discountShop,
-            limitPercent,
-            promoPercent,
-            discountFlag,
-        );
-        const bonus = this.computeMaxBonus(basePrice, priceAfterPromo, discountShop, limitPercent);
-
-        const priceOnKassa = priceAfterPromo - bonus;
+        const input: CalculatorInput = {
+            prices: {
+                catalog: catalogPrice,
+                retail,
+                myDiscountValue: 0,
+            },
+            flags: {
+                isBestPrice: false,
+                isFinalPrice: false,
+                isOfferOfWeek: false,
+                isPriceReduced: false,
+                isSpecialCondition: false,
+                isBonusCondition: false,
+                isBonus20: isInventory,
+            },
+            constraints: {
+                explicitBonusLimitPercent: isInventory ? 20 : null,
+                explicitTotalLimitPercent: isInventory ? 30 : null,
+            },
+            promoCodePercent,
+        };
 
         return {
-            calcPriceForProduct: priceOnKassa,
-            calcBonusForProduct: bonus,
-            percentMyDiscount: promoPercent,
+            bonusOnly: SportmasterCalculator.calculate(input, CalculationMode.BONUS_ONLY),
+            withPromo: SportmasterCalculator.calculate(input, CalculationMode.PROMO_CODE),
         };
-    }
-
-    calcPercentMyDiscount(p: ProductApiResponse['product']): number {
-        const list = p?.personalPrice?.discountList ?? [];
-        const value = list.find(x => x?.actionName?.toLowerCase() === 'моя скидка');
-
-        const catalogVal = Number(p.price.catalog.value);
-        if (!value || !catalogVal) return 0;
-
-        const summaDiscount = Number(value.summa.value) / 100;
-        const priceCatalog = catalogVal / 100;
-
-        return Number(((summaDiscount / priceCatalog) * 100).toFixed(1));
     }
 }

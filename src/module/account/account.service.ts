@@ -80,7 +80,7 @@ export class AccountService {
     private adminsId: string[] = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
     private durationTimeProxyBlock = this.configService.getOrThrow('TIME_DURATION_PROXY_BLOCK_IN_MIN');
 
-    private TTL_CASH_ACCOUNT = 5000;
+    private TTL_CASH_ACCOUNT = 60;
     private TTL_CASH_SHORT_INFO = 20;
 
     constructor(

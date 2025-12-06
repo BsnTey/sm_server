@@ -12,7 +12,7 @@ import { RedisCacheService } from '../cache/cache.service';
 
 @Injectable()
 export class AccountDiscountService {
-    private TTL_CASH_DISCOUNT = 3_600;
+    private TTL_CASH_DISCOUNT = 60;
 
     constructor(
         private readonly accountDiscountRepository: AccountDiscountRepository,
@@ -30,7 +30,9 @@ export class AccountDiscountService {
     async deleteAccountDiscountsBatch(accountIds: string[], telegramId: string): Promise<{ status: string }> {
         await this.accountDiscountRepository.deleteAccountDiscountsBatch(accountIds, telegramId);
         const key = keyDiscountAccount(telegramId);
+        const key2 = keyDiscountNodes(telegramId);
         await this.cacheService.del(key);
+        await this.cacheService.del(key2);
         return { status: 'ok' };
     }
 

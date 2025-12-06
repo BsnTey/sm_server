@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, HttpCode, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, HttpCode, Patch, Post, Query, NotFoundException } from '@nestjs/common';
 import { SetPersonalDiscountAccountRequestDto } from './dto/set-personal-discount.dto';
 import { CheckingService } from './checking.service';
 import { TgPersonalDiscountDto } from './dto/tg-personal-discount.dto';
@@ -9,6 +9,9 @@ import { CheckProductBatchRequestDto, PrepareProductCheckRequestDto } from './dt
 import { ProductCheckingRequestDto } from './dto/product-checking.dto';
 import { HasZenno } from '@common/decorators/zenno.decorator';
 import { AdminDiscountService } from './admin-discount.service';
+import { AccountService } from '../account/account.service';
+import { AccountIdParamsDto } from '../account/dto/uuid-account.dto';
+import { AxiosError } from 'axios';
 
 @Controller('checking')
 export class CheckingController {
@@ -16,7 +19,18 @@ export class CheckingController {
         private checkingService: CheckingService,
         private accountDiscountService: AccountDiscountService,
         private adminDiscountService: AdminDiscountService,
+        private accountService: AccountService,
     ) {}
+
+    @Get('short-info/:accountId')
+    @HttpCode(200)
+    async getBonusAccount(@Param() params: AccountIdParamsDto): Promise<any> {
+        try {
+            return this.accountService.shortInfo(params.accountId);
+        } catch (err: any) {
+            return this.handleError(err);
+        }
+    }
 
     @Post('personal-discount/v1/set')
     @HttpCode(200)
@@ -32,7 +46,7 @@ export class CheckingController {
 
     @Delete('personal-discount/all/:telegramId')
     @HttpCode(200)
-    async deleteAllByTelegramId(@Query() data: TgPersonalDiscountDto) {
+    async deleteAllByTelegramId(@Param() data: TgPersonalDiscountDto) {
         return this.accountDiscountService.deleteAllByTelegramId(data.telegramId);
     }
 
@@ -93,5 +107,18 @@ export class CheckingController {
     @HasZenno()
     async refreshAllDiscountData() {
         return this.adminDiscountService.refreshAllDiscountData();
+    }
+
+    private handleError(err: any): { error: string } {
+        let errorMessage = '';
+        if (err instanceof NotFoundException) {
+            errorMessage = `Не найден`;
+        } else if (err instanceof AxiosError) {
+            const errorResponse = err.response?.data?.error;
+            errorMessage = errorResponse?.message || 'Ошибка запроса, повторите';
+        } else {
+            errorMessage = err.message || 'Неизвестная ошибка';
+        }
+        return { error: errorMessage };
     }
 }
