@@ -8,7 +8,7 @@ export class SportmasterHeadersService {
     private prefixHash = 'eb1a3e30291bc971c4da0e86375961a4';
     private userAgentMobile: string = 'android-4.85.0-google(60723)';
     private userAgentMobileWeb: string =
-        'Mozilla/5.0 (Linux; Android 7.1.2; ASUS_Z01QD Build/N2G48H; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/68.0.3440.70 Mobile Safari/537.36 android-4.85.0-google(60723)';
+        'Mozilla/5.0 (Linux; Android 14; WP32 Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/128.0.6613.98 Mobile Safari/537.36 android-4.85.0-google(60723)';
     private locale: string = 'ru';
     private country: string = 'RU';
     private eutc: string = 'UTC+3';
@@ -135,13 +135,13 @@ export class SportmasterHeadersService {
         if (!mnemocode) {
             referer = this.onlineCourses;
         } else {
-            referer = `https://${this.hostSite}courses/mobile-player/?videoId=${videoId}&type=video&lessonId=${lessonId}&mnemocode=${mnemocode}`;
+            referer = `https://${this.hostSite}courses/courses/mobile/`;
         }
 
         return {
             'User-Agent': this.userAgentMobileWeb,
             Host: this.hostSite,
-            Accept: this.acceptCourse,
+            Accept: this.accept,
             Accesstoken: accessToken,
             'X-Requested-With': this.xRequestedWith,
             'Sec-Fetch-Site': this.secFetchSite,
