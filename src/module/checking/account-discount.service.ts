@@ -121,9 +121,9 @@ export class AccountDiscountService {
      */
     async findAccountsByTelegramUser(telegramId: string): Promise<{ accountIds: string[] }> {
         const key = keyDiscountAccount(telegramId);
-        const accountIdsCache = await this.cacheService.get<{ accountIds: string[] }>(key);
+        const accountIdsCache = await this.cacheService.get<string[]>(key);
 
-        if (accountIdsCache) return accountIdsCache;
+        if (accountIdsCache) return { accountIds: accountIdsCache };
 
         const accountIds = await this.accountDiscountRepository.findAccountsByTelegramUser(telegramId);
 
