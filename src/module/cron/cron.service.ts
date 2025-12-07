@@ -136,14 +136,17 @@ export class CronService {
     }
 
     async viewLesson(lesson: IWatchLesson, progressId: number, accountId: string): Promise<boolean> {
-        const timeout = new Promise<boolean>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000));
-        const isWatchingPromise = this.accountService.watchingLesson(lesson, accountId);
+        let isWatching = false;
 
-        let isWatching: boolean;
         try {
-            isWatching = await Promise.race([isWatchingPromise, timeout]);
+            isWatching = await Promise.race([
+                this.accountService.watchingLesson(lesson, accountId),
+                new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Operation timed out')), 5000)),
+            ]);
         } catch (error) {
-            this.logger.error('ОШИБКА В ПРОСМОТРЕ', accountId, error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(`ОШИБКА В ПРОСМОТРЕ (Account: ${accountId}): ${errorMessage}`);
+
             isWatching = false;
         }
 

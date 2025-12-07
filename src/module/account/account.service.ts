@@ -1271,15 +1271,15 @@ export class AccountService {
     async watchingLesson(lesson: IWatchLesson, accountId: string): Promise<boolean> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
 
-        const status = await this.privateWatchingLesson(lesson, accountWithProxyEntity);
+        const status = await this.privateWatchingLesson(accountWithProxyEntity, lesson);
         return status == 204;
     }
 
     @RetryOn401()
     @RetryOnProxyError()
     private async privateWatchingLesson(
-        { mnemocode, videoId, lessonId, duration }: IWatchLesson,
         accountWithProxyEntity: AccountWithProxyEntity,
+        { mnemocode, videoId, lessonId, duration }: IWatchLesson,
     ): Promise<number> {
         if (!accountWithProxyEntity.accessTokenCourse) {
             await this.promblemCourses(accountWithProxyEntity.accountId);
