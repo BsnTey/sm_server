@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { AccountRepository } from './account.repository';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
 import { AccountEntity } from './entities/account.entity';
@@ -379,7 +379,7 @@ export class AccountService {
     async getCoursesList(accountId: string): Promise<CourseList> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const { accessTokenCourse } = await this.createAccessTokenCourse(accountWithProxyEntity);
-        return this.getCourses(accessTokenCourse, accountWithProxyEntity);
+        return this.getCourses(accountWithProxyEntity, accessTokenCourse);
     }
 
     private generateRandomString(length: number) {
@@ -841,12 +841,12 @@ export class AccountService {
 
     @RetryOn401()
     @RetryOnProxyError()
-    async sendSms(accountOrId: string | AccountWithProxyEntity, phoneNumber: string): Promise<string> {
-        const account = typeof accountOrId === 'string' ? await this.getAccountEntity(accountOrId) : accountOrId;
+    async sendSms(account: string | AccountWithProxyEntity, phoneNumber: string): Promise<string> {
+        const accountEntity = typeof account === 'string' ? await this.getAccountEntity(account) : account;
 
         const targetUrl = this.url + `v1/verify/sendSms`;
 
-        const headers = this.sportmasterHeaders.getHeadersForSearchAccount(targetUrl, account);
+        const headers = this.sportmasterHeaders.getHeadersForSearchAccount(targetUrl, accountEntity);
 
         const payload = {
             phone: {
@@ -863,7 +863,7 @@ export class AccountService {
             requestMethod: 'POST',
             headers,
             requestBody: payload,
-            proxyUrl: account.proxy!.proxy,
+            proxyUrl: accountEntity.proxy!.proxy,
         });
 
         if (!responseData?.data?.requestId) {
@@ -1253,7 +1253,7 @@ export class AccountService {
 
     @RetryOn401()
     @RetryOnProxyError()
-    private async getCourses(accessTokenCourse: string, accountWithProxyEntity: AccountWithProxyEntity): Promise<CourseList> {
+    private async getCourses(accountWithProxyEntity: AccountWithProxyEntity, accessTokenCourse: string): Promise<CourseList> {
         const url = this.urlSite + `courses/api/courses?limit=10`;
         const httpOptions = await this.getHttpOptionsSiteCourse(accountWithProxyEntity, accessTokenCourse);
         const response = await this.httpService.get(url, httpOptions);
@@ -1271,15 +1271,15 @@ export class AccountService {
     async watchingLesson(lesson: IWatchLesson, accountId: string): Promise<boolean> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
 
-        const status = await this.privateWatchingLesson(lesson, accountWithProxyEntity);
+        const status = await this.privateWatchingLesson(accountWithProxyEntity, lesson);
         return status == 204;
     }
 
     @RetryOn401()
     @RetryOnProxyError()
     private async privateWatchingLesson(
-        { mnemocode, videoId, lessonId, duration }: IWatchLesson,
         accountWithProxyEntity: AccountWithProxyEntity,
+        { mnemocode, videoId, lessonId, duration }: IWatchLesson,
     ): Promise<number> {
         if (!accountWithProxyEntity.accessTokenCourse) {
             await this.promblemCourses(accountWithProxyEntity.accountId);
