@@ -1,5 +1,5 @@
 import { UseFilters, UseGuards } from '@nestjs/common';
-import { Ctx, Hears, Message, On, Scene, SceneEnter, Update } from 'nestjs-telegraf';
+import { Ctx, Hears, Message, On, Scene, SceneEnter, Start, Update } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
 import {
     ADMIN,
@@ -24,12 +24,23 @@ import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter
 import { TelegramService } from '../../telegram.service';
 import { ConfigService } from '@nestjs/config';
 import { FAMILY_PRIVELEGIE, FAMILY_USER } from '../../scenes/family.scene';
+import { EXTENSION_SCENE } from '../../scenes/profile.scene-constant';
 
 @Update()
 @UseFilters(TelegrafExceptionFilter)
 export class BaseUpdate {
     @Hears([START.name])
-    async onStart(@Ctx() ctx: Context) {
+    async onStart(@Ctx() ctx: Context & { startPayload?: string }) {
+        await ctx.scene.enter(START.scene);
+    }
+
+    @Start()
+    async onStartWithParametres(@Ctx() ctx: Context & { startPayload?: string }) {
+        if (ctx.startPayload === 'extension') {
+            await ctx.scene.enter(EXTENSION_SCENE);
+            return;
+        }
+
         await ctx.scene.enter(START.scene);
     }
 

@@ -4,3 +4,4 @@ export const PROMOCODE_BOT_SCENE = 'promocodeBotScene';
 export const FORTUNE_BOT_SCENE = 'fortuneBotScene';
 export const PAYMENT_PROMOCODE_BOT_SCENE = 'paymentPromocodeBotScene';
 export const MY_DISCOUNT_SCENE = 'myDiscountScene';
+export const EXTENSION_SCENE = 'extensionScene';

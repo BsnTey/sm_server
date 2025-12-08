@@ -2,12 +2,17 @@ import { Action, Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nest
 import { WizardContext } from 'telegraf/typings/scenes';
 import { ALL_KEYS_MENU_BUTTON_NAME, PROFILE } from '../base-command/base-command.constants';
 import { TelegramService } from '../../telegram.service';
-import { AccountService } from '../../../account/account.service';
 import { CheckingService } from '../checking/checking.service';
 import { profileKeyboard } from '../../keyboards/profile.keyboard';
 import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
-import { FORTUNE_BOT_SCENE, MAKE_DEPOSIT_SCENE, MY_DISCOUNT_SCENE, PROFILE_GET_INFO_ORDER } from '../../scenes/profile.scene-constant';
+import {
+    EXTENSION_SCENE,
+    FORTUNE_BOT_SCENE,
+    MAKE_DEPOSIT_SCENE,
+    MY_DISCOUNT_SCENE,
+    PROFILE_GET_INFO_ORDER,
+} from '../../scenes/profile.scene-constant';
 import { UserService } from '../../../user/user.service';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
@@ -26,6 +31,7 @@ export class ProfileUpdate {
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         const user = await this.userService.getUserByTelegramId(String(telegramId));
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
+
         await ctx.reply('Выберете действие', profileKeyboard(user.role));
     }
 
@@ -81,6 +87,11 @@ export class ProfileUpdate {
     @Action('fortune')
     async goToFortune(@Ctx() ctx: WizardContext) {
         await ctx.scene.enter(FORTUNE_BOT_SCENE);
+    }
+
+    @Action('extension')
+    async goToExtension(@Ctx() ctx: WizardContext) {
+        await ctx.scene.enter(EXTENSION_SCENE);
     }
 }
 
