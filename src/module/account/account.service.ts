@@ -61,7 +61,7 @@ import { encodeXlocation } from './utils/x-location.utils';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { RetryOn401 } from './decorators/retry-on-403.decorator';
-import { PersonalDiscount } from './interfaces/personal-discount.interface';
+import { PersonalDiscount, PersonalDiscountResponse } from './interfaces/personal-discount.interface';
 import { ProfileFamilyResponse } from './interfaces/profile-family.interface';
 import { FamilyInviteResponse, InviteMemberFamily, MemberFamily } from './interfaces/family-invite.interface';
 import { ProductApiResponse } from './interfaces/product.interface';
@@ -1317,6 +1317,20 @@ export class AccountService {
 
         const response = await this.httpService.post(url, payload, httpOptions);
         return response.data.data;
+    }
+
+    async getPersonalDiscount(accountId: string): Promise<PersonalDiscountResponse[]> {
+        try {
+            const personalDiscount = await this.personalDiscount(accountId);
+            return personalDiscount.list.map(i => {
+                return {
+                    dateEnd: i.dateEnd,
+                    nodeName: i.nodeName,
+                };
+            });
+        } catch (e: any) {
+            throw new Error('Ошибка при получении персональной скидки');
+        }
     }
 
     @RetryOn401()
