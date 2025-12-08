@@ -59,6 +59,8 @@ export class AccountDiscountService {
     }
 
     async createAccountDiscountsBatch(items: AccountDiscountsToInsert[]): Promise<void> {
+        //приводит к падению без проверки
+        if (items.length == 0) return;
         const key = keyDiscountNodes(items[0].telegramId);
         const key2 = keyDiscountAccount(items[0].telegramId);
         await this.cacheService.del(key);

@@ -1,4 +1,4 @@
-import { Controller, Get, HttpCode, Redirect } from '@nestjs/common';
+import { Controller, Get, HttpCode } from '@nestjs/common';
 import { ConfigAppService } from './config.service';
 
 @Controller('config')
