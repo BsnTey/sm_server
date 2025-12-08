@@ -10,4 +10,10 @@ export class ConfigAppController {
     async getConfigExtension() {
         return this.configAppService.getConfigExtension();
     }
+
+    @Get('extension/v1')
+    @HttpCode(200)
+    async getConfigExtensionV1() {
+        return this.configAppService.getConfigExtensionV1();
+    }
 }
