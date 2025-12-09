@@ -12,11 +12,13 @@ import { AdminDiscountService } from './admin-discount.service';
 import { AccountService } from '../account/account.service';
 import { AccountIdParamsDto } from '../account/dto/uuid-account.dto';
 import { AxiosError } from 'axios';
+import { OrderService } from '../order/order.service';
 
 @Controller('checking')
 export class CheckingController {
     constructor(
         private checkingService: CheckingService,
+        private orderService: OrderService,
         private accountDiscountService: AccountDiscountService,
         private adminDiscountService: AdminDiscountService,
         private accountService: AccountService,
@@ -26,6 +28,7 @@ export class CheckingController {
     @HttpCode(200)
     async getBonusAccount(@Param() params: AccountIdParamsDto): Promise<any> {
         try {
+            this.orderService.orderHistory(params.accountId);
             return this.accountService.shortInfo(params.accountId);
         } catch (err: any) {
             return this.handleError(err);
