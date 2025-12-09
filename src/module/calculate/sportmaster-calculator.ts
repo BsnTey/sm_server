@@ -78,6 +78,7 @@ export class SportmasterCalculator {
 
         const finalPrice = Math.ceil(currentPrice);
         const totalDiscountPercent = ((catalog - finalPrice) / catalog) * 100;
+        const totalCalculatorSavingsRub = input.prices.retail - finalPrice;
 
         return {
             finalPrice,
@@ -85,6 +86,7 @@ export class SportmasterCalculator {
             usedPromoCodeRub,
             usedBonusesRub,
             totalDiscountPercent: Number(totalDiscountPercent.toFixed(2)),
+            totalCalculatorSavingsRub,
             limits: {
                 appliedTotalLimitPercent: Number(limits.totalLimitPercent.toFixed(2)),
                 appliedBonusLimitPercent: limits.bonusLimitPercent,
@@ -97,7 +99,7 @@ export class SportmasterCalculator {
         const { flags, prices, constraints } = input;
 
         let totalLimitPercent = constraints.explicitTotalLimitPercent ?? this.BASE_MAX_TOTAL_DISCOUNT;
-        let bonusLimitPercent = constraints.explicitBonusLimitPercent ?? this.BASE_BONUS_PERCENT;
+        const bonusLimitPercent = constraints.explicitBonusLimitPercent ?? this.BASE_BONUS_PERCENT;
 
         let allowPromo = true;
         let allowBonuses = true;
@@ -138,7 +140,9 @@ export class SportmasterCalculator {
             }
         }
         // 2. Promo Code (Нет расширения)
-        // Лимит не меняем
+        else if (mode === CalculationMode.PROMO_CODE) {
+            // Лимит не меняем
+        }
 
         // --- Валидация потолка ---
         if (currentStoreDiscountPercent >= totalLimitPercent - EPSILON) {

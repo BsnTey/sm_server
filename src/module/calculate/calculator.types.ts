@@ -1,14 +1,12 @@
 /**
  * DTO - Единый формат данных для входа в калькулятор.
- * Неважно, откуда пришли данные (сайт, приложение, API),
+ * Неважно, откуда пришли данные (сайт, приложение, база),
  * адаптер должен привести их к этому виду.
- *
- * @shared - Этот файл идентичен на клиенте и бэкенде.
  */
 export interface CalculatorInput {
     prices: {
-        catalog: number; // Цена до скидок (зачеркнутая), в рублях
-        retail: number; // Текущая цена на витрине, в рублях
+        catalog: number; // Цена до скидок (зачеркнутая)
+        retail: number; // Текущая цена на витрине
         myDiscountValue: number; // Значение "Моей скидки" в рублях (если есть, иначе 0)
         myDiscountPercent?: number; // В процентах (ручной ввод)
     };
@@ -34,6 +32,7 @@ export interface CalculationResult {
     usedBonusesRub: number; // Сколько списано бонусов
     usedPromoCodeRub: number; // Сколько списано промокодом
     totalDiscountPercent: number; // Итоговый процент скидки от Catalog цены
+    totalCalculatorSavingsRub: number; // Явная выгода (без учета скидки магазина)
     limits: {
         appliedTotalLimitPercent: number; // Какой лимит общей скидки был применен (50, 58, 60...)
         appliedBonusLimitPercent: number; // Какой лимит списания бонусов был применен (30, 20, 10...)

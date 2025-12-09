@@ -10,6 +10,7 @@ export const profileKeyboard = (role: UserRole) => {
     btnArr.push([Markup.button.callback('Чекер промо', 'check_promo')]);
     btnArr.push([Markup.button.callback('Чекер моей скидки', 'check_my_discount')]);
     btnArr.push([Markup.button.callback('Получить инфо по заказу', 'get_info_order')]);
+    btnArr.push([Markup.button.callback('Расширение', 'extension')]);
     return Markup.inlineKeyboard(btnArr);
 };
 
@@ -38,3 +39,9 @@ export const createPromocodeScene = Markup.inlineKeyboard([
 ]);
 
 export const getSurprise = Markup.inlineKeyboard([[Markup.button.callback('Мне повезет', 'get_surprise')]]);
+
+export function downloadExtension(files: string[]) {
+    const buttons = files.map(filename => [Markup.button.callback(`📥 Скачать: ${filename}`, `dl_ext:${filename}`)]);
+
+    return Markup.inlineKeyboard(buttons);
+}

@@ -34,7 +34,6 @@ export class CalculateService {
         const input = ApiAdapter.parseCalculatorInput(product);
         const percentMyDiscount = ApiAdapter.calcMyDiscountPercent(product);
 
-        // Если есть "Моя скидка", используем режим MY_DISCOUNT, иначе BONUS_ONLY
         const mode = input.prices.myDiscountValue > 0 ? CalculationMode.MY_DISCOUNT : CalculationMode.BONUS_ONLY;
         const result = SportmasterCalculator.calculate(input, mode);
 

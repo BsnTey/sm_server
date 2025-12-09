@@ -60,6 +60,7 @@ import { TemplateModule } from '../template/template.module';
 import { MyDiscountUpdate } from './updates/myDiscount/myDiscount.update';
 import { OrderModule } from '../order/order.module';
 import { CheckingModule } from '../checking/checking.module';
+import { ExtensionUpdate } from './updates/extension/extension.update';
 
 @Module({
     imports: [
@@ -125,6 +126,7 @@ import { CheckingModule } from '../checking/checking.module';
         FamilyUserUpdate,
         FamilyPrivelegieUpdate,
         MyDiscountUpdate,
+        ExtensionUpdate,
     ],
     exports: [TelegramService],
 })
