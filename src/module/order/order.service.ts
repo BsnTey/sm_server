@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { AccountService } from '../account/account.service';
 import { OrderRepository } from './order.repository';
 import { Order } from '@prisma/client';
@@ -73,39 +73,43 @@ export class OrderService {
     }
 
     async orderHistory(accountId: string) {
-        const data = await this.accountService.orderHistory(accountId);
-        const orders = data?.data?.orders ?? [];
-        if (!Array.isArray(orders) || orders.length === 0) return data;
+        try {
+            const data = await this.accountService.orderHistory(accountId);
+            const orders = data?.data?.orders ?? [];
+            if (!Array.isArray(orders) || orders.length === 0) return data;
 
-        const byNumber = new Map<string, any>();
-        for (const o of orders) {
-            if (o?.number) byNumber.set(o.number, o);
-        }
-
-        // Парсер ISO-даты из API -> Date | undefined
-        const parseOrderDate = (raw: unknown): Date | undefined => {
-            if (typeof raw !== 'string') return undefined;
-            const d = new Date(raw);
-            return isNaN(d.getTime()) ? undefined : d;
-        };
-
-        const tasks = Array.from(byNumber.values()).map(async (order: any) => {
-            const orderNumber = order?.number as string | undefined;
-            if (!orderNumber) return;
-
-            const orderDate = parseOrderDate(order?.date);
-
-            try {
-                await this.addOrder(accountId, orderNumber, orderDate);
-            } catch (err) {
-                //ignore
+            const byNumber = new Map<string, any>();
+            for (const o of orders) {
+                if (o?.number) byNumber.set(o.number, o);
             }
-        });
 
-        await Promise.allSettled(tasks);
-        const key = getOrdersTodayKey(accountId);
-        await this.cacheService.del(key);
+            // Парсер ISO-даты из API -> Date | undefined
+            const parseOrderDate = (raw: unknown): Date | undefined => {
+                if (typeof raw !== 'string') return undefined;
+                const d = new Date(raw);
+                return isNaN(d.getTime()) ? undefined : d;
+            };
 
-        return data;
+            const tasks = Array.from(byNumber.values()).map(async (order: any) => {
+                const orderNumber = order?.number as string | undefined;
+                if (!orderNumber) return;
+
+                const orderDate = parseOrderDate(order?.date);
+
+                try {
+                    await this.addOrder(accountId, orderNumber, orderDate);
+                } catch (err) {
+                    //ignore
+                }
+            });
+
+            await Promise.allSettled(tasks);
+            const key = getOrdersTodayKey(accountId);
+            await this.cacheService.del(key);
+
+            return data;
+        } catch (e) {
+            throw new BadRequestException('order account error');
+        }
     }
 }
