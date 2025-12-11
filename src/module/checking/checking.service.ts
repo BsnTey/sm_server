@@ -662,26 +662,40 @@ export class CheckingService {
         if (!cachedProduct) {
             const attempts = Math.min(accounts.length, 3);
 
+            let bestProductCandidate = null;
+
             for (let i = 0; i < attempts; i++) {
                 try {
                     const result = await this.accountService.getProductById(accounts[i].accountId, productId);
 
                     if (result?.product) {
-                        cachedProduct = await this.setToCacheProduct(result.product);
-                    }
+                        const tempCalc = this.calculateService.computeCalculateFromProduct(result.product);
 
-                    if (cachedProduct) {
-                        break;
+                        if (tempCalc.percentMyDiscount > 0) {
+                            cachedProduct = await this.setToCacheProduct(result.product);
+                            break;
+                        }
+
+                        if (!bestProductCandidate) {
+                            bestProductCandidate = result.product;
+                        }
                     }
                 } catch (error) {
                     this.logger.warn(`Attempt ${i + 1} failed for account ${accounts[i].accountId}`);
                 }
+            }
+            if (!cachedProduct && bestProductCandidate) {
+                cachedProduct = await this.setToCacheProduct(bestProductCandidate);
             }
         }
 
         let calcProd = null;
         if (cachedProduct) {
             calcProd = cachedProduct.calc;
+
+            if (!calcProd.percentMyDiscount && cachedProduct.percentMyDiscount) {
+                calcProd.percentMyDiscount = cachedProduct.percentMyDiscount;
+            }
         }
 
         accounts.sort(cmp);
@@ -935,7 +949,7 @@ export class CheckingService {
             percentMyDiscount,
         };
 
-        this.cacheService.setUntilEndOfDay(key, cashedProduct);
+        await this.cacheService.setUntilEndOfDay(key, cashedProduct);
 
         return cashedProduct;
     }
