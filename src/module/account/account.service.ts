@@ -1394,7 +1394,10 @@ export class AccountService {
             answer,
         };
 
-        const response = await this.httpService.post<ProfileFamilyResponse>(url, payload, httpOptions);
+        const response = await this.httpService.post<ProfileFamilyResponse>(url, payload, {
+            ...httpOptions,
+            timeout: 10000,
+        });
         return response.data;
     }
 
@@ -1405,7 +1408,10 @@ export class AccountService {
         const url = this.url + `v1/profile/family/${familyId}`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
-        const response = await this.httpService.delete<ProfileFamilyResponse>(url, httpOptions);
+        const response = await this.httpService.delete<ProfileFamilyResponse>(url, {
+            ...httpOptions,
+            timeout: 10000,
+        });
         return response.data;
     }
 
@@ -1416,7 +1422,10 @@ export class AccountService {
         const url = this.url + `v1/profile/family/${member.familyId}/members/${member.memberId}`;
         const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
 
-        const response = await this.httpService.delete<ProfileFamilyResponse>(url, httpOptions);
+        const response = await this.httpService.delete<ProfileFamilyResponse>(url, {
+            ...httpOptions,
+            timeout: 10000,
+        });
         return response.data;
     }
 
