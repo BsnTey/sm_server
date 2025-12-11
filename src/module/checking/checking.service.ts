@@ -667,7 +667,7 @@ export class CheckingService {
                     const result = await this.accountService.getProductById(accounts[i].accountId, productId);
 
                     if (result?.product) {
-                        cachedProduct = await this.cashedAndGetProductInfo(result.product);
+                        cachedProduct = await this.setToCacheProduct(result.product);
                     }
 
                     if (cachedProduct) {
@@ -799,7 +799,7 @@ export class CheckingService {
             return null;
         }
 
-        this.cashedAndGetProductInfo(product);
+        this.setToCacheProduct(product);
 
         let bonusCount = 0;
         try {
@@ -938,14 +938,6 @@ export class CheckingService {
         this.cacheService.setUntilEndOfDay(key, cashedProduct);
 
         return cashedProduct;
-    }
-
-    private async cashedAndGetProductInfo(product: ProductApiResponse['product']): Promise<CashedProduct> {
-        const cached = await this.getFromCacheProduct(product.id);
-        if (!cached) {
-            return this.setToCacheProduct(product);
-        }
-        return cached;
     }
 
     private buildResult(
