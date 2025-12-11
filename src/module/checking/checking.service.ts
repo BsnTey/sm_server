@@ -813,7 +813,15 @@ export class CheckingService {
             return null;
         }
 
-        this.setToCacheProduct(product);
+        const cachedProduct = await this.getFromCacheProduct(productId);
+
+        if (!cachedProduct && productRes?.product) {
+            const tempCalc = this.calculateService.computeCalculateFromProduct(productRes.product);
+
+            if (tempCalc.percentMyDiscount > 0) {
+                await this.setToCacheProduct(productRes.product);
+            }
+        }
 
         let bonusCount = 0;
         try {
