@@ -22,7 +22,7 @@ export class BrokerConsumer implements OnModuleInit {
         private readonly personalDiscountChunkWorker: PersonalDiscountChunkWorker,
         private readonly personalDiscountProductWorker: PersonalDiscountProductWorker,
         private readonly messagesToTelegramWorker: MessagesToTelegramWorker,
-    ) { }
+    ) {}
 
     async onModuleInit() {
         await this.channel.addSetup(async (channel: ConfirmChannel) => {
@@ -73,7 +73,7 @@ export class BrokerConsumer implements OnModuleInit {
         );
 
         // 5. Personal Discount Product
-        await channel.prefetch(4);
+        await channel.prefetch(2);
         await channel.consume(
             RABBIT_MQ_QUEUES.PERSONAL_DISCOUNT_PRODUCT_QUEUE,
             msg =>
