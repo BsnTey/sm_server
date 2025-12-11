@@ -197,16 +197,16 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
         if (!account?.accountId) throw new NotFoundException('Информация устарела. Попробуйте заново');
         const accountId = account.accountId;
 
+        const user = await this.userService.getUserByTelegramId(String(telegramId));
+
         this.logger.log(
             `Пользователь ${sender.first_name} - ${sender.id} запросил подтвердить его приглашение в семью для accountId ${accountId}`,
         );
         try {
             await this.familyService.answerInvite(accountId, true);
             await ctx.deleteMessage();
-            await ctx.reply('✅ Приглашение принято. Проверьте свой аккаунт');
+            await ctx.reply('✅ Приглашение принято. Проверьте свой аккаунт', getMainMenuKeyboard(user!.role));
             await ctx.scene.leave();
-            const user = await this.userService.getUserByTelegramId(String(telegramId));
-            await ctx.reply('Главное меню', getMainMenuKeyboard(user!.role));
         } catch (e: any) {
             await ctx.reply('❌ Что то пошло не так при подтверждении');
             return ctx.scene.reenter();
