@@ -28,7 +28,9 @@ export class CheckingController {
     @HttpCode(200)
     async getBonusAccount(@Param() params: AccountIdParamsDto): Promise<any> {
         try {
-            this.orderService.orderHistory(params.accountId);
+            this.orderService.orderHistory(params.accountId).catch(() => {
+                // ignore
+            });
             return this.accountService.shortInfo(params.accountId);
         } catch (err: any) {
             return this.handleError(err);

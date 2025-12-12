@@ -109,6 +109,11 @@ export class OrderService {
 
             return data;
         } catch (e) {
+            this.logger.error(`Ошибка при обновлении истории заказов для ${accountId}:`, e);
+
+            if (e instanceof Error) {
+                throw new BadRequestException(`Order history failed: ${e.message}`);
+            }
             throw new BadRequestException('order account error');
         }
     }
