@@ -1,6 +1,8 @@
 import { Logger, Provider } from '@nestjs/common';
 import { AmqpConnectionManager, connect } from 'amqp-connection-manager';
 import { ConfigService } from '@nestjs/config';
+import { ConfirmChannel } from 'amqplib';
+import { DELAYED_EXCHANGE, DELAYED_EXCHANGE_ARGS, DELAYED_EXCHANGE_TYPE } from '@common/broker/rabbitmq.constants';
 
 export const RABBIT_MQ = 'RABBIT_MQ';
 
@@ -25,4 +27,19 @@ export const brokerProvider: Provider = {
         }
     },
     inject: [ConfigService],
+};
+
+export const rabbitChannelProvider: Provider = {
+    provide: RABBIT_MQ,
+    useFactory: (connection: AmqpConnectionManager) => {
+        return connection.createChannel({
+            setup: async (ch: ConfirmChannel) => {
+                await ch.assertExchange(DELAYED_EXCHANGE, DELAYED_EXCHANGE_TYPE, {
+                    durable: true,
+                    arguments: DELAYED_EXCHANGE_ARGS,
+                });
+            },
+        });
+    },
+    inject: [RABBIT_MQ_CONNECTION],
 };

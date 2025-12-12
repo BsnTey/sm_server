@@ -1,7 +1,7 @@
 import { forwardRef, Global, Inject, Module, OnApplicationShutdown } from '@nestjs/common';
 import { ChannelWrapper } from 'amqp-connection-manager';
 import { BrokerConsumer } from './broker.consumer';
-import { brokerProvider, RABBIT_MQ } from './broker.provider';
+import { brokerProvider, RABBIT_MQ, rabbitChannelProvider } from './broker.provider';
 import { ConfigModule } from '@nestjs/config';
 import { DelayedPublisher } from '@common/broker/delayed.publisher';
 import { NotificationModule } from '../../module/notification/notification.module';
@@ -19,6 +19,7 @@ import { TelegramModule } from '../../module/telegram/telegram.module';
     imports: [ConfigModule, forwardRef(() => NotificationModule), AccountModule, CheckingModule, TelegramModule],
     providers: [
         brokerProvider,
+        rabbitChannelProvider,
         BrokerConsumer,
         DelayedPublisher,
         AccountShortInfoWorker,
@@ -27,7 +28,7 @@ import { TelegramModule } from '../../module/telegram/telegram.module';
         PersonalDiscountProductWorker,
         MessagesToTelegramWorker,
     ],
-    exports: [brokerProvider, DelayedPublisher],
+    exports: [brokerProvider, DelayedPublisher, rabbitChannelProvider],
 })
 export class BrokerModule implements OnApplicationShutdown {
     @Inject(RABBIT_MQ)
