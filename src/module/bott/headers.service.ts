@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { chromium, Cookie } from 'patchright';
 import { extractCsrf } from '../telegram/utils/payment.utils';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '../http/http.service';
@@ -32,7 +31,7 @@ export class BotTHeadersService implements OnModuleInit {
 
     async onModuleInit() {
         if (this.nodeEnv == 'developer') return;
-        await this.updateTokenClaudeFlare();
+        // await this.updateTokenClaudeFlare();
     }
 
     getHeaders() {
@@ -64,84 +63,84 @@ export class BotTHeadersService implements OnModuleInit {
         return data.includes('cf-challenge') || data.includes('__cf_chl_opt') || data.includes('Checking your browser');
     }
 
-    async updateTokenClaudeFlare() {
-        if (this.tokenUpdatePromise) {
-            return this.tokenUpdatePromise;
-        }
-
-        this.isUpdatingToken = true;
-        this.tokenUpdatePromise = (async () => {
-            const statsUrl = `${this.urlBotT}lk/common/replenishment/main/statistics?bot_id=${this.sellerTradeBotId}`;
-
-            try {
-                this.logger.log('Попытка обновить токены через быстрый HTTP запрос...');
-
-                const response = await this.httpService.get(statsUrl, {
-                    headers: this.getHeaders(),
-                });
-
-                if (!this.isCloudflareChallenge(response.data)) {
-                    this.csrfToken = extractCsrf(response.data);
-
-                    const setCookie = response.headers['set-cookie'];
-                    this.updateCookiesFromHeaders(setCookie);
-
-                    this.logger.log('Токены обновлены через HTTP');
-                    return;
-                }
-
-                this.logger.warn('Обнаружена защита Cloudflare, переключаемся на браузер...');
-            } catch (error: any) {
-                this.logger.warn(`Ошибка HTTP запроса (${error.message}), пробуем через браузер...`);
-            }
-
-            let browser;
-            try {
-                browser = await chromium.launch({
-                    headless: true,
-                    args: ['--disable-blink-features=AutomationControlled'],
-                });
-                const context = await browser.newContext({ userAgent: this.userAgentWeb });
-
-                await context.addCookies([
-                    {
-                        name: '_identity',
-                        value: this.identityValue,
-                        domain: this.hostBot,
-                        path: '/',
-                        httpOnly: true,
-                        secure: true,
-                    },
-                ]);
-
-                const page = await context.newPage();
-                await page.goto(statsUrl, {
-                    waitUntil: 'networkidle',
-                    timeout: 30000,
-                });
-
-                await page.waitForSelector('div.card-header', { timeout: 15000 });
-
-                const html = await page.content();
-                this.csrfToken = extractCsrf(html);
-
-                const cookieContext = await context.cookies();
-                this.cookie = cookieContext.map((c: Cookie) => `${c.name}=${c.value}`).join('; ');
-
-                this.logger.log('Токены Bot-T обновлены успешно (через Browser)');
-            } catch (error: any) {
-                this.logger.error('Критическая ошибка обновления токенов:', error.message);
-                throw error;
-            } finally {
-                if (browser) await browser.close();
-            }
-        })().finally(() => {
-            this.isUpdatingToken = false;
-            this.tokenUpdatePromise = null;
-        });
-
-        return this.tokenUpdatePromise;
-    }
+    // async updateTokenClaudeFlare() {
+    //     if (this.tokenUpdatePromise) {
+    //         return this.tokenUpdatePromise;
+    //     }
+    //
+    //     this.isUpdatingToken = true;
+    //     this.tokenUpdatePromise = (async () => {
+    //         const statsUrl = `${this.urlBotT}lk/common/replenishment/main/statistics?bot_id=${this.sellerTradeBotId}`;
+    //
+    //         try {
+    //             this.logger.log('Попытка обновить токены через быстрый HTTP запрос...');
+    //
+    //             const response = await this.httpService.get(statsUrl, {
+    //                 headers: this.getHeaders(),
+    //             });
+    //
+    //             if (!this.isCloudflareChallenge(response.data)) {
+    //                 this.csrfToken = extractCsrf(response.data);
+    //
+    //                 const setCookie = response.headers['set-cookie'];
+    //                 this.updateCookiesFromHeaders(setCookie);
+    //
+    //                 this.logger.log('Токены обновлены через HTTP');
+    //                 return;
+    //             }
+    //
+    //             this.logger.warn('Обнаружена защита Cloudflare, переключаемся на браузер...');
+    //         } catch (error: any) {
+    //             this.logger.warn(`Ошибка HTTP запроса (${error.message}), пробуем через браузер...`);
+    //         }
+    //
+    //         let browser;
+    //         try {
+    //             browser = await chromium.launch({
+    //                 headless: true,
+    //                 args: ['--disable-blink-features=AutomationControlled'],
+    //             });
+    //             const context = await browser.newContext({ userAgent: this.userAgentWeb });
+    //
+    //             await context.addCookies([
+    //                 {
+    //                     name: '_identity',
+    //                     value: this.identityValue,
+    //                     domain: this.hostBot,
+    //                     path: '/',
+    //                     httpOnly: true,
+    //                     secure: true,
+    //                 },
+    //             ]);
+    //
+    //             const page = await context.newPage();
+    //             await page.goto(statsUrl, {
+    //                 waitUntil: 'networkidle',
+    //                 timeout: 30000,
+    //             });
+    //
+    //             await page.waitForSelector('div.card-header', { timeout: 15000 });
+    //
+    //             const html = await page.content();
+    //             this.csrfToken = extractCsrf(html);
+    //
+    //             const cookieContext = await context.cookies();
+    //             this.cookie = cookieContext.map((c: Cookie) => `${c.name}=${c.value}`).join('; ');
+    //
+    //             this.logger.log('Токены Bot-T обновлены успешно (через Browser)');
+    //         } catch (error: any) {
+    //             this.logger.error('Критическая ошибка обновления токенов:', error.message);
+    //             throw error;
+    //         } finally {
+    //             if (browser) await browser.close();
+    //         }
+    //     })().finally(() => {
+    //         this.isUpdatingToken = false;
+    //         this.tokenUpdatePromise = null;
+    //     });
+    //
+    //     return this.tokenUpdatePromise;
+    // }
 
     private updateCookiesFromHeaders(setCookieHeaders: string[] | undefined) {
         if (!setCookieHeaders) return;

@@ -16,9 +16,6 @@ export class AccessStrategy extends PassportStrategy(Strategy, 'accessToken') {
             ]),
             ignoreExpiration: false,
             secretOrKey: configService.getOrThrow('ACCESS_TOKEN_JWT_SECRET'),
-            signOptions: {
-                expiresIn: configService.getOrThrow('ACCESS_TOKEN_EXPIRATION'),
-            },
         });
     }
 

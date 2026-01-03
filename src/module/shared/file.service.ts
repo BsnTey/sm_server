@@ -23,7 +23,7 @@ export class FileService {
      */
     async saveFile(fileName: string, fileBuffer: Buffer): Promise<void> {
         const filePath = path.join(this.uploadDir, fileName);
-        await fs.promises.writeFile(filePath, fileBuffer);
+        await fs.promises.writeFile(filePath, fileBuffer as any);
     }
 
     /**
@@ -73,9 +73,9 @@ export class FileService {
         const writer = fs.createWriteStream(filePath);
         response.data.pipe(writer);
 
-        await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
+        await new Promise<void>((resolve, reject) => {
+            writer.on('finish', () => resolve());
+            writer.on('error', err => reject(err));
         });
     }
 
@@ -86,7 +86,7 @@ export class FileService {
             });
 
             return Buffer.from(response.data);
-        } catch (error) {
+        } catch {
             throw new Error('Не удалось скачать файл');
         }
     }

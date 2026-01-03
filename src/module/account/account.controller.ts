@@ -127,7 +127,7 @@ export class AccountController {
     @HasZenno()
     @Put(':accountId')
     @HttpCode(200)
-    async updateAccount(@Body() dto: UpdateAccountRequestDto, @Param() params: AccountIdParamsDto): Promise<UpdateAccountResponseDto> {
+    async updateAccount(@Body() dto: UpdateAccountRequestDto, @Param() params: AccountIdParamsDto) {
         const account = await this.accountService.updateAccount(params.accountId, dto);
         return account ? 'success' : 'error';
     }
@@ -146,7 +146,7 @@ export class AccountController {
     async updateBonusCountAccount(
         @Body() dto: UpdatingBonusCountRequestDto,
         @Param() params: AccountIdParamsDto,
-    ): Promise<UpdatingBonusCountResponseDto> {
+    ) {
         const account = await this.accountService.updateAccountBonusCount(params.accountId, dto);
         return account ? 'success' : 'error';
     }
@@ -177,7 +177,7 @@ export class AccountController {
     async updateCookieAccount(
         @Body() dto: UpdatingCookieRequestDto,
         @Param() params: AccountIdParamsDto,
-    ): Promise<UpdatingCookieResponseDto> {
+    ) {
         return this.accountService.updateCookie(params.accountId, dto);
     }
 
@@ -249,7 +249,7 @@ export class AccountController {
     @HasZenno()
     @Post(':accountId/device')
     @HttpCode(200)
-    async addDeviceInfo(@Param() params: AccountIdParamsDto, @Body() deviceInfoDto: DeviceInfoRequestDto): Promise<DeviceInfoResponseDto> {
+    async addDeviceInfo(@Param() params: AccountIdParamsDto, @Body() deviceInfoDto: DeviceInfoRequestDto) {
         return this.accountService.addDeviceInfo(params.accountId, deviceInfoDto);
     }
 
@@ -259,7 +259,7 @@ export class AccountController {
     async updateDeviceInfo(
         @Param() params: AccountIdParamsDto,
         @Body() deviceInfoDto: DeviceInfoRequestDto,
-    ): Promise<DeviceInfoResponseDto> {
+    ) {
         return this.deviceInfoService.updateDeviceInfo(params.accountId, deviceInfoDto);
     }
 

@@ -78,7 +78,7 @@ export class AccountService {
     private url = this.configService.getOrThrow('API_DONOR');
     private urlSite = this.configService.getOrThrow('API_DONOR_SITE');
     private adminsId: string[] = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
-    private durationTimeProxyBlock = this.configService.getOrThrow('TIME_DURATION_PROXY_BLOCK_IN_MIN');
+    private durationTimeProxyBlock = 60;
 
     private TTL_CASH_ACCOUNT = 60;
     private TTL_CASH_SHORT_INFO = 20;
@@ -218,7 +218,7 @@ export class AccountService {
         let deviceInfo: IDeviceInfo | null = null;
         try {
             deviceInfo = await this.deviceInfoService.getDeviceInfo(accountId);
-        } catch (error) {
+        } catch {
             //null
         }
 
@@ -316,7 +316,7 @@ export class AccountService {
         try {
             await this.accountRep.addAccountCourses(accountId);
             await this.courseService.createAccountLessonProgress(account.accountId, lessons);
-        } catch (e) {
+        } catch {
             await this.courseService.createAccountLessonProgressFromExistCourses(account.accountId, lessons);
         }
     }
@@ -575,7 +575,7 @@ export class AccountService {
         try {
             const accountWithProxy = await this.rawLoadAccountCore(accountId);
             return accountWithProxy.proxy.uuid;
-        } catch (e) {
+        } catch {
             return null;
         }
     }
@@ -646,24 +646,20 @@ export class AccountService {
 
         const proxyInfo = await this.proxyService.getRandomProxy();
 
-        try {
-            const { data } = await this.createAnonym(deviceId, proxyInfo.proxy);
+        const { data } = await this.createAnonym(deviceId, proxyInfo.proxy);
 
-            const accessToken = data.token.accessToken;
-            const xUserId = data.profile.id;
+        const accessToken = data.token.accessToken;
+        const xUserId = data.profile.id;
 
-            const newEntity = new AccountWithProxyEntity({
-                accessToken,
-                xUserId,
-                deviceId,
-                proxy: proxyInfo,
-            });
+        const newEntity = new AccountWithProxyEntity({
+            accessToken,
+            xUserId,
+            deviceId,
+            proxy: proxyInfo,
+        });
 
-            await this.cacheService.setUntilEndOfDay(key, newEntity);
-            return newEntity;
-        } catch (e) {
-            throw e;
-        }
+        await this.cacheService.setUntilEndOfDay(key, newEntity);
+        return newEntity;
     }
 
     private async createAnonym(deviceId: string, proxyUrl: string): Promise<AnonymResponse> {
@@ -1301,7 +1297,7 @@ export class AccountService {
         try {
             const response = await this.httpService.post(url, payload, httpOptions);
             return response.status;
-        } catch (e: any) {
+        } catch {
             return 404;
         }
     }
@@ -1328,7 +1324,7 @@ export class AccountService {
                     nodeName: i.nodeName,
                 };
             });
-        } catch (e: any) {
+        } catch {
             throw new Error('Ошибка при получении персональной скидки');
         }
     }

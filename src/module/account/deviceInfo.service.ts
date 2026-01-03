@@ -7,7 +7,7 @@ import { IDeviceInfo } from './interfaces/deviceInfo.interface';
 export class DeviceInfoService {
     constructor(private readonly deviceInfoRepository: DeviceInfoRepository) {}
 
-    async addDeviceInfo(accountId: string, dto: DeviceInfoRequestDto): Promise<DeviceInfoResponseDto> {
+    async addDeviceInfo(accountId: string, dto: DeviceInfoRequestDto) {
         const deviceInfoExists = await this.deviceInfoRepository.exists(accountId);
         if (deviceInfoExists) {
             throw new BadRequestException(`Информация об устройстве для аккаунта ${accountId} уже существует`);
@@ -27,7 +27,7 @@ export class DeviceInfoService {
         return deviceInfo.getDeviceParams();
     }
 
-    async updateDeviceInfo(accountId: string, dto: DeviceInfoRequestDto): Promise<DeviceInfoResponseDto> {
+    async updateDeviceInfo(accountId: string, dto: DeviceInfoRequestDto) {
         const deviceInfoExists = await this.deviceInfoRepository.exists(accountId);
         if (deviceInfoExists) {
             throw new BadRequestException(`Информация об устройстве для аккаунта ${accountId} уже существует`);

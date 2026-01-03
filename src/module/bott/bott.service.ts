@@ -54,7 +54,7 @@ export class BottService {
                 if (isTokenError && attempt < MAX_RETRIES) {
                     this.logger.warn(`Попытка запроса с Bot-t: ${attempt} провалена. Обновляю токен.`);
                     try {
-                        await this.botTHeaders.updateTokenClaudeFlare();
+                        // await this.botTHeaders.updateTokenClaudeFlare();
                     } catch (updateError: any) {
                         this.logger.error(`Ошибка обновления токена на попытке: ${attempt} : ${updateError.message}`);
                         throw new Error(`Critical: Ошибка при обновлении токена. Ошибка: ${updateError.message}`);
