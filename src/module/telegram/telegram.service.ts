@@ -8,12 +8,14 @@ import { Telegraf } from 'telegraf';
 @Injectable()
 export class TelegramService {
     private readonly logger = new Logger(TelegramService.name);
-    private adminsId: string[] = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
+    private readonly adminsId: string[];
 
     constructor(
         private configService: ConfigService,
         @InjectBot() private readonly bot: Telegraf,
-    ) {}
+    ) {
+        this.adminsId = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
+    }
 
     async exitScene(menuBtn: string, @Ctx() ctx: WizardContext) {
         await ctx.scene.leave();

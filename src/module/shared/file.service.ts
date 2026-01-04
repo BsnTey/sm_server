@@ -68,15 +68,21 @@ export class FileService {
     async saveFileFromTg(fileName: string, fileLink: URL): Promise<void> {
         const filePath = path.join(this.uploadDir, fileName);
 
-        const response = await this.httpService.get(fileLink.href, { responseType: 'stream' });
-
-        const writer = fs.createWriteStream(filePath);
-        response.data.pipe(writer);
-
-        await new Promise<void>((resolve, reject) => {
-            writer.on('finish', () => resolve());
-            writer.on('error', err => reject(err));
+        // 1. Используем arraybuffer вместо stream
+        const response = await this.httpService.get(fileLink.href, {
+            responseType: 'arraybuffer',
         });
+
+        // 2. Проверяем, что пришли данные
+        if (!response.data) {
+            throw new Error(`Пустой ответ при скачивании файла: ${fileLink.href}`);
+        }
+
+        // 3. Пишем буфер напрямую в файл
+        // Важно: response.data может быть строкой или объектом буфера, приводим к Buffer
+        const buffer = Buffer.isBuffer(response.data) ? response.data : Buffer.from(response.data);
+
+        await fs.promises.writeFile(filePath, buffer as Uint8Array);
     }
 
     async downloadFile(fileUrl: string): Promise<Buffer> {

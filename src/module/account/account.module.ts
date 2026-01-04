@@ -10,8 +10,10 @@ import { CourseRepository } from './course.repository';
 import { DeviceInfoService } from './deviceInfo.service';
 import { DeviceInfoRepository } from './deviceInfo.repository';
 import { CalculateModule } from '../calculate/calculate.module';
+import { DeviceModule } from '@core/device/device.module';
 
 @Module({
+    imports: [ProxyModule, HttpModule, CalculateModule, DeviceModule],
     controllers: [AccountController],
     providers: [
         AccountService,
@@ -23,6 +25,5 @@ import { CalculateModule } from '../calculate/calculate.module';
         DeviceInfoRepository,
     ],
     exports: [AccountService, SportmasterHeadersService, CourseService],
-    imports: [ProxyModule, HttpModule, CalculateModule],
 })
 export class AccountModule {}

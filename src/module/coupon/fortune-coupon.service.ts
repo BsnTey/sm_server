@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { BottService } from '../bott/bott.service';
-import { extractCsrf, extractUsersStatistics } from '../telegram/utils/payment.utils';
+import { extractUsersStatistics } from '../telegram/utils/payment.utils';
 import { ConfigService } from '@nestjs/config';
 import { SenderTelegram } from '../telegram/interfaces/telegram.context';
 
@@ -41,13 +41,15 @@ export class FortuneCouponService {
     //     { name: 'Скидка 20%. Активация в Спортивном боте', chance: 26, code: 'Discount_20' },
     // ];
 
-    private tgNamesExceptionStatistic = this.configService.getOrThrow<string>('TELEGRAM_NAMES_EXCEPTION_STATISTIC').split(',');
+    private readonly tgNamesExceptionStatistic: string[];
 
     constructor(
         private readonly couponRepository: FortuneCouponRepository,
         private readonly bottService: BottService,
         private configService: ConfigService,
-    ) {}
+    ) {
+        this.tgNamesExceptionStatistic = this.configService.getOrThrow<string>('TELEGRAM_NAMES_EXCEPTION_STATISTIC').split(',');
+    }
 
     getRandomPrize(sender: SenderTelegram): Prize {
         return this.getRandomPrizeFromPool(this.prizes);
@@ -127,11 +129,10 @@ export class FortuneCouponService {
         }
 
         if (type === FortuneSurpriseType.Replenish) {
-            const responseStatistics = await this.bottService.getStatistics();
-            const csrfToken = extractCsrf(responseStatistics);
+            await this.bottService.getStatistics();
             const activateAt = dayjs(expiresAt).format('YYYY-MM-DDTHH:mm');
-            const promoStatus = await this.bottService.createReplenishPromocode(csrfToken, generatedCode, value, 1, activateAt);
-            if (promoStatus !== 302 && promoStatus !== 200) {
+            const promoStatus = await this.bottService.createReplenishPromocode(generatedCode, value, 1, activateAt);
+            if (promoStatus !== 302) {
                 throw new BadRequestException('Не удалось создать промокод для начисления');
             }
             return this.couponRepository.createCoupon({
@@ -146,11 +147,10 @@ export class FortuneCouponService {
                 owner: telegramId,
             });
         } else if (type === FortuneSurpriseType.Discount) {
-            const responseStatistics = await this.bottService.getStatistics();
-            const csrfToken = extractCsrf(responseStatistics);
+            await this.bottService.getStatistics();
             const activateAt = dayjs(expiresAt).format('YYYY-MM-DDTHH:mm');
-            const promoStatus = await this.bottService.createPromocode(csrfToken, generatedCode, value, 1, activateAt);
-            if (promoStatus !== 200) {
+            const promoStatus = await this.bottService.createPromocode(generatedCode, value, 1, activateAt);
+            if (promoStatus !== 302) {
                 throw new BadRequestException('Не удалось создать промокод для скидки');
             }
             return this.couponRepository.createCoupon({

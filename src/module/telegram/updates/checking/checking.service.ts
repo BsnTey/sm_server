@@ -68,7 +68,7 @@ export class CheckingService {
 
         try {
             await Promise.race([processAccount(resultChecking, accountId), timeoutPromise]);
-        } catch (error: any) {
+        } catch {
             resultChecking[accountId] = `${accountId}: Ошибка тайм-аута\n`;
         }
     }
@@ -86,7 +86,7 @@ export class CheckingService {
             const { bonusCount, bonusDetails } = await this.accountService.shortInfo(trimmedAccountId);
             try {
                 await this.orderService.orderHistory(trimmedAccountId);
-            } catch (e) {
+            } catch {
                 //ignore
             }
 

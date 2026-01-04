@@ -119,12 +119,14 @@ export class BaseUpdate {
 @Scene(HELP.scene)
 @UseFilters(TelegrafExceptionFilter)
 export class HelpUpdate {
-    private tgAdmin: string = this.configService.getOrThrow('TG_ADMIN');
-    private shopTg: string = this.configService.getOrThrow('SHOP_TELEGRAM');
+    private readonly shopTg: string;
+
     constructor(
         private configService: ConfigService,
         private telegramService: TelegramService,
-    ) {}
+    ) {
+        this.shopTg = this.configService.getOrThrow('SHOP_TELEGRAM');
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {

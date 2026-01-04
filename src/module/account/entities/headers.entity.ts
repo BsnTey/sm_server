@@ -1,7 +1,9 @@
 import md5 from 'md5';
-import { IRequestHeadersCourse, IRequestHeadersUserGate, ISportmasterRequestHeaders } from '../interfaces/headers.interface';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AccountWithProxyEntity } from './accountWithProxy.entity';
+import { HeaderPackage } from '../../http/interfaces/http.interface';
+import { DeviceInfoEntity } from '@core/device/entities/device-info.entity';
 
 @Injectable()
 export class SportmasterHeadersService {
@@ -32,9 +34,9 @@ export class SportmasterHeadersService {
 
     constructor(private configService: ConfigService) {}
 
-    getHeadersMobile(url: string, acc: any): ISportmasterRequestHeaders {
+    getHeadersMobile(url: string, acc: AccountWithProxyEntity): HeaderPackage {
         const timestamp = String(Math.floor(Date.now() / 1000));
-        return {
+        const headers = {
             'User-Agent': this.userAgentMobile,
             Host: this.host,
             Locale: this.locale,
@@ -53,11 +55,16 @@ export class SportmasterHeadersService {
             'Aplaut-Id': this.generateHash(url, acc.xUserId, timestamp),
             'Aplaut-Build': this.aplautBuild,
         };
+
+        return {
+            headers,
+            tlsClientIdentifier: this.getMobileTlsProfile(acc.deviceInfo.osVersion),
+        };
     }
 
-    getAnonymHeadersMobile(deviceId: string): ISportmasterRequestHeaders {
+    getAnonymHeadersMobile(deviceId: string, device: DeviceInfoEntity): HeaderPackage {
         const timestamp = String(Math.floor(Date.now() / 1000));
-        return {
+        const headers = {
             'User-Agent': this.userAgentMobile,
             Host: this.host,
             Locale: this.locale,
@@ -69,11 +76,16 @@ export class SportmasterHeadersService {
             Timestamp: timestamp,
             'Aplaut-Build': this.aplautBuild,
         };
+
+        return {
+            headers,
+            tlsClientIdentifier: this.getMobileTlsProfile(device.osVersion),
+        };
     }
 
-    getHeadersRefreshMobile(url: string, acc: any): ISportmasterRequestHeaders {
+    getHeadersRefreshMobile(url: string, acc: AccountWithProxyEntity): HeaderPackage {
         const timestamp = String(Math.floor(Date.now() / 1000));
-        return {
+        const headers = {
             'User-Agent': this.userAgentMobile,
             Host: this.host,
             Locale: this.locale,
@@ -91,46 +103,33 @@ export class SportmasterHeadersService {
             'Aplaut-Id': this.generateHash(url, acc.xUserId, timestamp),
             'Aplaut-Build': this.aplautBuild,
         };
-    }
-
-    getHeadersForSearchAccount(url: string, { deviceId, installationId, cityId, xUserId, accessToken }: any): Record<string, string> {
-        const timestamp = String(Math.floor(Date.now() / 1000));
 
         return {
-            'User-Agent': this.userAgentMobile,
-            Locale: 'ru',
-            Country: 'RU',
-            'Device-Id': deviceId,
-            'X-Device-Id': deviceId,
-            'Installation-Id': installationId,
-            'X-Request-Id': crypto.randomUUID(),
-            'City-Id': cityId,
-            'X-User-Id': xUserId,
-            Timestamp: timestamp,
-            'Aplaut-Id': this.generateHash(url, xUserId, timestamp),
-            'Aplaut-Build': '2',
-            Accept: 'application/json',
-            Authorization: accessToken,
-            'Content-Type': 'application/json; charset=UTF-8',
-            'Accept-Encoding': 'gzip, deflate, br',
+            headers,
+            tlsClientIdentifier: this.getMobileTlsProfile(acc.deviceInfo.osVersion),
         };
     }
 
-    getHeadersUserGate(userGateToken: string): IRequestHeadersUserGate {
-        return {
+    getHeadersUserGate(acc: AccountWithProxyEntity): HeaderPackage {
+        const headers = {
             'User-Agent': this.userAgentMobileWeb,
             Host: this.hostSite,
-            'Upgrade-Insecure-Requests': 1,
+            'Upgrade-Insecure-Requests': '1',
             Accept: this.accept,
-            'Ug-Token': userGateToken,
+            'Ug-Token': acc.userGateToken || '',
             'Accept-Encoding': this.acceptEncoding + ', br',
             'Accept-Language': this.acceptLanguage,
             'X-Requested-With': this.xRequestedWith,
             Referer: this.onlineCourses,
         };
+
+        return {
+            headers,
+            tlsClientIdentifier: this.getWebTlsProfile(acc),
+        };
     }
 
-    getHeadersWithAccessToken(accessToken: string, videoId?: string, lessonId?: string, mnemocode?: string): IRequestHeadersCourse {
+    getHeadersWithAccessToken(acc: AccountWithProxyEntity, videoId?: string, lessonId?: string, mnemocode?: string): HeaderPackage {
         let referer;
         if (!mnemocode) {
             referer = this.onlineCourses;
@@ -138,11 +137,11 @@ export class SportmasterHeadersService {
             referer = `https://${this.hostSite}courses/courses/mobile/`;
         }
 
-        return {
+        const headers = {
             'User-Agent': this.userAgentMobileWeb,
             Host: this.hostSite,
             Accept: this.accept,
-            Accesstoken: accessToken,
+            Accesstoken: acc.accessTokenCourse || '',
             'X-Requested-With': this.xRequestedWith,
             'Sec-Fetch-Site': this.secFetchSite,
             'Sec-Fetch-Mode': this.secFetchMode,
@@ -151,10 +150,29 @@ export class SportmasterHeadersService {
             'Accept-Language': this.acceptLanguage,
             Referer: referer,
         };
+
+        return {
+            headers,
+            tlsClientIdentifier: this.getWebTlsProfile(acc),
+        };
     }
 
     private generateHash(url: string, xUserId: string, timestamp: string): string {
         const combinedString = this.prefixHash + url + timestamp + xUserId;
         return md5(combinedString);
+    }
+
+    private getMobileTlsProfile(osVersion: string): string {
+        const version = parseInt(osVersion, 10) || 11;
+
+        if (version >= 13) return 'okhttp4_android_13';
+        if (version === 12) return 'okhttp4_android_12';
+
+        return 'okhttp4_android_11';
+    }
+
+    private getWebTlsProfile(account: AccountWithProxyEntity): string {
+        const version = account.deviceInfo.browserVersion?.split('.')[0] || '124';
+        return `chrome_${version}`;
     }
 }

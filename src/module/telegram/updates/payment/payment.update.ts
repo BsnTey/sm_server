@@ -43,7 +43,7 @@ export class PaymentUpdate {
                 'Для пополнения введите сумму (кратную 50р), на которую хотите пополнить.\nМинимум 500р, от 2000р пополнение +2%, от 5000р +5%';
             try {
                 await ctx.editMessageText(text);
-            } catch (e) {
+            } catch {
                 await ctx.reply(text);
             }
         } else {

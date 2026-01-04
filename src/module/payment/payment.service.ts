@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PaymentOrderEntity } from './entities/payment.entities';
 import { PaymentOrder as PaymentOrderModel } from '.prisma/client';
 import { StatusPayment } from '@prisma/client';
@@ -11,7 +11,7 @@ import {
     ERROR_NOT_FOUND_TRANSACTION,
     ERROR_USER_SEARCH_PAGE,
 } from './constants/error.constants';
-import { extractCsrf, extractUserBotId, extractUsersStatistics, getPromoCodeDetailsFromHtml } from '../telegram/utils/payment.utils';
+import { extractUserBotId, extractUsersStatistics, getPromoCodeDetailsFromHtml } from '../telegram/utils/payment.utils';
 import { IReplenishmentUsersBotT } from '../bott/interfaces/replenishment-bot-t.interface';
 import { UserStatistic } from './interfaces/statistic.interface';
 import { ConfigService } from '@nestjs/config';
@@ -20,36 +20,42 @@ import { FilterStatusPayment, Pagination } from './dto/queryFilter.dto';
 
 @Injectable()
 export class PaymentService {
-    private tgNamesExceptionStatistic: string[] = this.configService.getOrThrow('TELEGRAM_NAMES_EXCEPTION_STATISTIC').split(',');
-    private domain: string = this.configService.getOrThrow('DOMAIN');
+    private readonly logger = new Logger(PaymentService.name);
+
+    private readonly tgNamesExceptionStatistic: string[];
+    private readonly domain: string;
 
     constructor(
         private paymentRepository: PaymentRepository,
         private bottService: BottService,
         private configService: ConfigService,
-    ) { }
+    ) {
+        this.tgNamesExceptionStatistic = this.configService.getOrThrow('TELEGRAM_NAMES_EXCEPTION_STATISTIC').split(',');
+        this.domain = this.configService.getOrThrow('DOMAIN');
+    }
 
     async changeUserBalance(id: string, telegramId: string, amount: number, isPositive: boolean = true) {
         let searchId;
-        let csrfToken;
         try {
             const response = await this.bottService.searchSearchIdByTelegramId(telegramId);
             searchId = response.results[0].id;
-        } catch (err) {
+        } catch (e: any) {
+            this.logger.error('Ошибка searchSearchIdByTelegramId', e.message);
             throw new NotFoundException(ERROR_GET_SEARCH_ID);
         }
         let userBotId;
         try {
             const response = await this.bottService.getUserBotId(searchId);
             userBotId = extractUserBotId(response);
-            csrfToken = extractCsrf(response);
-        } catch (err) {
+        } catch (e: any) {
+            this.logger.error('Ошибка getUserBotId', e.message);
             throw new NotFoundException(ERROR_USER_SEARCH_PAGE);
         }
 
         try {
-            await this.bottService.userBalanceEdit(userBotId, csrfToken, String(amount), isPositive);
-        } catch (err) {
+            await this.bottService.userBalanceEdit(userBotId, String(amount), isPositive);
+        } catch (e: any) {
+            this.logger.error('Ошибка userBalanceEdit', e.message);
             throw new BadRequestException(ERROR_CHANGE_BALANCE);
         }
         try {
@@ -66,7 +72,8 @@ export class PaymentService {
                 formDate,
             );
             return new PaymentOrderEntity(paymentOrderModel);
-        } catch (err) {
+        } catch (e: any) {
+            this.logger.error('Ошибка getReplenishment', e.message);
             throw new BadRequestException(ERROR_GET_TRANSACTIONS);
         }
     }
@@ -150,7 +157,7 @@ export class PaymentService {
 
     async makeDepositUserBalance(id: string, receiptUrl: string): Promise<PaymentOrderEntity> {
         const entityTrans = await this.completeTransferedPaymentOrder(id, receiptUrl);
-        return await this.changeUserBalance(id, entityTrans.userTelegramId, entityTrans.amountCredited);
+        return this.changeUserBalance(id, entityTrans.userTelegramId, entityTrans.amountCredited);
     }
 
     private async completeTransferedPaymentOrder(id: string, receiptUrl: string): Promise<PaymentOrderEntity> {

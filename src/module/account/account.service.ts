@@ -22,7 +22,6 @@ import {
 } from './constants/error.constant';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '../http/http.service';
-import { SocksProxyAgent } from 'socks-proxy-agent';
 import { AccountWithProxyEntity } from './entities/accountWithProxy.entity';
 import { CartInterface } from './interfaces/cart.interface';
 import { IItemsCart, selectMainFromCart } from '../telegram/utils/cart.utils';
@@ -52,7 +51,6 @@ import { IDeviceInfo } from './interfaces/deviceInfo.interface';
 import { DeviceInfoRequestDto } from './dto/create-deviceInfo.dto';
 import { CourseIdAccountRequestDto } from './dto/course-account.dto';
 import { UpdatingCourseStatusAccountRequestDto } from './dto/update-course-status-account.dto';
-import { TlsProxyService } from '../http/tls-forwarder.service';
 import { GetAccountCredentialsResponseDto, UpdateAccountCredentialsRequestDto } from './dto/account-credentials.dto';
 import { DataProfile } from './interfaces/profile.interface';
 import { DataAddress, DataCoord, GeoPointLng, Location } from './interfaces/geo.interface';
@@ -71,13 +69,17 @@ import { RetryOnProxyError } from './decorators/retry-on-proxy-error.decorator';
 import { RedisCacheService } from '../cache/cache.service';
 import { getAccountEntityKey, getAnonymAccountEntityKey, getShortInfoKey } from '../cache/cache.keys';
 import { AnonymResponse } from './interfaces/anonym.interface';
+import { HttpOptions } from '../http/interfaces/http.interface';
+import { DeviceGeneratorService } from '@core/device/services/device-generator.service';
+import { CityEntity } from '@core/city/entities/city.entity';
+import { DeviceInfoEntity } from '@core/device/entities/device-info.entity';
 
 @Injectable()
 export class AccountService {
     private readonly logger = new Logger(AccountService.name);
-    private url = this.configService.getOrThrow('API_DONOR');
-    private urlSite = this.configService.getOrThrow('API_DONOR_SITE');
-    private adminsId: string[] = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
+    private readonly url: string;
+    private readonly urlSite: string;
+    private readonly adminsId: string[];
     private durationTimeProxyBlock = 60;
 
     private TTL_CASH_ACCOUNT = 60;
@@ -87,13 +89,17 @@ export class AccountService {
         private configService: ConfigService,
         private accountRep: AccountRepository,
         private proxyService: ProxyService,
-        private readonly tlsForwarder: TlsProxyService,
         private httpService: HttpService,
         private courseService: CourseService,
         private deviceInfoService: DeviceInfoService,
         private sportmasterHeaders: SportmasterHeadersService,
         private readonly cacheService: RedisCacheService,
-    ) {}
+        private deviceGen: DeviceGeneratorService,
+    ) {
+        this.url = this.configService.getOrThrow('API_DONOR');
+        this.urlSite = this.configService.getOrThrow('API_DONOR_SITE');
+        this.adminsId = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
+    }
 
     async addingAccount(accountDto: AddingAccountRequestDto): Promise<AccountEntity> {
         const {
@@ -404,52 +410,49 @@ export class AccountService {
         await this.refreshForValidation(accountWithProxyEntity);
     }
 
-    private async getHttpOptions(url: string, accountWithProxy: AccountWithProxyEntity): Promise<any> {
-        const headers = this.sportmasterHeaders.getHeadersMobile(url, accountWithProxy);
-        const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
+    private getHttpOptions(url: string, accountWithProxy: AccountWithProxyEntity): HttpOptions {
+        const { headers, tlsClientIdentifier } = this.sportmasterHeaders.getHeadersMobile(url, accountWithProxy);
 
-        return { headers, httpsAgent };
+        return { headers, proxy: accountWithProxy.proxy!.proxy, tlsClientIdentifier };
     }
 
-    private async getAnonymHttpOptions(proxy: string, deviceId: string): Promise<any> {
-        const headers = this.sportmasterHeaders.getAnonymHeadersMobile(deviceId);
-        const httpsAgent = new SocksProxyAgent(proxy);
+    private getAnonymHttpOptions(proxy: string, deviceId: string, device: DeviceInfoEntity): HttpOptions {
+        const { headers, tlsClientIdentifier } = this.sportmasterHeaders.getAnonymHeadersMobile(deviceId, device);
 
-        return { headers, httpsAgent };
+        return { headers, proxy: proxy, tlsClientIdentifier };
     }
 
-    private async getHttpOptionsRefresh(url: string, accountWithProxy: AccountWithProxyEntity): Promise<any> {
-        const headers = this.sportmasterHeaders.getHeadersRefreshMobile(url, accountWithProxy);
-        const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
+    private getHttpOptionsRefresh(url: string, accountWithProxy: AccountWithProxyEntity): HttpOptions {
+        const { headers, tlsClientIdentifier } = this.sportmasterHeaders.getHeadersRefreshMobile(url, accountWithProxy);
 
-        return { headers, httpsAgent };
+        return { headers, proxy: accountWithProxy.proxy!.proxy, tlsClientIdentifier };
     }
 
-    private async getHttpOptionsSiteUserGate(accountWithProxy: AccountWithProxyEntity): Promise<any> {
-        const headers = this.sportmasterHeaders.getHeadersUserGate(accountWithProxy.userGateToken!);
-        const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
+    private getHttpOptionsSiteUserGate(accountWithProxy: AccountWithProxyEntity): HttpOptions {
+        const { headers, tlsClientIdentifier } = this.sportmasterHeaders.getHeadersUserGate(accountWithProxy);
 
-        return { headers, httpsAgent };
+        return { headers, proxy: accountWithProxy.proxy!.proxy, tlsClientIdentifier };
     }
 
-    private async getHttpOptionsSiteCourse(accountWithProxy: AccountWithProxyEntity, accessTokenCourse: string): Promise<any> {
-        const headers = this.sportmasterHeaders.getHeadersWithAccessToken(accessTokenCourse);
-        const httpsAgent = new SocksProxyAgent(accountWithProxy.proxy!.proxy);
+    private getHttpOptionsSiteCourse(accountWithProxy: AccountWithProxyEntity): HttpOptions {
+        const { headers, tlsClientIdentifier } = this.sportmasterHeaders.getHeadersWithAccessToken(accountWithProxy);
 
-        return { headers, httpsAgent };
+        return { headers, proxy: accountWithProxy.proxy!.proxy, tlsClientIdentifier };
     }
 
-    private async getHttpOptionsSiteCourseVideo(
-        accessTokenCourse: string,
-        proxy: string,
+    private getHttpOptionsSiteCourseVideo(
+        accountWithProxy: AccountWithProxyEntity,
         videoId: string,
         lessonId: string,
         mnemocode: string,
-    ): Promise<any> {
-        const headers = this.sportmasterHeaders.getHeadersWithAccessToken(accessTokenCourse, videoId, lessonId, mnemocode);
-        const httpsAgent = new SocksProxyAgent(proxy);
-
-        return { headers, httpsAgent };
+    ): HttpOptions {
+        const { headers, tlsClientIdentifier } = this.sportmasterHeaders.getHeadersWithAccessToken(
+            accountWithProxy,
+            videoId,
+            lessonId,
+            mnemocode,
+        );
+        return { headers, proxy: accountWithProxy.proxy!.proxy, tlsClientIdentifier };
     }
 
     //Используется в декораторе 403
@@ -521,7 +524,7 @@ export class AccountService {
     @RetryOnProxyError()
     private async refreshForValidation(accountWithProxyEntity: AccountWithProxyEntity): Promise<IRefreshAccount> {
         const url = this.url + 'v1/auth/refresh';
-        const httpOptions = await this.getHttpOptionsRefresh(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptionsRefresh(url, accountWithProxyEntity);
 
         const payload = {
             refreshToken: accountWithProxyEntity.refreshToken,
@@ -565,10 +568,24 @@ export class AccountService {
             (accountWithProxy.proxy.blockedAt && accountWithProxy.proxy.blockedAt > timeBlockedAgo)
         ) {
             const proxy = await this.proxyService.getRandomProxy();
-            const newAccountWithProxy = await this.accountRep.setProxyAccount(accountWithProxy.accountId, proxy.uuid);
-            return new AccountWithProxyEntity(newAccountWithProxy);
+            await this.accountRep.setProxyAccount(accountWithProxy.accountId, proxy.uuid);
+            const newAccountWithProxy = await this.accountRep.getAccountWithProxy(accountWithProxy.accountId);
+            if (!newAccountWithProxy) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
+            return new AccountWithProxyEntity(newAccountWithProxy as IAccountWithProxy);
         }
         return new AccountWithProxyEntity(accountWithProxy as IAccountWithProxy);
+    }
+
+    private async upsertDeviceInfo(acc: AccountWithProxyEntity): Promise<AccountWithProxyEntity> {
+        if (acc?.deviceInfo?.osVersion) {
+            return acc;
+        }
+        const device = this.deviceGen.generate();
+        await this.deviceInfoService.addDeviceInfo(acc.accountId, device);
+
+        acc.deviceInfo = device;
+
+        return acc;
     }
 
     async getProxyUuid(accountId: string): Promise<string | null> {
@@ -585,7 +602,8 @@ export class AccountService {
 
         if (!accountWithProxy) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
 
-        return this.getAndValidateOrSetProxyAccount(accountWithProxy);
+        const validatedAcc = await this.getAndValidateOrSetProxyAccount(accountWithProxy);
+        return this.upsertDeviceInfo(validatedAcc);
     }
 
     private async loadAccountCore(accountId: string): Promise<AccountWithProxyEntity> {
@@ -645,8 +663,16 @@ export class AccountService {
         const deviceId = crypto.randomUUID();
 
         const proxyInfo = await this.proxyService.getRandomProxy();
+        const device = this.deviceGen.generate();
 
-        const { data } = await this.createAnonym(deviceId, proxyInfo.proxy);
+        const { data } = await this.createAnonym(deviceId, proxyInfo.proxy, device);
+
+        const city = new CityEntity({
+            cityId: '1720920299',
+            fullName: 'Москва',
+            xLocation:
+                'H4sIAAAAAAAAAL2Vz2rbQBDGX0XsKSEmaGX99a0oKhG1JaPKgbYUoSZqENgWyErABEOchF5a8KWnkkNy6a1g3IS6Tu1nmH2jjmzStKnWLqXNRbuaHfT9mPl2dET2o6SexO2MVI5IM8RFUTY1RdGpUSLNpE0qZW1TpZoqy71Snvw4au9GHVJ5cfTjzd4jFUKprEplUTIMcpfnhK0Iz',
+        });
 
         const accessToken = data.token.accessToken;
         const xUserId = data.profile.id;
@@ -656,16 +682,18 @@ export class AccountService {
             xUserId,
             deviceId,
             proxy: proxyInfo,
+            citySM: city,
+            deviceInfo: device,
         });
 
         await this.cacheService.setUntilEndOfDay(key, newEntity);
         return newEntity;
     }
 
-    private async createAnonym(deviceId: string, proxyUrl: string): Promise<AnonymResponse> {
+    private async createAnonym(deviceId: string, proxyUrl: string, device: DeviceInfoEntity): Promise<AnonymResponse> {
         const url = this.url + 'v1/auth/anonym';
 
-        const httpOptions = await this.getAnonymHttpOptions(proxyUrl, deviceId);
+        const httpOptions = this.getAnonymHttpOptions(proxyUrl, deviceId, device);
 
         const payload = {
             device: {
@@ -737,7 +765,7 @@ export class AccountService {
         const acc = await this.getAccountEntity(accountId);
         const encodedCity = encodeURI(city.toUpperCase());
         const url = this.url + `v1/geo/suggest?query=${encodedCity}`;
-        const httpOptions = await this.getHttpOptions(url, acc);
+        const httpOptions = this.getHttpOptions(url, acc);
         const response = await this.httpService.get(url, httpOptions);
         return response.data.data.addressSuggestList;
     }
@@ -748,7 +776,7 @@ export class AccountService {
         const encodedQuery = encodeURIComponent(uri);
         const url = `${this.url}v1/geo/address?query=${encodedQuery}&mode=URI`;
 
-        const httpOptions = await this.getHttpOptions(url, account);
+        const httpOptions = this.getHttpOptions(url, account);
         const response = await this.httpService.get(url, httpOptions);
         return response.data.data;
     }
@@ -757,7 +785,7 @@ export class AccountService {
     @RetryOnProxyError()
     private async findCityByCoord(account: AccountWithProxyEntity, coord: GeoPointLng): Promise<DataCoord> {
         const url = this.url + `v1/city/coord?lat=${coord.lat}&lng=${coord.lng}`;
-        const httpOptions = await this.getHttpOptions(url, account);
+        const httpOptions = this.getHttpOptions(url, account);
         const response = await this.httpService.get(url, httpOptions);
         return response.data.data;
     }
@@ -766,7 +794,7 @@ export class AccountService {
     @RetryOnProxyError()
     private async setGeo(account: AccountWithProxyEntity, location: Location): Promise<void> {
         const url = this.url + `v1/geo/location`;
-        const httpOptions = await this.getHttpOptions(url, account);
+        const httpOptions = this.getHttpOptions(url, account);
 
         const payload = {
             location,
@@ -818,7 +846,7 @@ export class AccountService {
     }> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v2/bonus/shortInfo';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         const response = await this.httpService.get<ShorInfoData>(url, httpOptions);
 
         return {
@@ -842,7 +870,7 @@ export class AccountService {
 
         const targetUrl = this.url + `v1/verify/sendSms`;
 
-        const headers = this.sportmasterHeaders.getHeadersForSearchAccount(targetUrl, accountEntity);
+        const httpOptions = this.getHttpOptions(targetUrl, accountEntity);
 
         const payload = {
             phone: {
@@ -854,20 +882,9 @@ export class AccountService {
             communicationChannel: 'SMS',
         };
 
-        const responseData = await this.tlsForwarder.forwardRequest<{ data: { requestId: string } }>({
-            requestUrl: targetUrl,
-            requestMethod: 'POST',
-            headers,
-            requestBody: payload,
-            proxyUrl: accountEntity.proxy!.proxy,
-        });
+        const response = await this.httpService.post(targetUrl, payload, httpOptions);
 
-        if (!responseData?.data?.requestId) {
-            this.logger.error('Unexpected response from Sportmaster after TLS forwarding', responseData);
-            throw new Error('Ошибка при проверке номера на стороне СМ');
-        }
-
-        return responseData.data.requestId;
+        return response.data.requestId;
     }
 
     @RetryOn401()
@@ -883,7 +900,7 @@ export class AccountService {
     @RetryOnProxyError()
     private async verifyCheck(accountWithProxyEntity: AccountWithProxyEntity, requestId: string, code: string): Promise<string> {
         const url = this.url + `v1/verify/check`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
             requestId,
@@ -898,7 +915,7 @@ export class AccountService {
     @RetryOnProxyError()
     private async changePhone(accountWithProxyEntity: AccountWithProxyEntity, token: string): Promise<boolean> {
         const url = this.url + `v1/profile/changePhone`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
             token,
@@ -914,7 +931,7 @@ export class AccountService {
             accountWithProxyEntity = await this.getAccountEntity(accountWithProxyEntity);
         }
         const url = this.url + `v2/analytics/tags`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {};
         await this.httpService.post(url, payload, httpOptions);
@@ -929,7 +946,7 @@ export class AccountService {
             accountWithProxyEntity = await this.getAccountEntity(accountWithProxyEntity);
         }
         const url = this.url + 'v1/cart2';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         const payload = { clearDeletedLines: 'true', cartResponse: 'FULL2' };
         const response = await this.httpService.post(url, payload, httpOptions);
 
@@ -941,7 +958,7 @@ export class AccountService {
     async applySnapshot(accountId: string, snapshotUrl: string): Promise<CartInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart/applySnapshot';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         const payload = {
             snapshotUrl: snapshotUrl,
         };
@@ -955,7 +972,7 @@ export class AccountService {
     async addPromocode(accountId: string, promocode: string): Promise<boolean> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart2/promoCode';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         const payload = {
             promoCode: promocode,
         };
@@ -969,7 +986,7 @@ export class AccountService {
     async createSnapshot(accountId: string): Promise<string> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart/createSnapshot';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         const payload = {};
         const response = await this.httpService.post(url, payload, httpOptions);
 
@@ -981,7 +998,7 @@ export class AccountService {
     async deletePromocode(accountId: string): Promise<void> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + this.url + 'v1/cart/promoCode';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         await this.httpService.delete(url, httpOptions);
     }
 
@@ -1003,7 +1020,7 @@ export class AccountService {
             accountWithProxyEntity = await this.getAccountEntity(accountWithProxyEntity);
         }
         const url = this.url + 'v1/cart2/remove';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const ids = removeList.map((item: IItemsCart) => {
             return {
@@ -1025,7 +1042,7 @@ export class AccountService {
     async addInCart(accountId: string, { productId, sku }: IItemsCart): Promise<any> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart2/add';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         const payload = {
             productList: [
                 {
@@ -1054,7 +1071,7 @@ export class AccountService {
         }
 
         const url = this.url + 'v2/products/search?limit=10&offset=0';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = { queryText: article, persGateTags: ['A_search', 'auth_login_call'] };
 
@@ -1068,7 +1085,7 @@ export class AccountService {
     async getProductById(accountId: string, productId: string): Promise<ProductApiResponse> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v2/products/${productId}`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {};
 
@@ -1082,7 +1099,7 @@ export class AccountService {
     async internalPickupAvailability(accountId: string, internalPickupAvabilityItems: IItemsCart[]): Promise<PickupAvabilityInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart2/internalPickupAvailability';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
             cartItemIds: internalPickupAvabilityItems,
@@ -1096,7 +1113,7 @@ export class AccountService {
     async internalPickup(accountId: string, shopId: string, internalPickupAvabilityItems: IItemsCart[]) {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart2/obtainPoint/internalPickup';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
             shopNumber: shopId,
@@ -1116,7 +1133,7 @@ export class AccountService {
     async submitOrder(accountId: string, version: string): Promise<string> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/cart/submit';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
             cartVersion: version,
@@ -1133,7 +1150,7 @@ export class AccountService {
     async approveRecipientOrder(accountId: string, recipient: IRecipientOrder): Promise<any> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/cart2/receiver`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
             fio: `${recipient.firstName} ${recipient.lastName}`,
@@ -1150,7 +1167,7 @@ export class AccountService {
     async orderHistory(accountId: string): Promise<OrdersInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v3/orderHistory`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
         return response.data;
     }
@@ -1160,7 +1177,7 @@ export class AccountService {
     async orderInfo(accountId: string, orderNumber: string): Promise<OrderInfoInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v4/order/${orderNumber}`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         const payload = {};
         const response = await this.httpService.post(url, payload, httpOptions);
         return response.data;
@@ -1174,7 +1191,7 @@ export class AccountService {
         const randomIndex = Math.floor(Math.random() * reasons.length);
         const reason = reasons[randomIndex];
         const url = this.url + `v1/order/${orderNumber}`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
             cancelReasonId: reason,
@@ -1189,7 +1206,7 @@ export class AccountService {
     async getPromocodeFromProfile(accountId: string): Promise<PromocodeInterface> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/promo`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
         return response.data;
     }
@@ -1199,7 +1216,7 @@ export class AccountService {
     async getProfile(accountId: string): Promise<DataProfile> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/profile`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
         return response.data.data;
     }
@@ -1209,7 +1226,7 @@ export class AccountService {
     async pushToken(accountId: string, pushToken: string): Promise<any> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v1/profile/pushToken';
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
             pushToken,
@@ -1224,7 +1241,7 @@ export class AccountService {
     @RetryOnProxyError()
     private async getUserGateToken(accountWithProxyEntity: AccountWithProxyEntity): Promise<UserGateTokenInterface> {
         const url = this.url + `v1/profile/userGateToken`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
         return response.data;
     }
@@ -1233,7 +1250,7 @@ export class AccountService {
     @RetryOnProxyError()
     async getCoursesHtml(accountWithProxyEntity: AccountWithProxyEntity): Promise<string> {
         const url = this.urlSite + `courses/?webview=true`;
-        const httpOptions = await this.getHttpOptionsSiteUserGate(accountWithProxyEntity);
+        const httpOptions = this.getHttpOptionsSiteUserGate(accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
         return response.data;
     }
@@ -1251,7 +1268,8 @@ export class AccountService {
     @RetryOnProxyError()
     private async getCourses(accountWithProxyEntity: AccountWithProxyEntity, accessTokenCourse: string): Promise<CourseList> {
         const url = this.urlSite + `courses/api/courses?limit=10`;
-        const httpOptions = await this.getHttpOptionsSiteCourse(accountWithProxyEntity, accessTokenCourse);
+        accountWithProxyEntity.accessTokenCourse = accessTokenCourse;
+        const httpOptions = this.getHttpOptionsSiteCourse(accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
         return response.data;
     }
@@ -1283,13 +1301,7 @@ export class AccountService {
         }
 
         const url = this.urlSite + `courses/api/courses/lessons/${mnemocode}/${lessonId}/watching`;
-        const httpOptions = await this.getHttpOptionsSiteCourseVideo(
-            accountWithProxyEntity.accessTokenCourse,
-            accountWithProxyEntity.proxy!.proxy,
-            videoId,
-            lessonId,
-            mnemocode,
-        );
+        const httpOptions = this.getHttpOptionsSiteCourseVideo(accountWithProxyEntity, videoId, lessonId, mnemocode);
         const payload = {
             startTime: 0,
             endTime: duration,
@@ -1307,7 +1319,7 @@ export class AccountService {
     async personalDiscount(accountId: string): Promise<PersonalDiscount> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/personal-discount`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {};
 
@@ -1334,7 +1346,7 @@ export class AccountService {
     async findProductsBySearch(accountId: string, subquery: string, limit = 100, offset = 0): Promise<Products> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v2/products/search?limit=${limit}&offset=${offset}`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
             facetAvailabilityApply: false,
@@ -1354,7 +1366,7 @@ export class AccountService {
     async getProfileFamily(accountId: string): Promise<ProfileFamilyResponse> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/profile/family`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
         return response.data.data;
     }
@@ -1364,7 +1376,7 @@ export class AccountService {
     async familyInvite(accountId: string, member: InviteMemberFamily): Promise<FamilyInviteResponse> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/profile/family/_invite`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload: InviteMemberFamily = {
             memberPhone: member.memberPhone,
@@ -1384,7 +1396,7 @@ export class AccountService {
     async familyAnswer(accountId: string, familyId: string, answer: boolean): Promise<ProfileFamilyResponse> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/profile/family/${familyId}/_answer`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const payload = {
             answer,
@@ -1399,7 +1411,7 @@ export class AccountService {
     async deleteFamily(accountId: string, familyId: string): Promise<ProfileFamilyResponse> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/profile/family/${familyId}`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const response = await this.httpService.delete<ProfileFamilyResponse>(url, httpOptions);
         return response.data;
@@ -1410,7 +1422,7 @@ export class AccountService {
     async deleteFamilyMember(accountId: string, member: MemberFamily): Promise<ProfileFamilyResponse> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + `v1/profile/family/${member.familyId}/members/${member.memberId}`;
-        const httpOptions = await this.getHttpOptions(url, accountWithProxyEntity);
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
 
         const response = await this.httpService.delete<ProfileFamilyResponse>(url, httpOptions);
         return response.data;

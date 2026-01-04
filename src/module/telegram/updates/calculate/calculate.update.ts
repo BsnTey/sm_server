@@ -20,7 +20,7 @@ export class CalculateUpdate {
         private calculateServiceTelegram: TemplateService,
         private calculateService: CalculateService,
         private cacheService: RedisCacheService,
-    ) { }
+    ) {}
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -264,4 +264,3 @@ function applyTemplate(template: string, totalPrice: number, commission: number)
         .replace(/{commission}/g, commission.toString())
         .replace(/\/n/g, '\n');
 }
-

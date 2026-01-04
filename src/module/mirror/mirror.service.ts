@@ -14,15 +14,18 @@ interface JwtPayload {
 
 @Injectable()
 export class MirrorService {
-    private hash = this.configService.getOrThrow('ZENNO_HASH');
-    private domain = this.configService.getOrThrow('DOMAIN').split('://')[1];
+    private readonly hash: string;
+    private readonly domain: string;
 
     constructor(
         private readonly mirrorRepository: MirrorRepository,
         private readonly accountService: AccountService,
         private readonly jwtService: JwtService,
         private configService: ConfigService,
-    ) {}
+    ) {
+        this.hash = this.configService.getOrThrow('ZENNO_HASH');
+        this.domain = this.configService.getOrThrow('DOMAIN').split('://')[1];
+    }
 
     async createAccountMirror(telegramId: string, telegramName: string): Promise<AccountMirror> {
         return this.mirrorRepository.createAccountMirror(telegramId, telegramName);

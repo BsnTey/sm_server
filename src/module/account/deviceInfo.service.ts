@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DeviceInfoRequestDto, DeviceInfoResponseDto } from './dto/create-deviceInfo.dto';
+import { DeviceInfoRequestDto } from './dto/create-deviceInfo.dto';
 import { DeviceInfoRepository } from './deviceInfo.repository';
 import { IDeviceInfo } from './interfaces/deviceInfo.interface';
 

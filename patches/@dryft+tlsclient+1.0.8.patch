@@ -1,0 +1,271 @@
+diff --git a/node_modules/@dryft/tlsclient/lib/helpers/adapter.js b/node_modules/@dryft/tlsclient/lib/helpers/adapter.js
+index 20619b1..62a7818 100644
+--- a/node_modules/@dryft/tlsclient/lib/helpers/adapter.js
++++ b/node_modules/@dryft/tlsclient/lib/helpers/adapter.js
+@@ -20,57 +20,9 @@ const tlspath_1 = require("./tlspath");
+ let { TLS_LIB_PATH } = (0, tlspath_1.getTLSDependencyPath)();
+ let DEFAULT_CLIENT_ID = "chrome_120";
+ exports.DEFAULT_CLIENT_ID = DEFAULT_CLIENT_ID;
+-let DEFAULT_HEADERS = {
+-    accept: "*/*",
+-    "accept-encoding": "gzip, deflate, br",
+-    "accept-language": "en-US,en;q=0.9",
+-    "sec-ch-ua": `"Chromium";v="118", "Google Chrome";v="118", "Not=A?Brand";v="99"`,
+-    "sec-ch-ua-mobile": "?0",
+-    "sec-ch-ua-platform": '"Windows"',
+-    "sec-fetch-dest": "empty",
+-    "sec-fetch-mode": "cors",
+-    "sec-fetch-site": "same-origin",
+-    "sec-fetch-user": "?1",
+-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+-};
++let DEFAULT_HEADERS = {};
+ exports.DEFAULT_HEADERS = DEFAULT_HEADERS;
+-let DEFAULT_HEADER_ORDER = [
+-    "host",
+-    "x-real-ip",
+-    "x-forwarded-for",
+-    "connection",
+-    "content-length",
+-    "cache-control",
+-    "sec-ch-ua",
+-    "accept-datetime",
+-    "dnt",
+-    "x-csrf-token",
+-    "if-unmodified-since",
+-    "authorization",
+-    "x-requested-with",
+-    "if-modified-since",
+-    "max-forwards",
+-    "x-http-method-override",
+-    "x-request-id",
+-    "sec-ch-ua-platform",
+-    "pragma",
+-    "upgrade-insecure-requests",
+-    "sec-ch-ua-mobile",
+-    "user-agent",
+-    "content-type",
+-    "if-none-match",
+-    "if-match",
+-    "if-range",
+-    "range",
+-    "accept",
+-    "origin",
+-    "sec-fetch-site",
+-    "sec-fetch-mode",
+-    "sec-fetch-dest",
+-    "referer",
+-    "accept-encoding",
+-    "accept-language",
+-];
++let DEFAULT_HEADER_ORDER = null;
+ exports.DEFAULT_HEADER_ORDER = DEFAULT_HEADER_ORDER;
+ function settle(resolve, reject, response) {
+     const validateStatus = response.config.validateStatus;
+@@ -94,6 +46,25 @@ function createAdapter(_config) {
+     });
+     return function (config) {
+         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
++            let finalUrl = config.url;
++            if (config.params) {
++                // Пытаемся использовать сериализатор из конфига или стандартный
++                let serializedParams;
++                if (config.paramsSerializer && typeof config.paramsSerializer === 'function') {
++                    serializedParams = config.paramsSerializer(config.params);
++                } else if (config.paramsSerializer && typeof config.paramsSerializer.encode === 'function') {
++                    serializedParams = config.paramsSerializer.encode(config.params);
++                } else {
++                    // Стандартная сериализация, если ничего не задано
++                    serializedParams = new URLSearchParams(config.params).toString();
++                }
++
++                if (serializedParams) {
++                    // Если в URL уже был знак ?, добавляем &, иначе ?
++                    finalUrl += (finalUrl.indexOf('?') === -1 ? '?' : '&') + serializedParams;
++                }
++            }
++
+             const requestPayload = {
+                 tlsClientIdentifier: config.tlsClientIdentifier || DEFAULT_CLIENT_ID,
+                 followRedirects: config.followRedirects || false,
+@@ -113,32 +84,54 @@ function createAdapter(_config) {
+                 customTlsClient: config.customTlsClient || undefined,
+                 certificatePinningHosts: {},
+                 headers: Object.assign(Object.assign({}, (config.defaultHeaders || DEFAULT_HEADERS)), config.headers),
+-                headerOrder: config.headerOrder || DEFAULT_HEADER_ORDER,
+-                requestUrl: config.url,
++                headerOrder: config.headerOrder || undefined,
++                requestUrl: finalUrl,
+                 requestMethod: config.method.toUpperCase(),
+                 requestBody: config.data,
+             };
+-            let res = yield pool.exec("request", [JSON.stringify(requestPayload)]);
+-            const resJSON = JSON.parse(res);
+-            let resHeaders = {};
+-            Object.keys(resJSON.headers).forEach((key) => {
+-                resHeaders[key] = !isNaN(resJSON.headers[key][0])
+-                    ? parseFloat(resJSON.headers[key][0])
+-                    : resJSON.headers[key][0];
+-            });
+-            var response = {
+-                data: resJSON.body,
+-                status: resJSON.status,
+-                statusText: http_1.default.STATUS_CODES[resJSON.status],
+-                headers: resHeaders,
+-                config,
+-                request: {
+-                    responseURL: encodeURI(resJSON.headers && resJSON.headers.Location
+-                        ? resJSON.headers.Location[0]
+-                        : resJSON.target),
+-                },
+-            };
+-            settle(resolve, reject, response);
++            try {
++                let res = yield pool.exec("request", [JSON.stringify(requestPayload)]);
++                const resJSON = JSON.parse(res);
++
++                // 5. ПАТЧ: КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ КРАША
++                // Если библиотека вернула ошибку (например, неверный прокси), реджектим промис
++                if (resJSON.err) {
++                    const errorMsg = resJSON.err;
++                    // Пытаемся понять тип ошибки
++                    let code = axios_1.AxiosError.ERR_NETWORK;
++                    if (errorMsg.includes("timeout")) code = axios_1.AxiosError.ERR_CANCELED;
++
++                    reject(new axios_1.AxiosError(errorMsg, code, config, null, null));
++                    return;
++                }
++
++                // Защита от undefined headers
++                let resHeaders = {};
++                if (resJSON.headers) {
++                    Object.keys(resJSON.headers).forEach((key) => {
++                        resHeaders[key] = !isNaN(resJSON.headers[key][0])
++                            ? parseFloat(resJSON.headers[key][0])
++                            : resJSON.headers[key][0];
++                    });
++                }
++
++                var response = {
++                    data: resJSON.body,
++                    status: resJSON.status,
++                    statusText: http_1.default.STATUS_CODES[resJSON.status] || "OK",
++                    headers: resHeaders,
++                    config,
++                    request: {
++                        responseURL: encodeURI(resJSON.headers && resJSON.headers.Location
++                            ? resJSON.headers.Location[0]
++                            : resJSON.target),
++                    },
++                };
++                settle(resolve, reject, response);
++            } catch (e) {
++                // Ловим ошибки самого workerpool (если DLL не загрузилась и т.д.)
++                reject(new axios_1.AxiosError(e.message, axios_1.AxiosError.ERR_NETWORK, config, null, null));
++            }
+         }));
+     };
+ }
+diff --git a/node_modules/@dryft/tlsclient/lib/helpers/tlspath.js b/node_modules/@dryft/tlsclient/lib/helpers/tlspath.js
+index 5ae904a..e356409 100644
+--- a/node_modules/@dryft/tlsclient/lib/helpers/tlspath.js
++++ b/node_modules/@dryft/tlsclient/lib/helpers/tlspath.js
+@@ -8,7 +8,7 @@ const fs_1 = require("fs");
+ const os_1 = __importDefault(require("os"));
+ const arch = os_1.default.arch();
+ const platform = os_1.default.platform();
+-let version = "1.7.2";
++let version = "1.12.0";
+ let filename, extension, distribution;
+ if (platform === "win32") {
+     filename = "tls-client-windows";
+@@ -46,8 +46,10 @@ else {
+     process.exit(1);
+ }
+ let _filename = `${filename}-${distribution}-v${version}.${extension}`;
+-const url = `https://github.com/bogdanfinn/tls-client/releases/download/v1.7.2/${_filename}`;
+-const destination = `${os_1.default.tmpdir()}/${_filename}`;
++const url = `https://github.com/bogdanfinn/tls-client/releases/download/v1.12.0/${_filename}`;
++const destination = process.env.TLS_LIB_PATH
++    ? process.env.TLS_LIB_PATH
++    : `${os_1.default.tmpdir()}/${_filename}`;
+ function getTLSDependencyPath() {
+     return {
+         DOWNLOAD_PATH: url,
+diff --git a/node_modules/@dryft/tlsclient/scripts/tlspath.js b/node_modules/@dryft/tlsclient/scripts/tlspath.js
+index f5fa5a3..a426bbd 100644
+--- a/node_modules/@dryft/tlsclient/scripts/tlspath.js
++++ b/node_modules/@dryft/tlsclient/scripts/tlspath.js
+@@ -3,7 +3,7 @@ const os = require("os");
+ const arch = os.arch();
+ const platform = os.platform();
+ 
+-let version = "1.7.2";
++let version = "1.12.0";
+ let filename, extension, distribution;
+ 
+ if (platform === "win32") {
+@@ -39,8 +39,10 @@ if (platform === "win32") {
+   process.exit(1);
+ }
+ let _filename = `${filename}-${distribution}-v${version}.${extension}`;
+-const url = `https://github.com/bogdanfinn/tls-client/releases/download/v1.7.2/${_filename}`;
+-const destination = `${os.tmpdir()}/${_filename}`;
++const url = `https://github.com/bogdanfinn/tls-client/releases/download/v1.12.0/${_filename}`;
++const destination = process.env.TLS_LIB_PATH
++    ? process.env.TLS_LIB_PATH
++    : `${os_1.default.tmpdir()}/${_filename}`;
+ 
+ function getTLSDependencyPath() {
+   return {
+diff --git a/node_modules/@dryft/tlsclient/src/helpers/adapter.ts b/node_modules/@dryft/tlsclient/src/helpers/adapter.ts
+index 86aace7..5994a4d 100644
+--- a/node_modules/@dryft/tlsclient/src/helpers/adapter.ts
++++ b/node_modules/@dryft/tlsclient/src/helpers/adapter.ts
+@@ -6,20 +6,20 @@ import { getTLSDependencyPath } from "./tlspath";
+ let { TLS_LIB_PATH } = getTLSDependencyPath();
+ 
+ let DEFAULT_CLIENT_ID = "chrome_120";
+-let DEFAULT_HEADERS = {
+-  accept: "*/*",
+-  "accept-encoding": "gzip, deflate, br",
+-  "accept-language": "en-US,en;q=0.9",
+-  "sec-ch-ua": `"Chromium";v="118", "Google Chrome";v="118", "Not=A?Brand";v="99"`,
+-  "sec-ch-ua-mobile": "?0",
+-  "sec-ch-ua-platform": '"Windows"',
+-  "sec-fetch-dest": "empty",
+-  "sec-fetch-mode": "cors",
+-  "sec-fetch-site": "same-origin",
+-  "sec-fetch-user": "?1",
+-  "user-agent":
+-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+-};
++// let DEFAULT_HEADERS = {
++//   accept: "*/*",
++//   "accept-encoding": "gzip, deflate, br",
++//   "accept-language": "en-US,en;q=0.9",
++//   "sec-ch-ua": `"Chromium";v="118", "Google Chrome";v="118", "Not=A?Brand";v="99"`,
++//   "sec-ch-ua-mobile": "?0",
++//   "sec-ch-ua-platform": '"Windows"',
++//   "sec-fetch-dest": "empty",
++//   "sec-fetch-mode": "cors",
++//   "sec-fetch-site": "same-origin",
++//   "sec-fetch-user": "?1",
++//   "user-agent":
++//     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
++// };
+ let DEFAULT_HEADER_ORDER = [
+   "host",
+   "x-real-ip",
+diff --git a/node_modules/@dryft/tlsclient/src/index.ts b/node_modules/@dryft/tlsclient/src/index.ts
+index fd4312c..aee8e98 100644
+--- a/node_modules/@dryft/tlsclient/src/index.ts
++++ b/node_modules/@dryft/tlsclient/src/index.ts
+@@ -48,7 +48,6 @@ export default createTLSClient;
+ export {
+   DEFAULT_CLIENT_ID,
+   DEFAULT_HEADERS,
+-  DEFAULT_HEADER_ORDER,
+   TLSClientConfiguration,
+   createTLSClient,
+ };

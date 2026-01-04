@@ -4,9 +4,11 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class ConfigAppService {
-    private changeBot = this.configService.getOrThrow<string>('CHANGE_BOT_TELEGRAM');
+    private readonly changeBot: string;
 
-    constructor(private configService: ConfigService) {}
+    constructor(private configService: ConfigService) {
+        this.changeBot = this.configService.getOrThrow<string>('CHANGE_BOT_TELEGRAM');
+    }
 
     getConfigExtension() {
         return {

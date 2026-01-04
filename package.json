@@ -23,7 +23,8 @@
     "migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "npx prisma studio",
     "npm-install": "npm install",
-    "ts-check-errors": "tsc --noemit"
+    "ts-check-errors": "tsc --noemit",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@dryft/tlsclient": "^1.0.8",
@@ -126,7 +127,8 @@
     "@types/pg": "^8.16.0",
     "concurrently": "^9.1.2",
     "globals": "^16.5.0",
-    "prettier": "^3.7.4"
+    "prettier": "^3.7.4",
+    "patch-package": "^8.0.1"
   },
   "jest": {
     "moduleFileExtensions": [

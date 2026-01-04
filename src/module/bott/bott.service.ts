@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '../http/http.service';
 import { BotTHeadersService } from './headers.service';
@@ -27,17 +27,22 @@ const TTL = {
 export class BottService {
     private readonly logger = new Logger(BottService.name);
 
-    private urlBotT: string = this.configService.getOrThrow('HOST_BOTT_W_PROTOCOL');
-    private apiUrlBotT: string = this.configService.getOrThrow('API_BOTT_W_PROTOCOL');
-    private sellerTradeBotId: string = this.configService.getOrThrow('SELLER_TRADE_BOT_ID');
-    private sellerTradeBotToken: string = this.configService.getOrThrow('SELLER_TRADE_TOKEN');
+    private readonly urlBotT: string;
+    private readonly apiUrlBotT: string;
+    private readonly sellerTradeBotId: string;
+    private readonly sellerTradeBotToken: string;
 
     constructor(
-        private configService: ConfigService,
-        private httpService: HttpService,
-        private botTHeaders: BotTHeadersService,
+        private readonly configService: ConfigService,
+        private readonly httpService: HttpService,
+        private readonly botTHeaders: BotTHeadersService,
         private readonly cacheService: RedisCacheService,
-    ) {}
+    ) {
+        this.urlBotT = this.configService.getOrThrow('HOST_BOTT_W_PROTOCOL');
+        this.apiUrlBotT = this.configService.getOrThrow('API_BOTT_W_PROTOCOL');
+        this.sellerTradeBotId = this.configService.getOrThrow('SELLER_TRADE_BOT_ID');
+        this.sellerTradeBotToken = this.configService.getOrThrow('SELLER_TRADE_TOKEN');
+    }
 
     private async wrapperFuncLoading<T>(funcToExecute: () => Promise<T>): Promise<T> {
         const MAX_RETRIES = 5;
@@ -48,13 +53,13 @@ export class BottService {
                 if (attempt > 1 || this.botTHeaders.getIsUpdating()) {
                     await this.botTHeaders.ensureTokenUpdated();
                 }
-                return await funcToExecute();
+                return funcToExecute();
             } catch (error: any) {
                 const isTokenError = this.isCloudflareOrAuthError(error);
                 if (isTokenError && attempt < MAX_RETRIES) {
                     this.logger.warn(`Попытка запроса с Bot-t: ${attempt} провалена. Обновляю токен.`);
                     try {
-                        // await this.botTHeaders.updateTokenClaudeFlare();
+                        await this.botTHeaders.updateTokenClaudeFlare();
                     } catch (updateError: any) {
                         this.logger.error(`Ошибка обновления токена на попытке: ${attempt} : ${updateError.message}`);
                         throw new Error(`Critical: Ошибка при обновлении токена. Ошибка: ${updateError.message}`);
@@ -82,9 +87,11 @@ export class BottService {
 
     async searchSearchIdByTelegramId(telegramId: string): Promise<ISearchByTelegramId> {
         const key = getSearchIdKey(telegramId);
-        // ISearchByTelegramId - это объект, поэтому оборачивать не нужно
         const cached = await this.cacheService.get<ISearchByTelegramId>(key);
         if (cached) return cached;
+
+        const headers = this.botTHeaders.getAjaxHeaders();
+        const proxy = this.botTHeaders.getProxy();
 
         const params = {
             bot_id: this.sellerTradeBotId,
@@ -96,10 +103,13 @@ export class BottService {
         };
 
         const url = `${this.apiUrlBotT}v2/ajax/bot/user/name`;
-        const response = await this.httpService.get<ISearchByTelegramId>(url, { params });
+        const response = await this.httpService.get<ISearchByTelegramId>(url, { headers, params, proxy });
 
-        await this.cacheService.set(key, response.data, TTL.DAY);
-        return response.data;
+        if (response.status == 200) {
+            await this.cacheService.set(key, response.data, TTL.DAY);
+            return response.data;
+        }
+        throw new BadRequestException('Ошибка при поиске пользователя по Telegram ID');
     }
 
     @WrapWithLoading()
@@ -109,12 +119,15 @@ export class BottService {
         if (cached) return cached.value;
 
         const headers = this.botTHeaders.getHeaders();
+        const proxy = this.botTHeaders.getProxy();
+
         const params = {
             bot_id: this.sellerTradeBotId,
             'BotUserSearch[user_id]': searchId,
         };
         const url = this.urlBotT + `lk/common/users/users/index`;
-        const response = await this.httpService.get(url, { headers, params });
+        const response = await this.httpService.get(url, { headers, params, proxy });
+        this.botTHeaders.updateFromResponse(response);
 
         // Сохраняем как объект
         await this.cacheService.set(key, { value: response.data }, TTL.DAY);
@@ -122,9 +135,10 @@ export class BottService {
     }
 
     @WrapWithLoading()
-    async userBalanceEdit(userBotId: string, csrfToken: string, amount: string, isPositive: boolean): Promise<string> {
+    async userBalanceEdit(userBotId: string, amount: string, isPositive: boolean): Promise<string> {
         const headers = this.botTHeaders.getHeaders();
         const params = { id: userBotId, bot_id: this.sellerTradeBotId };
+        const proxy = this.botTHeaders.getProxy();
 
         const payload = qs.stringify({
             '_csrf-frontend': this.botTHeaders.getCSRFToken(),
@@ -133,9 +147,25 @@ export class BottService {
         });
 
         const url = this.urlBotT + `lk/common/users/user/balance-edit`;
-        const response = await this.httpService.post(url, payload, { headers, params });
 
-        // Инвалидация через константу ключа
+        let response;
+        try {
+            response = await this.httpService.post(url, payload, {
+                headers: {
+                    ...headers,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                params,
+                proxy,
+            });
+        } catch (e: any) {
+            if (e?.response?.status !== 302) {
+                throw Error('Ошибка при изменении баланса пользователя');
+            }
+            response = e.response;
+        }
+        this.botTHeaders.updateFromResponse(response);
+
         await this.cacheService.del(getStatisticsKey());
         return response.data;
     }
@@ -148,27 +178,36 @@ export class BottService {
             is_positive: isPositive,
         };
 
+        const headers = this.botTHeaders.getHeaders();
+        const proxy = this.botTHeaders.getProxy();
+
         const url = this.apiUrlBotT + `v1/bot/replenishment/user/index`;
-        const response = await this.httpService.post(url, payload, { params });
+        const response = await this.httpService.post(url, payload, { headers, params, proxy });
         return response.data;
     }
 
     @WrapWithLoading()
     async getStatistics(): Promise<Html> {
         const key = getStatisticsKey();
-        // Html (скорее всего строка) оборачиваем в объект
         const cached = await this.cacheService.get<CachedValue<Html>>(key);
-        if (cached) return cached.value;
+        if (cached) {
+            //нужно, чтоб подтянулся csrf в хедеры
+            this.botTHeaders.updateFromResponse(cached.value);
+            return cached.value;
+        }
 
         const params = { bot_id: this.sellerTradeBotId };
         const url = this.urlBotT + `lk/common/replenishment/main/statistics`;
         const headers = this.botTHeaders.getHeaders();
+        const proxy = this.botTHeaders.getProxy();
 
         try {
-            const response = await this.httpService.get(url, { headers, params });
+            const response = await this.httpService.get(url, { headers, params, proxy });
+            this.botTHeaders.updateFromResponse(response);
+
             await this.cacheService.set(key, { value: response.data }, TTL.HOUR);
             return response.data;
-        } catch (err) {
+        } catch {
             throw new BadRequestException(ERROR_GET_STATISTICS);
         }
     }
@@ -184,10 +223,12 @@ export class BottService {
         }
 
         const headers = this.botTHeaders.getHeaders();
+        const proxy = this.botTHeaders.getProxy();
         const params = { bot_id: this.sellerTradeBotId, page };
         const url = this.urlBotT + `lk/common/shop/coupon/index`;
 
-        const response = await this.httpService.get(url, { headers, params });
+        const response = await this.httpService.get(url, { headers, params, proxy });
+        this.botTHeaders.updateFromResponse(response);
 
         await this.cacheService.set(key, { value: response.data }, TTL.FIVE_MIN);
         this.logger.log(`Сохранил данные по ключу ${key}`);
@@ -196,16 +237,20 @@ export class BottService {
     }
 
     @WrapWithLoading()
-    async createPromocode(csrfToken: string, promoName: string, discountPercent: number, countActivation = 5, activateAt?: string) {
+    async createPromocode(promoName: string, discountPercent: number, countActivation = 5, activateAt?: string) {
         const headers = this.botTHeaders.getHeaders();
+        const proxy = this.botTHeaders.getProxy();
+
         const params = { bot_id: this.sellerTradeBotId, type: '0' };
 
         if (!activateAt) {
             activateAt = dayjs().add(1, 'month').format('YYYY-MM-DDTHH:mm');
         }
 
+        const csrf = this.botTHeaders.getCSRFToken();
+
         const payload = qs.stringify({
-            '_csrf-frontend': this.botTHeaders.getCSRFToken(),
+            '_csrf-frontend': csrf,
             'ShopCouponCreateForm[code]': promoName,
             'ShopCouponCreateForm[count]': countActivation,
             'ShopCouponCreateForm[min_price]': 50,
@@ -216,11 +261,26 @@ export class BottService {
         });
 
         const url = this.urlBotT + `lk/common/shop/coupon/create`;
-        const response = await this.httpService.post(url, payload, { headers, params });
+        let response;
+        try {
+            response = await this.httpService.post(url, payload, {
+                headers: {
+                    ...headers,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                params,
+                proxy,
+            });
+        } catch (e: any) {
+            if (e?.response?.status !== 302) {
+                throw Error('Ошибка при создании промокода на скидку');
+            }
+            response = e.response;
+        }
+        this.botTHeaders.updateFromResponse(response);
 
-        if (response.status === 200 || response.status === 201) {
+        if (response.status === 200 || response.status === 201 || response.status === 302) {
             this.logger.log(`Удалил данные промокодов на страницах`);
-            // Параллельное удаление ключей страниц купонов
             await Promise.all(
                 Array.from({ length: 9 }, (_, index) => {
                     return this.cacheService.del(getCouponPageKey(index + 1));
@@ -232,16 +292,19 @@ export class BottService {
     }
 
     @WrapWithLoading()
-    async createReplenishPromocode(csrfToken: string, promoName: string, discount: number, countActivation = 1, activateAt?: string) {
+    async createReplenishPromocode(promoName: string, discount: number, countActivation = 1, activateAt?: string) {
         const headers = this.botTHeaders.getHeaders();
+        const proxy = this.botTHeaders.getProxy();
         const params = { bot_id: this.sellerTradeBotId, type: '2' };
 
         if (!activateAt) {
             activateAt = dayjs().add(1, 'month').format('YYYY-MM-DDTHH:mm');
         }
 
+        const csrf = this.botTHeaders.getCSRFToken();
+
         const payload = qs.stringify({
-            '_csrf-frontend': this.botTHeaders.getCSRFToken(),
+            '_csrf-frontend': csrf,
             'ShopCouponReplenishmentCreate[code]': promoName,
             'ShopCouponReplenishmentCreate[discount]': discount,
             'ShopCouponReplenishmentCreate[count]': countActivation,
@@ -250,9 +313,25 @@ export class BottService {
         });
 
         const url = this.urlBotT + `lk/common/shop/coupon/replenish`;
-        const response = await this.httpService.post(url, payload, { headers, params });
+        let response;
+        try {
+            response = await this.httpService.post(url, payload, {
+                headers: {
+                    ...headers,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                params,
+                proxy,
+            });
+        } catch (e: any) {
+            if (e?.response?.status !== 302) {
+                throw Error('Ошибка при создании промокода пополнения');
+            }
+            response = e.response;
+        }
 
-        if (response.status === 200 || response.status === 201) {
+        this.botTHeaders.updateFromResponse(response);
+        if (response.status === 200 || response.status === 201 || response.status === 302) {
             await Promise.all(
                 Array.from({ length: 9 }, (_, index) => {
                     return this.cacheService.del(getCouponPageKey(index + 1));

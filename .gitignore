@@ -3,6 +3,7 @@
 /node_modules
 /build
 /files
+/libs
 downloads/*
 !downloads/.gitkeep
 public/receipts

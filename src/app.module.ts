@@ -25,11 +25,13 @@ import { TemplateModule } from './module/template/template.module';
 import { UserModule } from './module/user/user.module';
 import { CheckingModule } from './module/checking/checking.module';
 import { RedisCacheModule } from './module/cache/cache.module';
+import { DeviceModule } from '@core/device/device.module';
 
 @Module({
     imports: [
         ConfigModule.forRoot({
             isGlobal: true,
+            expandVariables: true,
         }),
         ScheduleModule.forRoot(),
         TelegrafModule.forRootAsync(getTelegramConfig()),
@@ -56,6 +58,7 @@ import { RedisCacheModule } from './module/cache/cache.module';
         TemplateModule,
         CheckingModule,
         RedisCacheModule,
+        DeviceModule,
     ],
 })
 export class AppModule {}

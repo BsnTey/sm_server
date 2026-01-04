@@ -14,14 +14,16 @@ import { SellerGuard } from './seller.guard';
 @Scene(AUTH_MIRROR.scene)
 @UseFilters(TelegrafExceptionFilter)
 export class AuthMirrorUpdate {
-    private DOMAIN = this.configService.getOrThrow('DOMAIN', 'http://localhost:3001');
+    private readonly DOMAIN: string;
 
     constructor(
         private userService: UserService,
         private telegramService: TelegramService,
         private configService: ConfigService,
         private mirrorService: MirrorService,
-    ) {}
+    ) {
+        this.DOMAIN = this.configService.getOrThrow('DOMAIN');
+    }
 
     @SceneEnter()
     @UseGuards(SellerGuard)

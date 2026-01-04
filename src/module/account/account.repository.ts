@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Account, CourseStatus, Order, Prisma } from '@prisma/client';
+import { Account, CourseStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@common/database/prisma.service';
 import { AccountEntity } from './entities/account.entity';
 import {
@@ -80,13 +80,14 @@ export class AccountRepository {
             include: {
                 proxy: true,
                 citySM: true,
+                deviceInfo: true,
             },
         });
     }
 
-    async setProxyAccount(accountId: string, proxyUuid: string): Promise<IAccountWithProxy> {
+    async setProxyAccount(accountId: string, proxyUuid: string) {
         //@ts-ignore
-        return this.prisma.account.update({
+        await this.prisma.account.update({
             where: {
                 accountId,
             },
@@ -96,10 +97,6 @@ export class AccountRepository {
                         uuid: proxyUuid,
                     },
                 },
-            },
-            include: {
-                proxy: true,
-                citySM: true,
             },
         });
     }

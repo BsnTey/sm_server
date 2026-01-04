@@ -40,7 +40,7 @@ export class CourseService implements OnModuleInit {
         try {
             const coursesIdObj = await this.getAvailableCoursesIdFromDB();
             this.coursesId = coursesIdObj.map(course => course.courseId);
-        } catch (e) {
+        } catch {
             this.logger.error('Необходимо добавить оригинальные курсы в БД');
         }
     }

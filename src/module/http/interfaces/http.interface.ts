@@ -1,14 +1,8 @@
-import { ISportmasterRequestHeaders } from '../../account/interfaces/headers.interface';
-import { SocksProxyAgent } from 'socks-proxy-agent';
-
-export interface IHttpInterface {
-    post: (url: string, payload: any, httpOptions: HttpOptions) => Promise<any>;
-    get: (url: string, httpOptions: HttpOptions) => Promise<any>;
-    delete: (url: string, httpOptions: HttpOptions) => Promise<any>;
-    // patch: () => any;
+export interface HeaderPackage {
+    headers: Record<string, string>;
+    tlsClientIdentifier: string;
 }
 
-export interface HttpOptions {
-    headers: ISportmasterRequestHeaders;
-    httpsAgent: SocksProxyAgent;
+export interface HttpOptions extends HeaderPackage {
+    proxy: string | undefined;
 }
