@@ -4,14 +4,8 @@ import { PaymentOrder as PaymentOrderModel } from '.prisma/client';
 import { StatusPayment } from '@prisma/client';
 import { PaymentRepository } from './payment.repository';
 import { BottService } from '../bott/bott.service';
-import {
-    ERROR_CHANGE_BALANCE,
-    ERROR_GET_SEARCH_ID,
-    ERROR_GET_TRANSACTIONS,
-    ERROR_NOT_FOUND_TRANSACTION,
-    ERROR_USER_SEARCH_PAGE,
-} from './constants/error.constants';
-import { extractUserBotId, extractUsersStatistics, getPromoCodeDetailsFromHtml } from '../telegram/utils/payment.utils';
+import { ERROR_GET_TRANSACTIONS, ERROR_NOT_FOUND_TRANSACTION } from './constants/error.constants';
+import { extractUsersStatistics, getPromoCodeDetailsFromHtml } from '../telegram/utils/payment.utils';
 import { IReplenishmentUsersBotT } from '../bott/interfaces/replenishment-bot-t.interface';
 import { UserStatistic } from './interfaces/statistic.interface';
 import { ConfigService } from '@nestjs/config';
@@ -34,48 +28,10 @@ export class PaymentService {
         this.domain = this.configService.getOrThrow('DOMAIN');
     }
 
-    async changeUserBalance(id: string, telegramId: string, amount: number, isPositive: boolean = true) {
-        let searchId;
-        try {
-            const response = await this.bottService.searchSearchIdByTelegramId(telegramId);
-            searchId = response.results[0].id;
-        } catch (e: any) {
-            this.logger.error('Ошибка searchSearchIdByTelegramId', e.message);
-            throw new NotFoundException(ERROR_GET_SEARCH_ID);
-        }
-        let userBotId;
-        try {
-            const response = await this.bottService.getUserBotId(searchId);
-            userBotId = extractUserBotId(response);
-        } catch (e: any) {
-            this.logger.error('Ошибка getUserBotId', e.message);
-            throw new NotFoundException(ERROR_USER_SEARCH_PAGE);
-        }
-
-        try {
-            await this.bottService.userBalanceEdit(userBotId, String(amount), isPositive);
-        } catch (e: any) {
-            this.logger.error('Ошибка userBalanceEdit', e.message);
-            throw new BadRequestException(ERROR_CHANGE_BALANCE);
-        }
-        try {
-            const response = await this.bottService.getReplenishment();
-            const { transactionId, completedAt } = this.getDataFromReplenishment(response, +telegramId, +amount);
-
-            const unixtimeMsc = completedAt * 1000;
-            const formDate = new Date(unixtimeMsc);
-
-            const paymentOrderModel: PaymentOrderModel = await this.paymentRepository.updatePaymentOrderInformation(
-                id,
-                transactionId,
-                isPositive,
-                formDate,
-            );
-            return new PaymentOrderEntity(paymentOrderModel);
-        } catch (e: any) {
-            this.logger.error('Ошибка getReplenishment', e.message);
-            throw new BadRequestException(ERROR_GET_TRANSACTIONS);
-        }
+    async changeUserBalance(telegramId: string, amount: number, isPositive: boolean = true) {
+        await this.bottService.getStatistics();
+        const userBotId = await this.bottService.getUserBotId(telegramId);
+        await this.bottService.userBalanceEdit(userBotId, amount.toString(), isPositive);
     }
 
     async createPaymentOrder(amount: number, userTelegramId: string): Promise<PaymentOrderEntity> {
@@ -157,7 +113,31 @@ export class PaymentService {
 
     async makeDepositUserBalance(id: string, receiptUrl: string): Promise<PaymentOrderEntity> {
         const entityTrans = await this.completeTransferedPaymentOrder(id, receiptUrl);
-        return this.changeUserBalance(id, entityTrans.userTelegramId, entityTrans.amountCredited);
+        await this.changeUserBalance(entityTrans.userTelegramId, entityTrans.amountCredited);
+        try {
+            const response = await this.bottService.getReplenishment();
+            const { transactionId, completedAt } = this.getDataFromReplenishment(
+                response,
+                +entityTrans.userTelegramId,
+                +entityTrans.amountCredited,
+            );
+
+            const unixtimeMsc = completedAt * 1000;
+            const formDate = new Date(unixtimeMsc);
+
+            const positiveBalance = true;
+
+            const paymentOrderModel: PaymentOrderModel = await this.paymentRepository.updatePaymentOrderInformation(
+                id,
+                transactionId,
+                positiveBalance,
+                formDate,
+            );
+            return new PaymentOrderEntity(paymentOrderModel);
+        } catch (e: any) {
+            this.logger.error('Ошибка getReplenishment', e.message);
+            throw new BadRequestException(ERROR_GET_TRANSACTIONS);
+        }
     }
 
     private async completeTransferedPaymentOrder(id: string, receiptUrl: string): Promise<PaymentOrderEntity> {

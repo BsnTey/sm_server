@@ -61,6 +61,10 @@ import { MyDiscountUpdate } from './updates/myDiscount/myDiscount.update';
 import { OrderModule } from '../order/order.module';
 import { CheckingModule } from '../checking/checking.module';
 import { ExtensionUpdate } from './updates/extension/extension.update';
+import { AccessGateService } from './updates/family/access-gate.service';
+import { AccessQuoteService } from './updates/family/access-quote.service';
+import { InviteAccessService } from './updates/family/invite-access.service';
+import { FamilyPurchaseService } from './updates/family/family-purchase.service';
 
 @Module({
     imports: [
@@ -127,6 +131,10 @@ import { ExtensionUpdate } from './updates/extension/extension.update';
         FamilyPrivelegieUpdate,
         MyDiscountUpdate,
         ExtensionUpdate,
+        AccessGateService,
+        AccessQuoteService,
+        InviteAccessService,
+        FamilyPurchaseService,
     ],
     exports: [TelegramService],
 })

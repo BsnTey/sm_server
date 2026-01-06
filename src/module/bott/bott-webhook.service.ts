@@ -1,10 +1,14 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import * as cheerio from 'cheerio';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { OrderApiWebhook } from './interfaces/order-webhook.interface';
 import { AccountService } from '../account/account.service';
 import { BottPurchaseService } from './bott-purchase.service';
+import { ParsedOrder } from './interfaces/purchase-repository';
 
 @Injectable()
 export class BottWebhookService {
+    private readonly logger = new Logger(BottWebhookService.name);
+
     constructor(
         private readonly accountService: AccountService,
         private readonly bottPurchaseService: BottPurchaseService,
@@ -59,25 +63,200 @@ export class BottWebhookService {
         return 'ok';
     }
 
+    async importOrdersFromHtml(html: string): Promise<number> {
+        let savedCount = 0;
+        const $ = cheerio.load(html);
+        const parsedOrders: ParsedOrder[] = [];
+
+        // 1. Пробегаемся по всем строкам таблицы
+        $('tr[data-key]').each((_, element) => {
+            try {
+                const orderData = this.parseSingleOrderRow($, element);
+                if (orderData) {
+                    parsedOrders.push(orderData);
+                }
+            } catch (e: any) {
+                this.logger.error(`Failed to parse row: ${e.message}`);
+            }
+        });
+
+        if (parsedOrders.length === 0) {
+            return 0;
+        }
+
+        // 2. СОРТИРОВКА: От старых к новым
+        parsedOrders.sort((a, b) => a.purchasedAt.getTime() - b.purchasedAt.getTime());
+
+        this.logger.log(`Found ${parsedOrders.length} orders. Processing chronologically...`);
+
+        // 3. Сохранение в БД
+        for (const order of parsedOrders) {
+            await this.processAndSaveOrder(order);
+            savedCount++;
+        }
+        return savedCount;
+    }
+
+    private parseSingleOrderRow($: cheerio.CheerioAPI, element: any): ParsedOrder | null {
+        const $row = $(element);
+        const orderId = $row.attr('data-key');
+        if (!orderId) return null;
+
+        // TG_ID
+        let buyerTelegramId = '';
+        const tgLink = $row.find('a[href^="tg://user?id="]').attr('href');
+        if (tgLink) {
+            buyerTelegramId = tgLink.split('=')[1];
+        } else {
+            const clientCell = $row.find('td[aria-label="Клиент"]');
+            clientCell.find('.nav-item').each((_, el) => {
+                if ($(el).text().includes('TG_ID:')) {
+                    buyerTelegramId = $(el).find('.badge').text().trim();
+                }
+            });
+        }
+
+        if (!buyerTelegramId) {
+            this.logger.warn(`Skipping order ${orderId}: No TG_ID found`);
+            return null;
+        }
+
+        // Дата
+        const dateText = $row.find('td[aria-label="Время покупки"]').text().trim();
+        const purchasedAt = this.parseHtmlDate(dateText);
+
+        // Сумма и кол-во
+        const priceCountText = $row.find('td[aria-label="Сумма покупки/количество"]').text().trim();
+        const priceMatch = priceCountText.match(/(\d+)\s*₽\/(\d+)\s*шт/);
+        const totalAmount = priceMatch ? Number(priceMatch[1]) : 0;
+        const totalCount = priceMatch ? Number(priceMatch[2]) : 1;
+
+        // Товары
+        let $productDataContainer = $row.find('.show_more_full_text');
+        if (!$productDataContainer.length) {
+            $productDataContainer = $row.find('td:has(span[id^="show_more_sub_id"])');
+            if (!$productDataContainer.length) {
+                $productDataContainer = $row.find('td[aria-label="Товар"]');
+            }
+        }
+
+        let rawHtml = $productDataContainer.html() || '';
+        rawHtml = rawHtml.replace(/<br\s*\/?>/gi, '\n');
+        const rawProductData = cheerio.load(rawHtml).text().trim();
+
+        const items = this.extractAccountItemsWithRaw(rawProductData, totalCount);
+
+        if (items.length === 0) {
+            this.logger.warn(`Skipping order ${orderId}: No valid account items found`);
+            return null;
+        }
+
+        return {
+            orderId,
+            buyerTelegramId,
+            purchasedAt,
+            items,
+            rawProductData,
+            totalAmount,
+        };
+    }
+
+    private async processAndSaveOrder(order: ParsedOrder) {
+        // Рассчитываем цену за единицу
+        const unitAmount = Math.floor(order.totalAmount / Math.max(1, order.items.length));
+
+        for (let i = 0; i < order.items.length; i++) {
+            const { accountId, hasPromoCode, rawLine } = order.items[i];
+
+            // 1. Смена владельца (Актуально, так как мы идем от старых заказов к новым)
+            // Если аккаунт перепродавался, последний вызов перезапишет владельца.
+            await this.accountService.changeOwner(accountId, order.buyerTelegramId);
+
+            const lineIndex = i + 1;
+            // Уникальный ID покупки: OrderID-LineIndex (для групповых) или просто OrderID
+            const id = order.items.length > 1 ? `${order.orderId}-${lineIndex}` : order.orderId;
+
+            // Формируем "Fake Payload" чтобы сохранить историю строки
+            const fakePayload = {
+                id: order.orderId,
+                status: 'IMPORTED_HTML',
+                product: { data: rawLine },
+                _lineIndex: lineIndex,
+                original_full_data: order.rawProductData,
+            };
+
+            try {
+                await this.bottPurchaseService.createPurchase({
+                    id,
+                    orderNumber: order.orderId,
+                    lineIndex,
+                    accountId,
+                    buyerTelegramId: order.buyerTelegramId,
+                    amount: unitAmount,
+                    purchasedAt: order.purchasedAt,
+                    rawPayload: JSON.parse(JSON.stringify(fakePayload)),
+                    hasPromoCode,
+                });
+            } catch (e: any) {
+                if (e?.code === 'P2002') {
+                    await this.bottPurchaseService.updatePurchase(id, order.purchasedAt, hasPromoCode);
+                    continue;
+                }
+                this.logger.error(`Error saving purchase ${id}: ${e.message}`);
+            }
+        }
+    }
+
     private extractAccountItems(raw: string, expectedCount: number): Array<{ accountId: string; hasPromoCode: boolean }> {
+        // Переиспользуем логику extractAccountItemsWithRaw, отбрасывая rawLine
+        return this.extractAccountItemsWithRaw(raw, expectedCount).map(({ accountId, hasPromoCode }) => ({ accountId, hasPromoCode }));
+    }
+
+    private extractAccountItemsWithRaw(
+        raw: string,
+        expectedCount: number,
+    ): Array<{ accountId: string; hasPromoCode: boolean; rawLine: string }> {
         if (!raw) return [];
 
+        // Разбиваем на строки, чистим пустые
         const lines = raw
             .split(/\r?\n/)
             .map(s => s.trim())
-            .filter(Boolean);
+            .filter(line => line.length > 10); // Фильтр "мусора"
 
+        const result: Array<{ accountId: string; hasPromoCode: boolean; rawLine: string }> = [];
+
+        // 1. Если это список (несколько строк или ожидается > 1)
         if (lines.length > 1 || expectedCount > 1) {
-            const result: Array<{ accountId: string; hasPromoCode: boolean }> = [];
             for (const ln of lines) {
-                const parsed = this.parseLine(ln);
-                if (parsed) result.push(parsed);
+                // ВАЖНО: Удаляем нумерацию "1) " здесь, чтобы parseLine получил чистую строку
+                const cleanLine = ln.replace(/^\d+\)\s*/, '');
+
+                const parsed = this.parseLine(cleanLine);
+                if (parsed) {
+                    result.push({ ...parsed, rawLine: ln });
+                }
             }
-            return result;
+        } else {
+            // 2. Одиночный товар (может быть без переносов строк)
+            const cleanLine = raw.replace(/^\d+\)\s*/, ''); // На всякий случай чистим
+            const single = this.parseLine(cleanLine);
+            if (single) {
+                result.push({ ...single, rawLine: raw });
+            }
         }
 
-        const single = this.parseLine(raw);
-        return single ? [single] : [];
+        return result;
+    }
+
+    // --- Вспомогательные методы ---
+
+    private parseHtmlDate(dateStr: string): Date {
+        // "2026-01-05 15:40" -> Date
+        if (!dateStr) return new Date();
+        const isoLike = dateStr.replace(' ', 'T') + ':00';
+        const date = new Date(isoLike);
+        return isNaN(date.getTime()) ? new Date() : date;
     }
 
     private parseLine(line: string): { accountId: string; hasPromoCode: boolean } | null {
@@ -91,13 +270,13 @@ export class BottWebhookService {
 
         const uuid = this.extractUuid(line);
         if (uuid) {
-            const hasPromoCode = this.detectPromoPrefix(tokens, uuid);
+            const hasPromoCode = this.detectPromoPrefix(tokens);
             return { accountId: uuid, hasPromoCode };
         }
 
         const guess = tokens[0] ?? null;
         if (guess && this.looksLikeAccountId(guess)) {
-            const hasPromoCode = this.detectPromoPrefix(tokens, guess);
+            const hasPromoCode = this.detectPromoPrefix(tokens);
             return { accountId: guess, hasPromoCode };
         }
 
@@ -110,18 +289,12 @@ export class BottWebhookService {
         return m ? m[0] : null;
     }
 
-    private detectPromoPrefix(tokens: string[], accountIdInLine: string): boolean {
+    private detectPromoPrefix(tokens: string[]): boolean {
+        // Логика: Если токенов >= 3 и первый похож на промо, второй на дату
         if (tokens.length < 3) return false;
 
-        const [maybePromo, maybeDate, maybeAccount] = tokens;
-
-        if (
-            this.looksLikePromoCode(maybePromo) &&
-            this.looksLikeIsoDate(maybeDate) &&
-            (this.isUuid(maybeAccount) || maybeAccount === accountIdInLine)
-        ) {
-            return true;
-        }
+        // Индексы могут сместиться, если есть нумерация, но мы её убрали в extractAccountItems
+        const [maybePromo, maybeDate] = tokens;
 
         return this.looksLikePromoCode(maybePromo) && this.looksLikeIsoDate(maybeDate);
     }

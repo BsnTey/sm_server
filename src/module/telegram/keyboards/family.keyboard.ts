@@ -41,3 +41,7 @@ export const defaultFamilyStatusKeyboard = Markup.inlineKeyboard([
 export const refreshFamilyStatusKeyboard = Markup.inlineKeyboard([[Markup.button.callback('Обновить информацию', 'refresh_info_family')]]);
 
 export const leaveFamilyKeyboard = Markup.inlineKeyboard([[Markup.button.callback('Покинуть семью', 'leave_family')]]);
+
+export const payFamilyKeyboard = Markup.inlineKeyboard([[Markup.button.callback('Купить доступ', 'buy_access_family')]]);
+
+export const isAccessPayFamilyKeyboard = Markup.inlineKeyboard([[Markup.button.callback('Подтвердить', 'access_pay_family')]]);

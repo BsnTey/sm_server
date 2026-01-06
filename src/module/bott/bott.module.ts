@@ -13,6 +13,6 @@ import { BottPurchaseService } from './bott-purchase.service';
     imports: [AccountModule, HttpModule, ProxyModule],
     controllers: [BottWebhookController],
     providers: [BottService, BotTHeadersService, BottWebhookService, BottPurchaseRepository, BottPurchaseService],
-    exports: [BottService, BotTHeadersService, BottPurchaseService],
+    exports: [BottService, BotTHeadersService, BottPurchaseService, BottWebhookService],
 })
 export class BottModule {}

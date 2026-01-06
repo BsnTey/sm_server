@@ -41,10 +41,14 @@ export class BotTHeadersService implements OnModuleInit {
 
     async onModuleInit() {
         if (this.nodeEnv == 'developer') return;
-        const proxyRaw = await this.proxyService.getRandomProxy();
-        this.proxy = proxyRaw.proxy;
-        await this.cacheService.del(getStatisticsKey());
-        await this.updateTokenClaudeFlare();
+        try {
+            const proxyRaw = await this.proxyService.getRandomProxy();
+            this.proxy = proxyRaw.proxy;
+            await this.cacheService.del(getStatisticsKey());
+            await this.updateTokenClaudeFlare();
+        } catch {
+            this.logger.error('CRITICAL STARTUP ERROR: An expired proxy was found. Application will terminate.');
+        }
     }
 
     updateFromResponse(response: any) {
@@ -86,7 +90,8 @@ export class BotTHeadersService implements OnModuleInit {
     }
 
     getCSRFToken(): string {
-        return this.csrfToken || '';
+        if (!this.csrfToken) throw new Error('Проблема с получением токена csrf');
+        return this.csrfToken;
     }
 
     ensureTokenUpdated(): Promise<void> {

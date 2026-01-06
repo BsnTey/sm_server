@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, HttpException } from '@nestjs/common';
 import { AccountService } from '../../../account/account.service';
 import { TelegramService } from '../../telegram.service';
 import { ProfileFamilyResponse, StatusFamilyMember } from '../../../account/interfaces/profile-family.interface';
@@ -154,6 +154,40 @@ export class FamilyService {
         };
     }
 
+    async checkOnValidFamily(accountIdInvited: string) {
+        //проверка того кого приглашают
+        let profileFamily;
+        try {
+            profileFamily = await this.getFamilyProfile(accountIdInvited);
+        } catch {
+            throw new Error('❌ Возможно аккаунт заблокирован');
+        }
+
+        if (!this.isValidForInvite(profileFamily)) {
+            throw new Error('❌ Участник уже состоит в семье. Покиньте перед новым приглашением');
+        }
+    }
+
+    async doInvite(accountIdOwner: string, accountIdInvited: string) {
+        let namePhoneInvited;
+        try {
+            namePhoneInvited = await this.getProfileNamePhone(accountIdInvited);
+        } catch (e: any) {
+            if (e instanceof NotFoundException || e instanceof HttpException) {
+                throw e.message || e;
+            }
+            throw new Error('❌ Что то пошло не так при поиске приглашаемого участника');
+        }
+        try {
+            await this.inviteMember(accountIdOwner, namePhoneInvited);
+        } catch (e: any) {
+            if (e instanceof BadRequestException) {
+                throw new Error(e.message);
+            }
+            throw new Error(e?.response?.data?.error?.message || 'Что то пошло не так при добавлении участника');
+        }
+    }
+
     async getFamilyProfile(accountId: string) {
         return this.accountService.getProfileFamily(accountId);
     }
@@ -169,14 +203,19 @@ export class FamilyService {
         return (!isOwner && !isInvited && !isMember) || statusIsNull || familyIsNull;
     }
 
-    async inviteMember(accountId: string, phoneName: PhoneName) {
-        const profileFamilyResponse = await this.getFamilyProfile(accountId);
-        const status = profileFamilyResponse.family?.currentMember?.status;
+    isValidForOwner(profile: ProfileFamilyResponse): boolean {
+        const status = profile.family?.currentMember?.status;
         const isOwner = StatusFamilyMember.OWNER === status;
         const statusIsNull = status == null;
-        const familyIsNull = profileFamilyResponse.family == null;
 
-        if (!(statusIsNull || isOwner || familyIsNull)) {
+        return statusIsNull || isOwner;
+    }
+
+    async inviteMember(accountId: string, phoneName: PhoneName) {
+        //проверка того кто приглашает
+        const profileOwnerFamilyResponse = await this.getFamilyProfile(accountId);
+
+        if (!this.isValidForOwner(profileOwnerFamilyResponse)) {
             throw new BadRequestException('Невозможно пригласить нового члена. Вы не являетесь владельцем семьи');
         }
 
@@ -187,10 +226,12 @@ export class FamilyService {
             memberName,
         };
 
+        const familyIsNull = profileOwnerFamilyResponse.family == null;
+
         if (familyIsNull) {
             await this.accountService.familyInvite(accountId, member);
         } else {
-            const familyId = profileFamilyResponse.family?.id;
+            const familyId = profileOwnerFamilyResponse.family?.id;
             if (familyId) (member as any).familyId = familyId;
             await this.accountService.familyInvite(accountId, member);
         }
