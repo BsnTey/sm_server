@@ -426,7 +426,7 @@ export class BottService {
             'OrderSearch[status]': '-1',
             bot_id: this.sellerTradeBotId,
         };
-        const url = this.urlBotT + `lk/common/users/users/index`;
+        const url = this.urlBotT + `lk/common/order/index`;
         const response = await this.httpService.get(url, { headers, params, proxy });
         this.botTHeaders.updateFromResponse(response);
 

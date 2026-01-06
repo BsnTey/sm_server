@@ -21,73 +21,87 @@ export class FamilyPurchaseService {
      * Основной метод, который выполняет всю процедуру
      */
     async processFamilyInvitePurchase(telegramId: string, ownerAccountId: string, invitedAccountId: string, amount: number): Promise<void> {
-        //здесь идет платный процесс обьединения. валидность аккаунта уже была проверена и пользователь согласился на цену.
-
-        // 1. Проверить баланс (Payment Service)
+        // 1. ВАЖНО: Лучше, чтобы проверка и списание были в changeUserBalance.
+        // Но если архитектура требует проверки через bottService, оставляем как есть.
         const currentBalance = await this.bottService.getUserBotBalance(telegramId);
-
         if (currentBalance < amount) {
             throw new BadRequestException(`На балансе не хватает ${amount - currentBalance}р`);
         }
 
-        // --- НАЧАЛО ТРАНЗАКЦИОННОЙ ЛОГИКИ ---
-        // Сначала списываем, потом делаем
-        // Если инвайт упадет — вернем деньги.
-
-        const isPositive = false;
+        // 2. Списание средств
+        const isPositive = false; // false = списание
         await this.paymentService.changeUserBalance(telegramId, amount, isPositive);
 
         let inviteSent = false;
+        let lastPurchase;
+
         try {
-            let lastPurchase = await this.bottPurchaseService.getLastPurchaseByAccountId(invitedAccountId);
+            // 3. ПОИСК ИЛИ СОЗДАНИЕ ПОКУПКИ (Resilient Logic)
+            lastPurchase = await this.bottPurchaseService.getLastPurchaseByAccountId(invitedAccountId);
 
             if (!lastPurchase) {
-                this.logger.log(`Purchase not found for ${invitedAccountId}, trying to import...`);
+                this.logger.log(`Purchase not found locally for ${invitedAccountId}. Attempting remote search...`);
 
-                // Пытаемся импортировать
                 try {
+                    // Пробуем найти и импортировать
                     const responseHTML = await this.bottService.searchOrderFromApi(invitedAccountId);
-                    await this.bottWebhookService.importOrdersFromHtml(responseHTML);
-                } catch (e: any) {
-                    this.logger.warn(`Failed to import orders: ${e.message}`);
-                }
+                    const importedCount = await this.bottWebhookService.importOrdersFromHtml(responseHTML);
 
-                // Проверяем снова
-                lastPurchase = await this.bottPurchaseService.getLastPurchaseByAccountId(invitedAccountId);
+                    this.logger.log(`Import result for ${invitedAccountId}: ${importedCount} orders.`);
 
-                // Если все еще нет — создаем ФЕЙК
-                if (!lastPurchase) {
-                    this.logger.warn(`Creating fake purchase fallback for ${invitedAccountId}`);
+                    // Если ничего не нашли - нужен фейк
+                    if (importedCount === 0) {
+                        this.logger.warn(`Search returned 0 results. Creating FAKE for ${invitedAccountId}`);
+                        await this.bottPurchaseService.createFakePurchase(invitedAccountId, telegramId);
+                    }
+                } catch (importError: any) {
+                    // Если API поиска упало или парсинг сломался - не страшно, создаем фейк
+                    this.logger.error(`Import failed for ${invitedAccountId}: ${importError.message}. Fallback to FAKE.`);
                     await this.bottPurchaseService.createFakePurchase(invitedAccountId, telegramId);
-
-                    lastPurchase = await this.bottPurchaseService.getLastPurchaseByAccountId(invitedAccountId);
                 }
+
+                // Финальная попытка получить запись (реальную импортированную или фейковую)
+                lastPurchase = await this.bottPurchaseService.getLastPurchaseByAccountId(invitedAccountId);
             }
 
+            // Если даже после всех попыток записи нет — это Dead End.
             if (!lastPurchase) {
-                throw new Error('Не удалось создать или найти запись о покупке. Операция отменена.');
+                throw new Error(`Критическая ошибка получения записи покупки для: ${invitedAccountId}`);
             }
 
+            // 4. ГЛАВНОЕ ДЕЙСТВИЕ (Инвайт)
             await this.familyService.doInvite(ownerAccountId, invitedAccountId);
-            inviteSent = true; // Инвайт ушел успешно
 
-            // 5. ОБНОВЛЕНИЕ ДАТЫ ПОКУПКИ
+            // --- ТОЧКА НЕВОЗВРАТА ПРОЙДЕНА ---
+            inviteSent = true;
+
+            // 5. ОБНОВЛЕНИЕ ДАННЫХ (Post-action)
             const now = new Date();
             const removePromo = false;
             await this.bottPurchaseService.updatePurchase(lastPurchase.id, now, removePromo);
-        } catch (error: any) {
-            this.logger.error(`Ошибка в processFamilyInvitePurchase: ${error.message}`, error.stack);
 
-            // 6. ROLLBACK (Возврат средств)
-            // Возвращаем деньги ТОЛЬКО если инвайт НЕ был отправлен.
+        } catch (error: any) {
+            this.logger.error(`Transaction failed: ${error.message}`, error.stack);
+
             if (!inviteSent) {
-                await this.paymentService.changeUserBalance(telegramId, amount, !isPositive); // !isPositive = true (возврат)
-                throw new InternalServerErrorException(error.message || 'Ошибка при создании приглашения. Средства возвращены.');
+                // 6. ROLLBACK (Возврат средств)
+                this.logger.warn(`Initiating refund of ${amount} to ${telegramId}...`);
+                try {
+                    const negativeBalance = true;
+                    await this.paymentService.changeUserBalance(telegramId, amount, negativeBalance);
+                } catch (refundError: any) {
+                    this.logger.error(`CRITICAL: Refund failed for ${telegramId}! Amount: ${amount}. Reason: ${refundError.message}`);
+                }
+
+                // Пробрасываем ошибку пользователю
+                throw new InternalServerErrorException(error.message || 'Ошибка выполнения. Средства возвращены.');
             } else {
-                // Если инвайт ушел, но упало обновление БД (updatePurchase)
-                // ДЕНЬГИ НЕ ВОЗВРАЩАЕМ, иначе будет халява.
-                // Просто логируем для админа, что данные в БД устарели.
-                this.logger.error(`CRITICAL: Invite sent for account ${invitedAccountId}, but DB update failed. User was charged.`);
+                // 7. ИНВАЙТ ПРОШЕЛ, НО УПАЛО ОБНОВЛЕНИЕ БД
+                // Деньги не возвращаем. Логируем инцидент.
+                this.logger.error(
+                    `DATA INCONSISTENCY: Invite sent for ${invitedAccountId}, but DB update failed. ` +
+                    `User ${telegramId} was charged. Purchase ID: ${lastPurchase?.id}`
+                );
             }
         }
     }
