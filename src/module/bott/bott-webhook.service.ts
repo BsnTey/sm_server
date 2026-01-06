@@ -76,7 +76,7 @@ export class BottWebhookService {
                     parsedOrders.push(orderData);
                 }
             } catch (e: any) {
-                this.logger.error(`Failed to parse row: ${e.message}`);
+                this.logger.debug(`Failed to parse row: ${e.message}`);
             }
         });
 
