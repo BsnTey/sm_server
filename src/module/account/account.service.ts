@@ -1309,8 +1309,15 @@ export class AccountService {
         try {
             const response = await this.httpService.post(url, payload, httpOptions);
             return response.status;
-        } catch {
-            return 404;
+        } catch (e: any) {
+            const status = e.response?.status || 'Unknown';
+            const data = JSON.stringify(e.response?.data || {});
+
+            this.logger.warn(
+                `Ошибка запроса privateWatchingLesson (Acc: ${accountWithProxyEntity.accountId}, Lesson: ${lessonId}): Status ${status}, Data: ${data}`
+            );
+
+            return status || 404;
         }
     }
 

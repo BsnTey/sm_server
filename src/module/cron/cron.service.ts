@@ -56,6 +56,7 @@ export class CronService {
                     for (let j = 0; j < lessonsWithProgress.length; j++) {
                         const lesson = lessonsWithProgress[j];
                         if (lesson.progress.status === LessonStatus.VIEWED) continue;
+                        if (lesson.progress.status === LessonStatus.BLOCKED) continue;
 
                         const canViewNow =
                             !lesson.progress.nextViewAt || new Date(lesson.progress.nextViewAt).toISOString() <= new Date().toISOString();

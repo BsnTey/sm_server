@@ -153,7 +153,7 @@ export class SportmasterHeadersService {
 
         return {
             headers,
-            tlsClientIdentifier: this.getWebTlsProfile(acc),
+            tlsClientIdentifier: this.getMobileTlsProfile(acc.deviceInfo.osVersion),
         };
     }
 
