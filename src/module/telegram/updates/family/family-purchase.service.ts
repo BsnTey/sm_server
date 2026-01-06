@@ -44,6 +44,7 @@ export class FamilyPurchaseService {
 
                 try {
                     // Пробуем найти и импортировать
+                    await this.bottService.getStatistics();
                     const responseHTML = await this.bottService.searchOrderFromApi(invitedAccountId);
                     const importedCount = await this.bottWebhookService.importOrdersFromHtml(responseHTML);
 
