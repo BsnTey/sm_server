@@ -130,25 +130,20 @@ export class SportmasterHeadersService {
     }
 
     getHeadersWithAccessToken(acc: AccountWithProxyEntity, videoId?: string, lessonId?: string, mnemocode?: string): HeaderPackage {
-        let referer;
-        if (!mnemocode) {
-            referer = this.onlineCourses;
-        } else {
-            referer = `https://${this.hostSite}courses/courses/mobile/`;
+        if (!acc.accessTokenCourse) {
+            throw new Error(`Отсутствует токен курсов у ${acc.accountId}`);
         }
 
         const headers = {
             'User-Agent': this.userAgentMobileWeb,
             Host: this.hostSite,
-            Accept: this.accept,
-            Accesstoken: acc.accessTokenCourse || '',
+            Accept: this.acceptCourse,
+            Accesstoken: acc.accessTokenCourse,
             'X-Requested-With': this.xRequestedWith,
             'Sec-Fetch-Site': this.secFetchSite,
             'Sec-Fetch-Mode': this.secFetchMode,
             'Sec-Fetch-Dest': this.secFetchDest,
-            'Accept-Encoding': this.acceptEncoding + ', br',
             'Accept-Language': this.acceptLanguage,
-            Referer: referer,
         };
 
         return {
