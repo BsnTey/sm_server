@@ -32,7 +32,7 @@ export const extractBalance = (html: string) => {
         throw new Error('Баланс не найден');
     }
 
-    return +balance;
+    return Math.floor(parseFloat(balance));
 };
 
 export const extractAmountFTransferedPay = (payments: PaymentOrderEntity[]) => {
