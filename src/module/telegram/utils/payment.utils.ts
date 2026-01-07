@@ -25,14 +25,14 @@ export const extractUserBotId = (html: string) => {
 };
 
 export const extractBalance = (html: string) => {
-    const match = html.match(/data-bs-original-title="Изменить баланс">(\d+)₽/);
+    const match = html.match(/data-bs-original-title="Изменить баланс">([\d.]+)₽/);
     const balance = match ? match[1] : null;
 
     if (!balance) {
         throw new Error('Баланс не найден');
     }
 
-    return +balance;
+    return Math.floor(parseFloat(balance));
 };
 
 export const extractAmountFTransferedPay = (payments: PaymentOrderEntity[]) => {
