@@ -1302,6 +1302,7 @@ export class AccountService {
 
         const url = this.urlSite + `courses/api/courses/lessons/${mnemocode}/${lessonId}/watching`;
         const httpOptions = this.getHttpOptionsSiteCourseVideo(accountWithProxyEntity, videoId, lessonId, mnemocode);
+        httpOptions.tlsClientIdentifier = 'okhttp4_android_12';
         const payload = {
             startTime: 0,
             endTime: duration,
