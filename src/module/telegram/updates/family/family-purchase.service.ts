@@ -23,6 +23,7 @@ export class FamilyPurchaseService {
     async processFamilyInvitePurchase(telegramId: string, ownerAccountId: string, invitedAccountId: string, amount: number): Promise<void> {
         // 1. ВАЖНО: Лучше, чтобы проверка и списание были в changeUserBalance.
         // Но если архитектура требует проверки через bottService, оставляем как есть.
+        await this.bottService.getStatistics();
         const currentBalance = await this.bottService.getUserBotBalance(telegramId);
         if (currentBalance < amount) {
             throw new BadRequestException(`На балансе не хватает ${amount - currentBalance}р`);
@@ -44,7 +45,6 @@ export class FamilyPurchaseService {
 
                 try {
                     // Пробуем найти и импортировать
-                    await this.bottService.getStatistics();
                     const responseHTML = await this.bottService.searchOrderFromApi(invitedAccountId);
                     const importedCount = await this.bottWebhookService.importOrdersFromHtml(responseHTML);
 

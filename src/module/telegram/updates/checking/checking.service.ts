@@ -40,7 +40,19 @@ export class CheckingService {
         processAccount: (resultChecking: Record<string, string>, accountId: string) => Promise<void>,
     ): Promise<string[]> {
         const resultChecking: Record<string, string> = {};
-        const accountChunks = this.chunkArray(accounts, 5);
+
+        const uniqueAccountsSet = new Set<string>();
+
+        accounts.forEach(acc => {
+            const trimmed = acc.trim();
+            if (trimmed.length > 0) {
+                uniqueAccountsSet.add(trimmed);
+            }
+        });
+
+        const uniqueAccountsList = Array.from(uniqueAccountsSet);
+
+        const accountChunks = this.chunkArray(uniqueAccountsList, 5);
 
         for (const chunk of accountChunks) {
             await Promise.all(chunk.map(account => this.processWithTimeout(processAccount, resultChecking, account)));
