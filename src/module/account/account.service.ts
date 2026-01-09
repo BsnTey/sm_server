@@ -884,6 +884,8 @@ export class AccountService {
 
         const httpOptions = this.getHttpOptions(targetUrl, accountEntity);
 
+        delete httpOptions.headers?.['Accept-Encoding'];
+
         const payload = {
             phone: {
                 countryCode: '7',
