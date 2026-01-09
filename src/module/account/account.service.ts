@@ -73,6 +73,7 @@ import { HttpOptions } from '../http/interfaces/http.interface';
 import { DeviceGeneratorService } from '@core/device/services/device-generator.service';
 import { CityEntity } from '@core/city/entities/city.entity';
 import { DeviceInfoEntity } from '@core/device/entities/device-info.entity';
+import { AccountCheckResponse } from './interfaces/account-check-response.interface';
 
 @Injectable()
 export class AccountService {
@@ -216,6 +217,17 @@ export class AccountService {
         if (!account) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
 
         return new AccountEntity(account);
+    }
+
+    async getAccountByXUserId(xUserId: string): Promise<AccountCheckResponse> {
+        const accounts = await this.accountRep.findIdsByXUserId(xUserId);
+
+        const accountIds = accounts.map(acc => acc.accountId);
+
+        return {
+            isDouble: accountIds.length >= 2,
+            accountIds: accountIds,
+        };
     }
 
     async getFullAccount(accountId: string): Promise<AccountWDevice> {

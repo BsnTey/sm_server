@@ -27,6 +27,8 @@ import {
     UpdateAccountCredentialsResponseDto,
 } from './dto/account-credentials.dto';
 import { StatusCourseParamsDto } from './dto/status-course-param.dto';
+import { XUserIdParamsDto } from './dto/x-user-id-account.dto';
+import { AccountCheckResponse } from './interfaces/account-check-response.interface';
 
 @Controller('account')
 export class AccountController {
@@ -53,6 +55,13 @@ export class AccountController {
             ...accountEntity,
             cookie: JSON.parse(accountEntity.cookie),
         };
+    }
+
+    @HasZenno()
+    @Get('check-xuserid/:xUserId')
+    @HttpCode(200)
+    async getAccountByXUserId(@Param() params: XUserIdParamsDto): Promise<AccountCheckResponse> {
+        return this.accountService.getAccountByXUserId(params.xUserId);
     }
 
     @HasZenno()
@@ -143,10 +152,7 @@ export class AccountController {
     @HasZenno()
     @Patch(':accountId/bonusCount')
     @HttpCode(200)
-    async updateBonusCountAccount(
-        @Body() dto: UpdatingBonusCountRequestDto,
-        @Param() params: AccountIdParamsDto,
-    ) {
+    async updateBonusCountAccount(@Body() dto: UpdatingBonusCountRequestDto, @Param() params: AccountIdParamsDto) {
         const account = await this.accountService.updateAccountBonusCount(params.accountId, dto);
         return account ? 'success' : 'error';
     }
@@ -174,10 +180,7 @@ export class AccountController {
     @HasZenno()
     @Patch(':accountId/cookie')
     @HttpCode(200)
-    async updateCookieAccount(
-        @Body() dto: UpdatingCookieRequestDto,
-        @Param() params: AccountIdParamsDto,
-    ) {
+    async updateCookieAccount(@Body() dto: UpdatingCookieRequestDto, @Param() params: AccountIdParamsDto) {
         return this.accountService.updateCookie(params.accountId, dto);
     }
 
@@ -256,10 +259,7 @@ export class AccountController {
     @HasZenno()
     @Put(':accountId/device')
     @HttpCode(200)
-    async updateDeviceInfo(
-        @Param() params: AccountIdParamsDto,
-        @Body() deviceInfoDto: DeviceInfoRequestDto,
-    ) {
+    async updateDeviceInfo(@Param() params: AccountIdParamsDto, @Body() deviceInfoDto: DeviceInfoRequestDto) {
         return this.deviceInfoService.updateDeviceInfo(params.accountId, deviceInfoDto);
     }
 

@@ -95,6 +95,7 @@ model Account {
   deviceInfo               DeviceInfo?
   AccountPurchase          AccountPurchase[]
 
+  @@index([xUserId])
   @@map("account")
 }
 

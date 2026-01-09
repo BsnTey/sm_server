@@ -2,14 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Account, CourseStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@common/database/prisma.service';
 import { AccountEntity } from './entities/account.entity';
-import {
-    IAccountWithProxy,
-    IAccountWithProxyFromDB,
-    ICourseTokens,
-    IEmailFromDb,
-    IRefreshDataAccount,
-    IUpdateAccount,
-} from './interfaces/account.interface';
+import { IAccountWithProxyFromDB, ICourseTokens, IEmailFromDb, IRefreshDataAccount, IUpdateAccount } from './interfaces/account.interface';
 import { CitySMEntity } from './entities/citySM.entity';
 
 @Injectable()
@@ -106,6 +99,20 @@ export class AccountRepository {
             where: { accountId },
             select: {
                 cookie: true,
+            },
+        });
+    }
+
+    async findIdsByXUserId(xUserId: string): Promise<{ accountId: string }[]> {
+        return this.prisma.account.findMany({
+            where: {
+                xUserId: xUserId,
+            },
+            select: {
+                accountId: true,
+            },
+            orderBy: {
+                createdAt: 'asc',
             },
         });
     }
