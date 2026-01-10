@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ZodValidationPipe } from 'nestjs-zod';
-import { join } from 'path';
+import { resolve } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import './common/helpers/hbs.helper';
 import { engine } from 'express-handlebars';
@@ -18,8 +18,8 @@ async function bootstrap() {
     app.setGlobalPrefix('api');
     app.useGlobalPipes(new ZodValidationPipe());
     app.enableCors();
-    app.useStaticAssets(join(__dirname, '..', 'public'));
-    app.setBaseViewsDir(join(__dirname, '..', 'views'));
+    app.useStaticAssets(resolve('./public'));
+    app.setBaseViewsDir(resolve('./views'));
     app.engine(
         'hbs',
         engine({
