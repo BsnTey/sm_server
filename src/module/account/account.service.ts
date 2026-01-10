@@ -872,7 +872,7 @@ export class AccountService {
         await this.analyticsTags(accountWithProxyEntity);
         await new Promise<void>(resolve => setTimeout(resolve, 1000));
 
-        return await this.sendSms(accountWithProxyEntity, phoneNumber);
+        return this.sendSms(accountWithProxyEntity, phoneNumber);
     }
 
     @RetryOn401()
@@ -898,7 +898,7 @@ export class AccountService {
 
         const response = await this.httpService.post(targetUrl, payload, httpOptions);
 
-        return response.data.requestId;
+        return response.data.data.requestId;
     }
 
     @RetryOn401()
@@ -934,6 +934,7 @@ export class AccountService {
         const payload = {
             token,
         };
+
         await this.httpService.post(url, payload, httpOptions);
         return true;
     }
