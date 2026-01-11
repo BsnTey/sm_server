@@ -11,9 +11,11 @@ import { DeviceInfoService } from './deviceInfo.service';
 import { DeviceInfoRepository } from './deviceInfo.repository';
 import { CalculateModule } from '../calculate/calculate.module';
 import { DeviceModule } from '@core/device/device.module';
+import { ProtectionToken } from './protection-token.service';
+import { BrowserModule } from '../../shared/browser/browser.module';
 
 @Module({
-    imports: [ProxyModule, HttpModule, CalculateModule, DeviceModule],
+    imports: [ProxyModule, HttpModule, CalculateModule, DeviceModule, BrowserModule],
     controllers: [AccountController],
     providers: [
         AccountService,
@@ -23,6 +25,7 @@ import { DeviceModule } from '@core/device/device.module';
         CourseRepository,
         DeviceInfoService,
         DeviceInfoRepository,
+        ProtectionToken,
     ],
     exports: [AccountService, SportmasterHeadersService, CourseService],
 })

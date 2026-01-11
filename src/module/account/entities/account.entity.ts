@@ -89,4 +89,15 @@ export class AccountEntity implements Account {
 
         return JSON.stringify(cookieObject);
     }
+
+    getBasePrepareRequestCookie(addingCookie: Record<string, string> = {}): string {
+        const cookiesList: { name: string; value: string }[] = JSON.parse(this.cookie || '[]');
+        const targetNames = new Set(['SMID']);
+
+        const baseCookies = cookiesList.filter(c => targetNames.has(c.name)).map(c => `${c.name}=${c.value}`);
+
+        const extraCookies = Object.entries(addingCookie).map(([key, value]) => `${key}=${value}`);
+
+        return [...baseCookies, ...extraCookies, ''].join('; ');
+    }
 }

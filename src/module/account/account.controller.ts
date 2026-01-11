@@ -4,10 +4,10 @@ import { HasZenno } from '@common/decorators/zenno.decorator';
 import { AddingAccountRequestDto } from './dto/create-account.dto';
 import { UpdatingAccountRequestDto } from './dto/update-tokens-account.dto';
 import { AccountIdParamsDto } from './dto/uuid-account.dto';
-import { UpdateAccountRequestDto, UpdateAccountResponseDto } from './dto/update-account.dto';
+import { UpdateAccountRequestDto } from './dto/update-account.dto';
 import { IsEmailRequestDto, IsEmailResponseDto } from './dto/isEmail-account.dto';
 import { Account } from '@prisma/client';
-import { UpdatingBonusCountRequestDto, UpdatingBonusCountResponseDto } from './dto/updateBonusCount-account.dto';
+import { UpdatingBonusCountRequestDto } from './dto/updateBonusCount-account.dto';
 import { UpdatePushTokenRequestDto, UpdatePushTokenResponseDto } from './dto/updatePushToken-account.dto';
 import { UpdateGoogleIdRequestDto, UpdateGoogleIdResponseDto } from './dto/updateGoogleId-account.dto';
 import { AxiosError } from 'axios';
@@ -16,8 +16,8 @@ import { CourseService } from './course.service';
 import { UpdateCourseStatusRequestDto } from './dto/updateCourseStatus-course';
 import { CourseData } from './interfaces/course-data.interface';
 import { ERROR_ACCOUNT_NOT_FOUND } from './constants/error.constant';
-import { UpdatingCookieRequestDto, UpdatingCookieResponseDto } from './dto/updateCookie-account.dto';
-import { DeviceInfoRequestDto, DeviceInfoResponseDto } from './dto/create-deviceInfo.dto';
+import { UpdatingCookieRequestDto } from './dto/updateCookie-account.dto';
+import { DeviceInfoRequestDto } from './dto/create-deviceInfo.dto';
 import { DeviceInfoService } from './deviceInfo.service';
 import { CourseIdAccountRequestDto } from './dto/course-account.dto';
 import { UpdatingCourseStatusAccountRequestDto, UpdatingCourseStatusBulkRequestDto } from './dto/update-course-status-account.dto';
@@ -197,7 +197,7 @@ export class AccountController {
     @Get(':accountId/courses')
     @HttpCode(200)
     async getCoursesAccount(@Param() params: AccountIdParamsDto): Promise<any> {
-        return this.accountService.getCoursesList(params.accountId);
+        return this.accountService.getCourses(params.accountId);
     }
 
     //deprecated, используется в таблицах
