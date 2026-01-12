@@ -5,3 +5,5 @@ export const FORTUNE_BOT_SCENE = 'fortuneBotScene';
 export const PAYMENT_PROMOCODE_BOT_SCENE = 'paymentPromocodeBotScene';
 export const MY_DISCOUNT_SCENE = 'myDiscountScene';
 export const EXTENSION_SCENE = 'extensionScene';
+export const COURSES_SCENE = 'coursesScene';
+export const GET_COURSES_SCENE = 'getCoursesScene';

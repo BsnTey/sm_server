@@ -67,13 +67,17 @@ import { Cookie } from './interfaces/cookie.interface';
 import { Products } from './interfaces/products.interface';
 import { RetryOnProxyError } from './decorators/retry-on-proxy-error.decorator';
 import { RedisCacheService } from '../cache/cache.service';
-import { getAccountEntityKey, getAnonymAccountEntityKey, getShortInfoKey } from '../cache/cache.keys';
+import { getAccessTokenCouresKey, getAccountEntityKey, getAnonymAccountEntityKey, getShortInfoKey } from '../cache/cache.keys';
 import { AnonymResponse } from './interfaces/anonym.interface';
 import { HttpOptions } from '../http/interfaces/http.interface';
 import { DeviceGeneratorService } from '@core/device/services/device-generator.service';
 import { CityEntity } from '@core/city/entities/city.entity';
 import { DeviceInfoEntity } from '@core/device/entities/device-info.entity';
 import { AccountCheckResponse } from './interfaces/account-check-response.interface';
+import { ProtectionToken } from './protection-token.service';
+import { ProtectedTokensInterface } from './interfaces/protected-tokens.interface';
+import { AnswerItem } from '../courses/data/course-answers.data';
+import { CourseTest } from './interfaces/course-test.interface';
 
 @Injectable()
 export class AccountService {
@@ -85,6 +89,7 @@ export class AccountService {
 
     private TTL_CASH_ACCOUNT = 60;
     private TTL_CASH_SHORT_INFO = 20;
+    private TTL_ACCESS_TOKEN_COURSE = 3600;
 
     constructor(
         private configService: ConfigService,
@@ -96,6 +101,7 @@ export class AccountService {
         private sportmasterHeaders: SportmasterHeadersService,
         private readonly cacheService: RedisCacheService,
         private deviceGen: DeviceGeneratorService,
+        private protectionToken: ProtectionToken,
     ) {
         this.url = this.configService.getOrThrow('API_DONOR');
         this.urlSite = this.configService.getOrThrow('API_DONOR_SITE');
@@ -378,28 +384,6 @@ export class AccountService {
         return { pushToken };
     }
 
-    async createAccessTokenCourse(accountWithProxyEntity: AccountWithProxyEntity): Promise<{
-        accessTokenCourse: string;
-    }> {
-        if (!accountWithProxyEntity.userGateToken) {
-            const respUserGateToken = await this.getUserGateToken(accountWithProxyEntity);
-            const userGateToken = respUserGateToken.data.userGateToken;
-            await this.accountRep.updateUserGateToken(accountWithProxyEntity.accountId, userGateToken);
-            accountWithProxyEntity = await this.getAccountEntity(accountWithProxyEntity.accountId);
-        }
-
-        const htmlCourse = await this.getCoursesHtml(accountWithProxyEntity);
-
-        const accessTokenCourse = this.getAccessTokenCourseFromResponse(htmlCourse);
-        return { accessTokenCourse };
-    }
-
-    async getCoursesList(accountId: string): Promise<CourseList> {
-        const accountWithProxyEntity = await this.getAccountEntity(accountId);
-        const { accessTokenCourse } = await this.createAccessTokenCourse(accountWithProxyEntity);
-        return this.getCourses(accountWithProxyEntity, accessTokenCourse);
-    }
-
     private generateRandomString(length: number) {
         const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
         let result = '';
@@ -440,30 +424,20 @@ export class AccountService {
         return { headers, proxy: accountWithProxy.proxy!.proxy, tlsClientIdentifier };
     }
 
-    private getHttpOptionsSiteUserGate(accountWithProxy: AccountWithProxyEntity): HttpOptions {
-        const { headers, tlsClientIdentifier } = this.sportmasterHeaders.getHeadersUserGate(accountWithProxy);
+    private getHttpOptionsSite(accountWithProxy: AccountWithProxyEntity, qratorJsid: string): HttpOptions {
+        const { headers, tlsClientIdentifier } = this.sportmasterHeaders.getHeadersSite(accountWithProxy, qratorJsid);
 
         return { headers, proxy: accountWithProxy.proxy!.proxy, tlsClientIdentifier };
     }
 
-    private getHttpOptionsSiteCourse(accountWithProxy: AccountWithProxyEntity): HttpOptions {
+    private getHttpOptionsSiteCourse(accountWithProxy: AccountWithProxyEntity, tokens: ProtectedTokensInterface): HttpOptions {
+        const { headers, tlsClientIdentifier } = this.sportmasterHeaders.getHeadersForCourse(accountWithProxy, tokens);
+
+        return { headers, proxy: accountWithProxy.proxy!.proxy, tlsClientIdentifier };
+    }
+
+    private getHttpOptionsSiteCourseVideo(accountWithProxy: AccountWithProxyEntity): HttpOptions {
         const { headers, tlsClientIdentifier } = this.sportmasterHeaders.getHeadersWithAccessToken(accountWithProxy);
-
-        return { headers, proxy: accountWithProxy.proxy!.proxy, tlsClientIdentifier };
-    }
-
-    private getHttpOptionsSiteCourseVideo(
-        accountWithProxy: AccountWithProxyEntity,
-        videoId: string,
-        lessonId: string,
-        mnemocode: string,
-    ): HttpOptions {
-        const { headers, tlsClientIdentifier } = this.sportmasterHeaders.getHeadersWithAccessToken(
-            accountWithProxy,
-            videoId,
-            lessonId,
-            mnemocode,
-        );
         return { headers, proxy: accountWithProxy.proxy!.proxy, tlsClientIdentifier };
     }
 
@@ -635,7 +609,7 @@ export class AccountService {
             await this.cacheService.set(key, account, this.TTL_CASH_ACCOUNT);
             return account;
         }
-        return accountEntityFromCache;
+        return new AccountWithProxyEntity(accountEntityFromCache);
     }
 
     async searchProductByAnonym(query: string) {
@@ -1252,22 +1226,19 @@ export class AccountService {
         return response.data;
     }
 
-    @RetryOn401()
-    @RetryOnProxyError()
-    private async getUserGateToken(accountWithProxyEntity: AccountWithProxyEntity): Promise<UserGateTokenInterface> {
-        const url = this.url + `v1/profile/userGateToken`;
-        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
-        const response = await this.httpService.get(url, httpOptions);
-        return response.data;
-    }
+    async getAccessTokenCourse(accountId: string) {
+        const key = getAccessTokenCouresKey(accountId);
 
-    @RetryOn401()
-    @RetryOnProxyError()
-    async getCoursesHtml(accountWithProxyEntity: AccountWithProxyEntity): Promise<string> {
-        const url = this.urlSite + `courses/?webview=true`;
-        const httpOptions = this.getHttpOptionsSiteUserGate(accountWithProxyEntity);
-        const response = await this.httpService.get(url, httpOptions);
-        return response.data;
+        const cached = await this.cacheService.get<{ value: string }>(key);
+
+        if (cached?.value) return cached.value;
+
+        const response = await this.getCoursesHtml(accountId);
+        const token = this.getAccessTokenCourseFromResponse(response);
+
+        await this.cacheService.set<{ value: string }>(key, { value: token }, this.TTL_ACCESS_TOKEN_COURSE);
+
+        return token;
     }
 
     private getAccessTokenCourseFromResponse(html: string): string {
@@ -1276,16 +1247,56 @@ export class AccountService {
         if (match) {
             return match[0];
         }
-        throw new HttpException(ERROR_GET_ACCESS_TOKEN_COURSE, HttpStatus.BAD_REQUEST);
+        throw new Error(ERROR_GET_ACCESS_TOKEN_COURSE);
     }
 
-    @RetryOn401()
     @RetryOnProxyError()
-    private async getCourses(accountWithProxyEntity: AccountWithProxyEntity, accessTokenCourse: string): Promise<CourseList> {
-        const url = this.urlSite + `courses/api/courses?limit=10`;
-        accountWithProxyEntity.accessTokenCourse = accessTokenCourse;
-        const httpOptions = this.getHttpOptionsSiteCourse(accountWithProxyEntity);
+    private async getUserGateToken(accountWithProxyEntity: AccountWithProxyEntity): Promise<UserGateTokenInterface> {
+        const url = this.url + `v1/profile/userGateToken`;
+        const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
         const response = await this.httpService.get(url, httpOptions);
+        return response.data;
+    }
+
+    @RetryOnProxyError()
+    async getCoursesHtml(accountId: string): Promise<string> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const qratorJsid = await this.protectionToken.getQratorJsid(accountWithProxyEntity.proxy.proxy);
+
+        //критичный слеш, иначе 301
+        const url = this.urlSite + `courses/`;
+        const httpOptions = this.getHttpOptionsSite(accountWithProxyEntity, qratorJsid);
+        const response = await this.httpService.get(url, httpOptions);
+        return response.data;
+    }
+
+    @RetryOnProxyError()
+    async getCourses(accountId: string): Promise<CourseList> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const qratorJsid = await this.protectionToken.getQratorJsid(accountWithProxyEntity.proxy.proxy);
+        const accessToken = await this.getAccessTokenCourse(accountId);
+
+        const url = this.urlSite + `courses/api/courses?limit=25`;
+
+        const httpOptions = this.getHttpOptionsSiteCourse(accountWithProxyEntity, { qratorJsid, accessToken });
+        const response = await this.httpService.get(url, httpOptions);
+        return response.data;
+    }
+
+    @RetryOnProxyError()
+    async passTest(accountId: string, mnemocode: string, answersItem: AnswerItem[]): Promise<CourseTest> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const qratorJsid = await this.protectionToken.getQratorJsid(accountWithProxyEntity.proxy.proxy);
+        const accessToken = await this.getAccessTokenCourse(accountId);
+
+        const payload = {
+            answers: answersItem
+        };
+
+        const url = this.urlSite + `courses/tests/${mnemocode}`;
+
+        const httpOptions = this.getHttpOptionsSiteCourse(accountWithProxyEntity, { qratorJsid, accessToken });
+        const response = await this.httpService.post(url, payload, httpOptions);
         return response.data;
     }
 
@@ -1304,11 +1315,10 @@ export class AccountService {
         return status == 204;
     }
 
-    @RetryOn401()
     @RetryOnProxyError()
     private async privateWatchingLesson(
         accountWithProxyEntity: AccountWithProxyEntity,
-        { mnemocode, videoId, lessonId, duration }: IWatchLesson,
+        { mnemocode, lessonId, duration }: IWatchLesson,
     ): Promise<number> {
         if (!accountWithProxyEntity.accessTokenCourse) {
             await this.promblemCourses(accountWithProxyEntity.accountId);
@@ -1316,7 +1326,7 @@ export class AccountService {
         }
 
         const url = this.urlSite + `courses/api/courses/lessons/${mnemocode}/${lessonId}/watching`;
-        const httpOptions = this.getHttpOptionsSiteCourseVideo(accountWithProxyEntity, videoId, lessonId, mnemocode);
+        const httpOptions = this.getHttpOptionsSiteCourseVideo(accountWithProxyEntity);
         httpOptions.tlsClientIdentifier = 'okhttp4_android_12';
         const payload = {
             startTime: 0,
@@ -1330,7 +1340,7 @@ export class AccountService {
             const data = JSON.stringify(e.response?.data || {});
 
             this.logger.warn(
-                `Ошибка запроса privateWatchingLesson (Acc: ${accountWithProxyEntity.accountId}, Lesson: ${lessonId}): Status ${status}, Data: ${data}`
+                `Ошибка запроса privateWatchingLesson (Acc: ${accountWithProxyEntity.accountId}, Lesson: ${lessonId}): Status ${status}, Data: ${data}`,
             );
 
             return status || 404;

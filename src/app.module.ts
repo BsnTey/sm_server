@@ -26,6 +26,8 @@ import { UserModule } from './module/user/user.module';
 import { CheckingModule } from './module/checking/checking.module';
 import { RedisCacheModule } from './module/cache/cache.module';
 import { DeviceModule } from '@core/device/device.module';
+import { BrowserModule } from './shared/browser/browser.module';
+import { CourseModule } from './module/courses/courses.module';
 
 @Module({
     imports: [
@@ -59,6 +61,7 @@ import { DeviceModule } from '@core/device/device.module';
         CheckingModule,
         RedisCacheModule,
         DeviceModule,
+        CourseModule,
     ],
 })
 export class AppModule {}

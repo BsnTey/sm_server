@@ -7,6 +7,7 @@ import { profileKeyboard } from '../../keyboards/profile.keyboard';
 import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import {
+    COURSES_SCENE,
     EXTENSION_SCENE,
     FORTUNE_BOT_SCENE,
     MAKE_DEPOSIT_SCENE,
@@ -92,6 +93,11 @@ export class ProfileUpdate {
     @Action('extension')
     async goToExtension(@Ctx() ctx: WizardContext) {
         await ctx.scene.enter(EXTENSION_SCENE);
+    }
+
+    @Action('get_courses')
+    async goToCourses(@Ctx() ctx: WizardContext) {
+        await ctx.scene.enter(COURSES_SCENE);
     }
 }
 

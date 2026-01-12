@@ -65,6 +65,8 @@ import { AccessGateService } from './updates/family/access-gate.service';
 import { AccessQuoteService } from './updates/family/access-quote.service';
 import { InviteAccessService } from './updates/family/invite-access.service';
 import { FamilyPurchaseService } from './updates/family/family-purchase.service';
+import { CoursesUpdate, GetCoursesUpdate } from './updates/courses/courses.update';
+import { CourseModule } from '../courses/courses.module';
 
 @Module({
     imports: [
@@ -81,6 +83,7 @@ import { FamilyPurchaseService } from './updates/family/family-purchase.service'
         TemplateModule,
         OrderModule,
         CheckingModule,
+        CourseModule,
     ],
     providers: [
         TelegramService,
@@ -135,6 +138,8 @@ import { FamilyPurchaseService } from './updates/family/family-purchase.service'
         AccessQuoteService,
         InviteAccessService,
         FamilyPurchaseService,
+        CoursesUpdate,
+        GetCoursesUpdate,
     ],
     exports: [TelegramService],
 })

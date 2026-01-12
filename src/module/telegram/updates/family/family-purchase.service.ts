@@ -22,7 +22,6 @@ export class FamilyPurchaseService {
      */
     async processFamilyInvitePurchase(telegramId: string, ownerAccountId: string, invitedAccountId: string, amount: number): Promise<void> {
         // 1. ВАЖНО: Лучше, чтобы проверка и списание были в changeUserBalance.
-        // Но если архитектура требует проверки через bottService, оставляем как есть.
         await this.bottService.getStatistics();
         const currentBalance = await this.bottService.getUserBotBalance(telegramId);
         if (currentBalance < amount) {
