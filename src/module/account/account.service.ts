@@ -76,6 +76,8 @@ import { DeviceInfoEntity } from '@core/device/entities/device-info.entity';
 import { AccountCheckResponse } from './interfaces/account-check-response.interface';
 import { ProtectionToken } from './protection-token.service';
 import { ProtectedTokensInterface } from './interfaces/protected-tokens.interface';
+import { AnswerItem } from '../courses/data/course-answers.data';
+import { CourseTest } from './interfaces/course-test.interface';
 
 @Injectable()
 export class AccountService {
@@ -1278,6 +1280,23 @@ export class AccountService {
 
         const httpOptions = this.getHttpOptionsSiteCourse(accountWithProxyEntity, { qratorJsid, accessToken });
         const response = await this.httpService.get(url, httpOptions);
+        return response.data;
+    }
+
+    @RetryOnProxyError()
+    async passTest(accountId: string, mnemocode: string, answersItem: AnswerItem[]): Promise<CourseTest> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const qratorJsid = await this.protectionToken.getQratorJsid(accountWithProxyEntity.proxy.proxy);
+        const accessToken = await this.getAccessTokenCourse(accountId);
+
+        const payload = {
+            answers: answersItem
+        };
+
+        const url = this.urlSite + `courses/tests/${mnemocode}`;
+
+        const httpOptions = this.getHttpOptionsSiteCourse(accountWithProxyEntity, { qratorJsid, accessToken });
+        const response = await this.httpService.post(url, payload, httpOptions);
         return response.data;
     }
 

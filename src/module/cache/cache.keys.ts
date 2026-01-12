@@ -15,6 +15,7 @@ export const getAnonymAccountEntityKey = () => `acc:anonymEntity`;
 export const getShortInfoKey = (accountId: string) => `acc:shortInfo:${accountId}`;
 export const getAccessTokenCouresKey = (accountId: string) => `acc:accessTokenCourse:${accountId}`;
 export const getOrdersTodayKey = (accountId: string) => `orders_today:${accountId}`;
+export const courseAnalyticsKey = (accountId: string) => `course_analytics:${accountId}`;
 
 // Discount-related cache key prefixes
 export const CACHE_PREFIX_DISCOUNT = 'discount:';

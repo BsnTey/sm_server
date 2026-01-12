@@ -419,10 +419,10 @@ enum StatusPayment {
 }
 
 enum CourseStatus {
-  NONE
-  ACTIVE
-  FINISHED
-  BLOCKED
+  NONE //не активирован
+  ACTIVE //активирован
+  FINISHED //пройден
+  BLOCKED //
 }
 
 enum LessonStatus {
