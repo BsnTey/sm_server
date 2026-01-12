@@ -275,7 +275,7 @@ export class GetCoursesUpdate extends BaseUpdate {
     private async executePurchase(ctx: Context, tgId: number, accountId: string, amount: number) {
         try {
             const count = await this.coursePurchaseService.processCoursePurchase(String(tgId), accountId, amount);
-            await ctx.reply(`✅ Готово! Пройдено курсов: ${count}`);
+            await ctx.reply(`✅ Готово! Пройдено курсов: ${count.passedCount}`);
         } catch (e: any) {
             await ctx.reply(`❌ Ошибка: ${e.message}`);
         }

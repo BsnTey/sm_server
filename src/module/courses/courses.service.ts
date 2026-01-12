@@ -8,8 +8,6 @@ import { RedisCacheService } from '../cache/cache.service';
 import { courseAnalyticsKey } from '../cache/cache.keys';
 import sleep from 'sleep-promise';
 
-
-
 @Injectable()
 export class CourseWorkService {
     private readonly logger = new Logger(CourseWorkService.name);
@@ -17,17 +15,12 @@ export class CourseWorkService {
     constructor(
         private accountService: AccountService,
         private readonly cacheService: RedisCacheService,
-    ) {
-    }
+    ) {}
 
     /**
      * Основной метод: подбирает курсы под сумму и проходит их
      */
-    async completeCoursesForAmount(
-        accountId: string,
-        targetAmount: number,
-    ): Promise<{ earnedPoints: number; passedCount: number }> {
-
+    async completeCoursesForAmount(accountId: string, targetAmount: number): Promise<{ earnedPoints: number; passedCount: number }> {
         // 1. Получаем данные и уровень карты
         const { courseList, cardLevel } = await this.getCourseAnalytics(accountId);
 
@@ -61,7 +54,6 @@ export class CourseWorkService {
                 this.logger.log(`Проходим тест: ${mnemocode} для ${accountId}`);
                 const resp = await this.accountService.passTest(accountId, mnemocode, answers.answers);
                 await sleep(500);
-                console.log('жду между курсами  ', new Date);
 
                 if (!resp.success) throw new Error('Тест не выполнен');
 
@@ -72,7 +64,6 @@ export class CourseWorkService {
                 // Math.round используем, так как в findCoursesForTarget тоже использовался round
                 const pointsForCourse = Math.round(course.points * multiplier);
                 earnedPoints += pointsForCourse;
-
             } catch (e: any) {
                 this.logger.error(`Ошибка прохождения курса ${course.id}: ${e.message}`);
                 // Не прерываем весь процесс, чтобы пройти то, что можно пройти
@@ -82,14 +73,11 @@ export class CourseWorkService {
         return { earnedPoints, passedCount };
     }
 
-
     private findCoursesForTarget(allCourses: CourseItem[], target: number, level: CardLevel): CourseItem[] {
         const multiplier = MULTIPLIERS[level];
 
         // 1. Фильтруем кандидатов (Только ACTIVE и пройденные уроки)
-        const candidates = allCourses.filter(c =>
-            c.status === CourseStatus.ACTIVE && c.stats.countLessons === c.stats.countLessonsLearned,
-        );
+        const candidates = allCourses.filter(c => c.status === CourseStatus.ACTIVE && c.stats.countLessons === c.stats.countLessonsLearned);
 
         // Подготавливаем маппинг с реальными значениями баллов
         const items = candidates.map(c => ({
@@ -165,7 +153,7 @@ export class CourseWorkService {
         const result: CourseAnalyticsResult = {
             courseList: data.list,
             cardLevel,
-            ...calculatePointsLogic(data.list, cardLevel)
+            ...calculatePointsLogic(data.list, cardLevel),
         };
 
         await this.cacheService.set(cacheKey, result, 10);
@@ -193,7 +181,7 @@ export class CourseWorkService {
         this.logger.log(`Запускаем процесс обучения для ${coursesToStart.length} курсов. Account: ${accountId}`);
 
         // Имитация отправки в RabbitMQ
-        coursesToStart.forEach((course: { id: any; }) => {
+        coursesToStart.forEach((course: { id: any }) => {
             const payload = {
                 accountId,
                 courseId: course.id,
