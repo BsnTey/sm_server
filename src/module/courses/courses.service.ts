@@ -146,9 +146,17 @@ export class CourseWorkService {
         }
 
         const data = await this.accountService.getCourses(accountId);
-        const cardInfo = await this.accountService.shortInfo(accountId);
+        let cardInfo;
+        let cardLevel;
+        try {
+            cardInfo = await this.accountService.shortInfo(accountId);
+            cardLevel = cardInfo.bonusLevel.toUpperCase() as CardLevel;
+        } catch {
+            this.logger.warn(`Ошибка получения инфо по карте, запрос web версии для: ${accountId}`);
 
-        const cardLevel = cardInfo.bonusLevel.toUpperCase() as CardLevel;
+            cardInfo = await this.accountService.getWebBonuses(accountId);
+            cardLevel = cardInfo.currentLevel.toUpperCase() as CardLevel;
+        }
 
         const result: CourseAnalyticsResult = {
             courseList: data.list,

@@ -78,6 +78,7 @@ import { ProtectionToken } from './protection-token.service';
 import { ProtectedTokensInterface } from './interfaces/protected-tokens.interface';
 import { AnswerItem } from '../courses/data/course-answers.data';
 import { CourseTest } from './interfaces/course-test.interface';
+import { ProfileBonuses } from './interfaces/profile-bonuses.interface';
 
 @Injectable()
 export class AccountService {
@@ -1279,6 +1280,18 @@ export class AccountService {
         const url = this.urlSite + `courses/api/courses?limit=25`;
 
         const httpOptions = this.getHttpOptionsSiteCourse(accountWithProxyEntity, { qratorJsid, accessToken });
+        const response = await this.httpService.get(url, httpOptions);
+        return response.data;
+    }
+
+    @RetryOnProxyError()
+    async getWebBonuses(accountId: string): Promise<ProfileBonuses> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const qratorJsid = await this.protectionToken.getQratorJsid(accountWithProxyEntity.proxy.proxy);
+
+        const url = this.urlSite + `web-api/v1/profiles/current/bonuses`;
+
+        const httpOptions = this.getHttpOptionsSite(accountWithProxyEntity, qratorJsid);
         const response = await this.httpService.get(url, httpOptions);
         return response.data;
     }

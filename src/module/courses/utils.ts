@@ -2,18 +2,15 @@ import { CardLevel, CourseItem, CourseStatus, PointsCalculationResult } from './
 
 export const MULTIPLIERS: Record<CardLevel, number> = {
     [CardLevel.STANDART]: 1,
+    [CardLevel.STANDARD]: 1,
     [CardLevel.SILVER]: 1.5,
     [CardLevel.GOLD]: 2,
 };
 
-
 /**
  * Чистая функция подсчета баллов
  */
-export const calculatePointsLogic = (
-    courses: CourseItem[],
-    cardLevel: CardLevel = CardLevel.STANDART,
-): PointsCalculationResult => {
+export const calculatePointsLogic = (courses: CourseItem[], cardLevel: CardLevel = CardLevel.STANDART): PointsCalculationResult => {
     const multiplier = MULTIPLIERS[cardLevel];
     const result: PointsCalculationResult = {
         totalEarned: 0,
@@ -25,17 +22,12 @@ export const calculatePointsLogic = (
         if (course.status === CourseStatus.FINISHED) continue;
 
         const adjustedPoints = Math.round(course.points * multiplier);
-        const isLessonsCompleted =
-            course.stats.countLessons > 0 &&
-            course.stats.countLessons === course.stats.countLessonsLearned;
+        const isLessonsCompleted = course.stats.countLessons > 0 && course.stats.countLessons === course.stats.countLessonsLearned;
 
         if (course.status === CourseStatus.ACTIVE && isLessonsCompleted) {
             result.totalEarned += adjustedPoints;
             result.earnedCourses.push(adjustedPoints);
-        } else if (
-            (course.status === CourseStatus.ACTIVE && !isLessonsCompleted) ||
-            course.status === CourseStatus.NONE
-        ) {
+        } else if ((course.status === CourseStatus.ACTIVE && !isLessonsCompleted) || course.status === CourseStatus.NONE) {
             result.totalFuture += adjustedPoints;
         }
     }
@@ -49,7 +41,7 @@ export const calculatePointsLogic = (
  */
 export const generatePointOptions = (availablePoints: number[]): number[] => {
     // Используем Set для уникальности
-    let sums = new Set<number>();
+    const sums = new Set<number>();
     sums.add(0);
 
     // Динамическое программирование для поиска всех возможных сумм
@@ -59,13 +51,13 @@ export const generatePointOptions = (availablePoints: number[]): number[] => {
             newSums.add(sum + point);
         }
         // Объединяем наборы
-        newSums.forEach((s) => sums.add(s));
+        newSums.forEach(s => sums.add(s));
     }
 
     // Удаляем 0, сортируем и берем, например, первые 10-15 вариантов или фильтруем "мелкие" шаги
     // Для UX лучше оставить логичные шаги.
     return Array.from(sums)
-        .filter((s) => s > 0)
+        .filter(s => s > 0)
         .sort((a, b) => a - b);
 };
 

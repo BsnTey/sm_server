@@ -66,18 +66,16 @@ export class GetCoursesUpdate extends BaseUpdate {
         try {
             const analytics = await this.courseWorkService.getCourseAnalytics(session.accountId);
 
-            const message =`🟢 <b>Доступно к зачислению:</b> ${analytics.totalEarned}\n🟡 <b>Будущий потенциал:</b> ${analytics.totalFuture}`;
+            const message = `🟢 <b>Доступно к зачислению:</b> ${analytics.totalEarned}\n🟡 <b>Будущий потенциал:</b> ${analytics.totalFuture}`;
 
-            await ctx.reply(message,
-                {
-                    parse_mode: 'HTML',
-                    ...Markup.inlineKeyboard([
-                        [Markup.button.callback('💰 Зачислить сейчас', 'credit_now')],
-                        // [Markup.button.callback('🚀 Поставить в работу', 'start_work')]
-                    ])
-                }
-            );
-        } catch (e) {
+            await ctx.reply(message, {
+                parse_mode: 'HTML',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('💰 Зачислить сейчас', 'credit_now')],
+                    // [Markup.button.callback('🚀 Поставить в работу', 'start_work')]
+                ]),
+            });
+        } catch {
             await ctx.reply('Ошибка при расчете данных.');
         }
     }
@@ -119,10 +117,7 @@ export class GetCoursesUpdate extends BaseUpdate {
         const buttons = rangeLimits.map(limit => {
             const prev = limit - RANGE_STEP;
             // Текст: "от 0 до 1000", "от 1000 до 2000"
-            return Markup.button.callback(
-                `${prev} - ${limit}`,
-                `select_range_${limit}`
-            );
+            return Markup.button.callback(`${prev} - ${limit}`, `select_range_${limit}`);
         });
 
         // Разбиваем по 2 кнопки в ряд для красоты
@@ -132,13 +127,10 @@ export class GetCoursesUpdate extends BaseUpdate {
         }
         keyboardRows.push([Markup.button.callback('🔙 Отмена', 'back_to_analytics')]);
 
-        await ctx.editMessageText(
-            `💰 <b>Выберите диапазон зачисления:</b>\nДоступно максимум: <b>${Math.max(...allOptions)}</b>`,
-            {
-                parse_mode: 'HTML',
-                ...Markup.inlineKeyboard(keyboardRows)
-            }
-        );
+        await ctx.editMessageText(`💰 <b>Выберите диапазон зачисления:</b>\nДоступно максимум: <b>${Math.max(...allOptions)}</b>`, {
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard(keyboardRows),
+        });
     }
 
     /**
@@ -159,9 +151,7 @@ export class GetCoursesUpdate extends BaseUpdate {
         const filteredOptions = getOptionsInSpecificRange(allOptions, rangeMax);
 
         // Создаем кнопки с суммами
-        const buttons = filteredOptions.map(amount =>
-            Markup.button.callback(`${amount} б.`, `credit_amount_${amount}`)
-        );
+        const buttons = filteredOptions.map(amount => Markup.button.callback(`${amount} б.`, `credit_amount_${amount}`));
 
         // Группируем по 3 в ряд
         const keyboardRows = [];
@@ -172,10 +162,7 @@ export class GetCoursesUpdate extends BaseUpdate {
         keyboardRows.push([Markup.button.callback('🔙 К диапазонам', 'credit_now')]);
 
         const rangeMin = rangeMax - RANGE_STEP;
-        await ctx.editMessageText(
-            `🎯 Выберите точную сумму (от ${rangeMin} до ${rangeMax}):`,
-            Markup.inlineKeyboard(keyboardRows)
-        );
+        await ctx.editMessageText(`🎯 Выберите точную сумму (от ${rangeMin} до ${rangeMax}):`, Markup.inlineKeyboard(keyboardRows));
     }
 
     /**
@@ -183,7 +170,7 @@ export class GetCoursesUpdate extends BaseUpdate {
      */
     @Action(/credit_amount_(\d+)/)
     async onCreditAmountSelect(@Ctx() ctx: Context, @Sender() sender: SenderTelegram) {
-        // @ts-ignore
+        //@ts-ignore
         const amountPoints = parseInt(ctx.match[1], 10);
 
         // Сохраняем выбранную сумму в сессию, чтобы не потерять при переходе к оплате
@@ -205,16 +192,16 @@ export class GetCoursesUpdate extends BaseUpdate {
         // Показываем инвойс/кнопку оплаты
         await ctx.editMessageText(
             `💳 <b>Подтверждение операции</b>\n\n` +
-            `🎯 Начисление: <b>${amountPoints} баллов</b>\n` +
-            `💵 Стоимость: <b>${price}₽</b> (5%)\n\n` +
-            `Деньги будут списаны с баланса бота.`,
+                `🎯 Начисление: <b>${amountPoints} баллов</b>\n` +
+                `💵 Стоимость: <b>${price}₽</b> (5%)\n\n` +
+                `Деньги будут списаны с баланса бота.`,
             {
                 parse_mode: 'HTML',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback(`✅ Оплатить ${price}₽`, 'confirm_pay_courses')],
-                    [Markup.button.callback('🔙 Назад к выбору', 'credit_now')]
-                ])
-            }
+                    [Markup.button.callback('🔙 Назад к выбору', 'credit_now')],
+                ]),
+            },
         );
     }
 
@@ -236,7 +223,7 @@ export class GetCoursesUpdate extends BaseUpdate {
             const { earnedPoints } = await this.coursePurchaseService.processCoursePurchase(
                 String(sender.id),
                 session.accountId,
-                session.selectedAmount
+                session.selectedAmount,
             );
 
             let msg = `✅ <b>Выполнено!</b>\n`;
@@ -247,26 +234,16 @@ export class GetCoursesUpdate extends BaseUpdate {
                 msg += `\n\n⚠️ <i>Часть не удалось начислить. Разница в стоимости возвращена на баланс.</i>`;
             }
 
-            await ctx.reply(
-                msg,
-                { parse_mode: 'HTML' }
-            );
+            await ctx.reply(msg, { parse_mode: 'HTML' });
 
             await this.telegramService.sendAdminMessage(
                 `💰 Продажа курсов!\nSeller: ${sender.first_name}\nБаллы: ${session.selectedAmount}\nАккаунт: ${session.accountId}`,
             );
-
         } catch (e: any) {
-            await ctx.reply(
-                `❌ <b>Ошибка:</b> ${e.message}`,
-                { parse_mode: 'HTML' }
-            );
+            await ctx.reply(`❌ <b>Ошибка:</b> ${e.message}`, { parse_mode: 'HTML' });
 
             await this.telegramService.sendAdminMessage(
-                `❌ Ошибка на курсах\n` +
-                `Seller: ${sender.username}\n` +
-                `Account: ${session.accountId}\n` +
-                `Error: ${e.message}`,
+                `❌ Ошибка на курсах\n` + `Seller: ${sender.username}\n` + `Account: ${session.accountId}\n` + `Error: ${e.message}`,
             );
         }
     }
@@ -274,6 +251,8 @@ export class GetCoursesUpdate extends BaseUpdate {
     // Хелпер для запуска без оплаты (для админов)
     private async executePurchase(ctx: Context, tgId: number, accountId: string, amount: number) {
         try {
+            await ctx.deleteMessage();
+            await ctx.reply('⏳ Ожидайте выполнения');
             const count = await this.coursePurchaseService.processCoursePurchase(String(tgId), accountId, amount);
             await ctx.reply(`✅ Готово! Пройдено курсов: ${count.passedCount}`);
         } catch (e: any) {
