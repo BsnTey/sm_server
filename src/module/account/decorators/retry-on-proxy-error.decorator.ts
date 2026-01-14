@@ -162,11 +162,28 @@ async function resolveAccountContext(self: IProxyRetryableService, firstArg: Acc
 
 function isProxyRelatedError(error: any): boolean {
     if (!error) return false;
+
+    // Собираем сообщение из всех возможных мест
+    const msg = (error.message || (typeof error.data === 'string' ? error.data : '') || String(error)).toLowerCase();
+
+    const proxyKeywords = [
+        'proxy',
+        'socks',
+        'tunnel',
+        'unreachable',
+        'econnrefused',
+        'etimedout',
+        'econnreset',
+        'timeout',
+        'failed to do request',
+        'handshake failure',
+    ];
+
+    if (proxyKeywords.some(w => msg.includes(w))) return true;
+
     if (isAxiosError(error)) {
-        const msg = (error.message || '').toLowerCase();
-        if (['proxy', 'socks5', 'tunneling socket'].some(w => msg.includes(w))) return true;
-        if (['ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET'].includes(error.code || '')) return true;
+        if (['ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET', 'ERR_NETWORK'].includes(error.code || '')) return true;
     }
-    const msg = (error?.message || String(error)).toLowerCase();
-    return msg.includes('proxy') || msg.includes('socks5');
+
+    return false;
 }

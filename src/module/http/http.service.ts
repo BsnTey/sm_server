@@ -28,7 +28,9 @@ export class HttpService {
 
     async get<T = any>(url: string, options: TLSClientConfiguration = {}): Promise<AxiosResponse<T>> {
         try {
-            return this.client.get<T>(url, options as AxiosRequestConfig);
+            const response = await this.client.get<T>(url, options as AxiosRequestConfig);
+            this.validateResponse(response);
+            return response;
         } catch (error: any) {
             this.handleError('GET', url, error);
             throw error;
@@ -37,7 +39,9 @@ export class HttpService {
 
     async post<T = any>(url: string, payload: any, options: TLSClientConfiguration = {}): Promise<AxiosResponse<T>> {
         try {
-            return this.client.post<T>(url, payload, options as AxiosRequestConfig);
+            const response = await this.client.post<T>(url, payload, options as AxiosRequestConfig);
+            this.validateResponse(response);
+            return response;
         } catch (error: any) {
             this.handleError('POST', url, error);
             throw error;
@@ -46,7 +50,9 @@ export class HttpService {
 
     async put<T = any>(url: string, payload: any, options: TLSClientConfiguration = {}): Promise<AxiosResponse<T>> {
         try {
-            return this.client.put<T>(url, payload, options as AxiosRequestConfig);
+            const response = await this.client.put<T>(url, payload, options as AxiosRequestConfig);
+            this.validateResponse(response);
+            return response;
         } catch (error: any) {
             this.handleError('PUT', url, error);
             throw error;
@@ -55,7 +61,9 @@ export class HttpService {
 
     async delete<T = any>(url: string, options: TLSClientConfiguration = {}): Promise<AxiosResponse<T>> {
         try {
-            return this.client.delete<T>(url, options as AxiosRequestConfig);
+            const response = await this.client.delete<T>(url, options as AxiosRequestConfig);
+            this.validateResponse(response);
+            return response;
         } catch (error: any) {
             this.handleError('DELETE', url, error);
             throw error;
@@ -64,9 +72,28 @@ export class HttpService {
 
     async patch<T = any>(url: string, payload: any, options: TLSClientConfiguration = {}): Promise<AxiosResponse<T>> {
         try {
-            return this.client.patch<T>(url, payload, options as AxiosRequestConfig);
+            const response = await this.client.patch<T>(url, payload, options as AxiosRequestConfig);
+            this.validateResponse(response);
+            return response;
         } catch (error: any) {
             this.handleError('PATCH', url, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Проверяет, не вернула ли библиотека ошибку в виде "успешного" ответа со статусом 0
+     */
+    private validateResponse(response: AxiosResponse) {
+        if (response.status === 0) {
+            const errorMsg = typeof response.data === 'string' ? response.data : 'Unknown TLS Client Error (Status 0)';
+
+            const error: any = new Error(errorMsg);
+            error.config = response.config;
+            error.request = response.request;
+            error.response = response;
+            error.isAxiosError = true;
+
             throw error;
         }
     }
