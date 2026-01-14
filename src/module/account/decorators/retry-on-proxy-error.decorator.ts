@@ -59,10 +59,8 @@ interface RetryOnProxyErrorOptions {
 }
 
 // --- 3. Декоратор ---
-const PROXY_MIN_INTERVAL_MS = 450; // ~2.2 RPS на прокси
-
 export function RetryOnProxyError(options: RetryOnProxyErrorOptions = {}): MethodDecorator {
-    const { maxAttempts = 5, blockMinutes = 60, minProxyIntervalMs = PROXY_MIN_INTERVAL_MS } = options;
+    const { maxAttempts = 5, minProxyIntervalMs = 450 } = options;
 
     return (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {
         const originalMethod = descriptor.value;
@@ -71,23 +69,37 @@ export function RetryOnProxyError(options: RetryOnProxyErrorOptions = {}): Metho
         descriptor.value = async function (...args: any[]) {
             const self = this as unknown as IProxyRetryableService;
             const logger = self.logger || new Logger(`${target.constructor.name}:${methodName}`);
-            const firstArg = args[0] as AccountLike;
 
+            const originalArg = args[0];
+            const isArgObject = typeof originalArg === 'object' && originalArg !== null;
+
+            const accountId = isArgObject ? originalArg.accountId : originalArg;
             let lastError: any;
 
-            // Получаем контекст до цикла попыток
-            const context = await resolveAccountContext(self, firstArg);
+            let currentProxyUuid: string | undefined = isArgObject ? originalArg.proxy?.uuid : undefined;
 
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
-                    // --- Троттлинг ---
-                    await throttleProxy(context.proxyUuid, minProxyIntervalMs);
+                    if (attempt > 1) {
+                        const freshEntity = await self.getAccountEntity(accountId);
+
+                        currentProxyUuid = freshEntity.proxy?.uuid;
+
+                        if (isArgObject) {
+                            args[0] = freshEntity;
+                        }
+                    }
+
+                    if (currentProxyUuid) {
+                        await throttleProxy(currentProxyUuid, minProxyIntervalMs);
+                    }
 
                     if (attempt > 1) {
-                        logger.log(`[RetryOnProxyError] Attempt ${attempt}/${maxAttempts} for '${methodName}'.`);
+                        logger.log(`[Retry] Attempt ${attempt}/${maxAttempts}. ProxyUUID: ${currentProxyUuid || 'auto-resolved'}`);
                     }
 
                     return await originalMethod.apply(this, args);
+
                 } catch (error: any) {
                     lastError = error;
 
@@ -95,29 +107,31 @@ export function RetryOnProxyError(options: RetryOnProxyErrorOptions = {}): Metho
                         throw error;
                     }
 
-                    logger.warn(
-                        `[RetryOnProxyError] Proxy-related error on '${methodName}' (attempt ${attempt}/${maxAttempts}): ${
-                            error?.message || error
-                        }`,
-                    );
+                    if (attempt >= maxAttempts) break;
 
-                    if (attempt >= maxAttempts) {
-                        break;
+                    let proxyUuidToBlock = currentProxyUuid;
+
+                    const key = getAccountEntityKey(accountId);
+                    await self.cacheService.del(key);
+
+                    if (!proxyUuidToBlock) {
+                        try {
+                            const entityInFailState = await self.getAccountEntity(accountId);
+                            proxyUuidToBlock = entityInFailState?.proxy?.uuid;
+                        } catch (e: any) {
+                            logger.warn(`[RetryOnProxyError] Failed to fetch context in catch: ${e.message}`);
+                        }
                     }
 
-                    try {
-                        const blockedAt = new Date();
-                        await self.proxyService.updateProxy(context.proxyUuid, { blockedAt });
-                        logger.warn(`[RetryOnProxyError] Proxy blocked uuid=${context.proxyUuid} for ~${blockMinutes} min.`);
-                    } catch (blockErr) {
-                        logger.error(`[RetryOnProxyError] Failed to block proxy:`, blockErr);
-                    }
-
-                    try {
-                        const key = getAccountEntityKey(context.accountId);
-                        await self.cacheService.del(key);
-                    } catch (cacheErr) {
-                        logger.error(`[RetryOnProxyError] Failed to clear cache:`, cacheErr);
+                    if (proxyUuidToBlock) {
+                        try {
+                            await self.proxyService.updateProxy(proxyUuidToBlock, { blockedAt: new Date() });
+                            logger.warn(`[Retry] Blocked proxy ${proxyUuidToBlock} (attempt ${attempt})`);
+                        } catch (e) {
+                            logger.error('Failed to block proxy', e);
+                        }
+                    } else {
+                        logger.warn(`[Retry] Could not determine proxy UUID to block for account ${accountId}`);
                     }
                 }
             }
@@ -129,36 +143,6 @@ export function RetryOnProxyError(options: RetryOnProxyErrorOptions = {}): Metho
 }
 
 // --- 4. Вспомогательные функции ---
-
-type AccountLike = string | { accountId?: string; proxy?: { uuid?: string; proxy?: string | null } | null };
-
-interface AccountContext {
-    accountId: string;
-    proxyUuid: string;
-    proxyStr: string;
-}
-
-async function resolveAccountContext(self: IProxyRetryableService, firstArg: AccountLike): Promise<AccountContext> {
-    if (typeof firstArg === 'string') {
-        const accountId = firstArg;
-        const accountWithProxy = await self.getAccountEntity(accountId);
-        return {
-            accountId,
-            proxyUuid: accountWithProxy.proxy.uuid,
-            proxyStr: accountWithProxy?.proxy.proxy,
-        };
-    }
-
-    if (firstArg && typeof firstArg === 'object') {
-        const obj = firstArg as any;
-        const accountId: string = obj.accountId;
-        const proxyUuid: string = obj.proxy.uuid;
-        const proxyStr: string = obj.proxy.proxy;
-
-        return { accountId, proxyUuid, proxyStr };
-    }
-    throw new Error('Cannot resolve account context from first argument');
-}
 
 function isProxyRelatedError(error: any): boolean {
     if (!error) return false;
@@ -177,6 +161,8 @@ function isProxyRelatedError(error: any): boolean {
         'timeout',
         'failed to do request',
         'handshake failure',
+        'connectex',
+        'dial tcp',
     ];
 
     if (proxyKeywords.some(w => msg.includes(w))) return true;

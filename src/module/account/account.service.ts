@@ -547,15 +547,24 @@ export class AccountService {
     ): Promise<AccountWithProxyEntity> {
         const currentTime = new Date();
         const timeBlockedAgo = new Date();
-        timeBlockedAgo.setMinutes(currentTime.getMinutes() - +this.durationTimeProxyBlock);
+
+        const blockDuration = +(this.durationTimeProxyBlock || 60);
+        timeBlockedAgo.setMinutes(currentTime.getMinutes() - blockDuration);
+
+        const blockedAt = accountWithProxy.proxy?.blockedAt ? new Date(accountWithProxy.proxy.blockedAt) : null;
 
         if (
             !accountWithProxy.proxy ||
-            accountWithProxy.proxy.expiresAt < currentTime ||
-            (accountWithProxy.proxy.blockedAt && accountWithProxy.proxy.blockedAt > timeBlockedAgo)
+            new Date(accountWithProxy.proxy.expiresAt) < currentTime ||
+            (blockedAt && blockedAt > timeBlockedAgo)
         ) {
+            if (accountWithProxy.proxy?.uuid) {
+                this.logger.log(`Proxy ${accountWithProxy.proxy?.uuid} is bad (expired or blocked). Swapping.`);
+            }
+
             const proxy = await this.proxyService.getRandomProxy();
             await this.accountRep.setProxyAccount(accountWithProxy.accountId, proxy.uuid);
+
             const newAccountWithProxy = await this.accountRep.getAccountWithProxy(accountWithProxy.accountId);
             if (!newAccountWithProxy) throw new NotFoundException(ERROR_ACCOUNT_NOT_FOUND);
             return new AccountWithProxyEntity(newAccountWithProxy as IAccountWithProxy);
@@ -834,6 +843,7 @@ export class AccountService {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const url = this.url + 'v2/bonus/shortInfo';
         const httpOptions = this.getHttpOptions(url, accountWithProxyEntity);
+
         const response = await this.httpService.get<ShorInfoData>(url, httpOptions);
 
         return {
@@ -1303,7 +1313,7 @@ export class AccountService {
         const accessToken = await this.getAccessTokenCourse(accountId);
 
         const payload = {
-            answers: answersItem
+            answers: answersItem,
         };
 
         const url = this.urlSite + `courses/tests/${mnemocode}`;
