@@ -72,7 +72,7 @@ export class GetCoursesUpdate extends BaseUpdate {
                 parse_mode: 'HTML',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('💰 Зачислить сейчас', 'credit_now')],
-                    // [Markup.button.callback('🚀 Поставить в работу', 'start_work')]
+                    [Markup.button.callback('🚀 Поставить в работу', 'start_work')],
                 ]),
             });
         } catch {
@@ -80,19 +80,137 @@ export class GetCoursesUpdate extends BaseUpdate {
         }
     }
 
+    @Action('start_work')
+    async onStartWork(@Ctx() ctx: Context, @Sender() sender: SenderTelegram) {
+        const session = await this.cacheService.get<{ accountId: string }>(coursesCacheKey(sender.id));
+        if (!session) return ctx.reply('Сессия истекла. Введите аккаунт заново.');
+
+        // 1. Получаем опции для БУДУЩИХ баллов
+        const futureOptions = await this.courseWorkService.getFutureCreditOptions(session.accountId);
+
+        if (futureOptions.length === 0) {
+            return ctx.reply('Нет доступных зачислений для запуска в работу.');
+        }
+
+        // 2. Диапазоны (аналогично credit_now)
+        const rangeLimits = getAvailableRanges(futureOptions);
+
+        const buttons = rangeLimits.map(limit => {
+            const prev = limit - RANGE_STEP;
+            return Markup.button.callback(`${prev} - ${limit}`, `work_range_${limit}`);
+        });
+
+        const keyboardRows = [];
+        for (let i = 0; i < buttons.length; i += 2) {
+            keyboardRows.push(buttons.slice(i, i + 2));
+        }
+        keyboardRows.push([Markup.button.callback('🔙 Назад', 'back_to_analytics')]);
+
+        await ctx.editMessageText(
+            `🚀 <b>Запуск в работу</b>\nВыберите желаемое количество баллов:\nМаксимум: <b>${Math.max(...futureOptions)}</b>`,
+            {
+                parse_mode: 'HTML',
+                ...Markup.inlineKeyboard(keyboardRows),
+            },
+        );
+    }
+
     /**
-     * Обработка нажатия "Поставить в работу"
+     * Выбор конкретной суммы для работы
      */
-    // @Action('start_work')
-    // async onStartWork(@Ctx() ctx: Context, @Sender() sender: SenderTelegram) {
-    //     const session = await this.cacheService.get<{ accountId: string }>(coursesCacheKey(sender.id));
-    //     if (!session) throw new NotFoundException('Информация устарела. Попробуйте заново');
-    //
-    //     const count = await this.courseWorkService.startWorkFlow(session.accountId);
-    //
-    //     await ctx.answerCbQuery('Задачи отправлены');
-    //     await ctx.reply(`✅ <b>${count} курсов</b> поставлено в очередь на прохождение (RabbitMQ).\nПроцесс займет некоторое время.`);
-    // }
+    @Action(/work_range_(\d+)/)
+    async onWorkRangeSelect(@Ctx() ctx: Context, @Sender() sender: SenderTelegram) {
+        // @ts-ignore
+        const rangeMax = parseInt(ctx.match[1], 10);
+        const session = await this.cacheService.get<{ accountId: string }>(coursesCacheKey(sender.id));
+        if (!session) return ctx.reply('Сессия истекла. Введите аккаунт заново.');
+
+        const allOptions = await this.courseWorkService.getFutureCreditOptions(session.accountId);
+        const filteredOptions = getOptionsInSpecificRange(allOptions, rangeMax);
+
+        const buttons = filteredOptions.map(amount => Markup.button.callback(`${amount} б.`, `work_amount_${amount}`));
+
+        const keyboardRows = [];
+        for (let i = 0; i < buttons.length; i += 3) keyboardRows.push(buttons.slice(i, i + 3));
+        keyboardRows.push([Markup.button.callback('🔙 Назад', 'start_work')]);
+
+        await ctx.editMessageText(`🛠 Выберите точную сумму для зачисления:`, Markup.inlineKeyboard(keyboardRows));
+    }
+
+    /**
+     * Расчет стоимости и времени перед оплатой
+     */
+    @Action(/work_amount_(\d+)/)
+    async onWorkAmountSelect(@Ctx() ctx: Context, @Sender() sender: SenderTelegram) {
+        // @ts-ignore
+        const amount = parseInt(ctx.match[1], 10);
+        const sessionKey = coursesCacheKey(sender.id);
+        const session = await this.cacheService.get<any>(sessionKey);
+
+        // Сохраняем, что мы хотим "Отработать" (work), а не просто зачислить
+        await this.cacheService.set(sessionKey, { ...session, workAmount: amount }, TTL_COURSES);
+
+        const user = await this.userService.getUserByTelegramId(String(sender.id));
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
+
+        const price = this.coursePurchaseService.calculatePrice(amount, user.role);
+
+        // Оценка времени выполнения
+        let timeEstimateMsg = '⏳ Расчет времени...';
+        try {
+            const estimate = await this.courseWorkService.estimateWorkPayload(session.accountId, amount);
+            timeEstimateMsg = `⏱ Примерное время: <b>~${estimate.estimatedTimeMin} мин.</b>`;
+        } catch {
+            timeEstimateMsg = `⚠️ Не удалось рассчитать время точно.`;
+        }
+
+        await ctx.editMessageText(
+            `🚀 <b>Подтверждение запуска</b>\n\n` +
+                `🎯 Цель: <b>${amount} баллов</b>\n` +
+                `💵 Стоимость: <b>${price}₽</b>\n` +
+                `${timeEstimateMsg}\n\n` +
+                `После оплаты зачисление встанет в очередь выполнения. Уведомление придет по завершении.`,
+            {
+                parse_mode: 'HTML',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback(`✅ Оплатить ${price}₽ и начать`, 'confirm_pay_work')],
+                    [Markup.button.callback('🔙 Отмена', 'start_work')],
+                ]),
+            },
+        );
+    }
+
+    /**
+     * Оплата и постановка в очередь
+     */
+    @Action('confirm_pay_work')
+    async onConfirmPayWork(@Ctx() ctx: Context, @Sender() sender: SenderTelegram) {
+        const session = await this.cacheService.get<any>(coursesCacheKey(sender.id));
+        if (!session || !session.workAmount) return ctx.reply('Сессия истекла. Начните заново.');
+
+        const telegramId = String(sender.id);
+
+        await ctx.deleteMessage();
+        await ctx.reply('⏳ Проверка баланса и запуск...');
+
+        try {
+            // Вызываем новый метод сервиса, вся логика там
+            const { price } = await this.coursePurchaseService.processWorkQueuePurchase(telegramId, session.accountId, session.workAmount);
+
+            // Формируем успешный ответ
+            await ctx.reply(`✅ <b>Успешно!</b>\n` + `Списано: ${price}₽.\n\n` + `<i>Мы уведомим вас, когда процесс закончится.</i>`, {
+                parse_mode: 'HTML',
+            });
+
+            // Лог админу
+            await this.telegramService.sendAdminMessage(
+                `🚀 Запуск работы (Queue)\nUser: ${sender.username}\nБаллы: ${session.workAmount}\nЦена: ${price}₽`,
+            );
+        } catch (e: any) {
+            await ctx.reply(`❌ Ошибка: ${e.message}`);
+            await this.telegramService.sendAdminMessage(`❌ Ошибка запуска работы\nUser: ${sender.username}\nError: ${e.message}`);
+        }
+    }
 
     /**
      * ШАГ 1: Показываем категории (диапазоны)

@@ -32,6 +32,7 @@ export interface PointsCalculationResult {
     totalEarned: number; // Всего можно забрать сейчас
     totalFuture: number; // Будущий потенциал
     earnedCourses: number[]; // Массив баллов готовых курсов (уже умноженных) для генерации кнопок
+    futureCourses: number[]; // Баллы курсов для работы
 }
 
 export interface CourseAnalyticsResult extends PointsCalculationResult {

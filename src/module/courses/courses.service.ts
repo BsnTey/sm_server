@@ -3,7 +3,6 @@ import { AccountService } from '../account/account.service';
 import { COURSE_ANSWERS, COURSE_ID_TO_MNEMO } from './data/course-answers.data';
 import { CardLevel, CourseAnalyticsResult, CourseItem, CourseStatus } from './courses.types';
 import { calculatePointsLogic, generatePointOptions, MULTIPLIERS } from './utils';
-import { wait } from 'amqp-connection-manager/dist/types/helpers';
 import { RedisCacheService } from '../cache/cache.service';
 import { courseAnalyticsKey } from '../cache/cache.keys';
 import sleep from 'sleep-promise';
@@ -60,8 +59,6 @@ export class CourseWorkService {
                 // Если успешно (не вылетела ошибка):
                 passedCount++;
 
-                // Считаем баллы за этот конкретный курс с учетом множителя
-                // Math.round используем, так как в findCoursesForTarget тоже использовался round
                 const pointsForCourse = Math.round(course.points * multiplier);
                 earnedPoints += pointsForCourse;
             } catch (e: any) {
@@ -74,66 +71,9 @@ export class CourseWorkService {
     }
 
     private findCoursesForTarget(allCourses: CourseItem[], target: number, level: CardLevel): CourseItem[] {
-        const multiplier = MULTIPLIERS[level];
-
-        // 1. Фильтруем кандидатов (Только ACTIVE и пройденные уроки)
+        // Фильтр для "Earned" (уже пройденных)
         const candidates = allCourses.filter(c => c.status === CourseStatus.ACTIVE && c.stats.countLessons === c.stats.countLessonsLearned);
-
-        // Подготавливаем маппинг с реальными значениями баллов
-        const items = candidates.map(c => ({
-            course: c,
-            val: Math.round(c.points * multiplier),
-        }));
-
-        // Сортируем по убыванию (оптимизация для быстрого поиска)
-        items.sort((a, b) => b.val - a.val);
-
-        // --- Внутренняя рекурсивная функция поиска ---
-        const solveExact = (index: number, currentTarget: number): CourseItem[] | null => {
-            // Базовый случай: сумма собрана
-            if (currentTarget === 0) return [];
-
-            // Базовый случай: перебор окончен или ушли в минус
-            if (currentTarget < 0 || index >= items.length) return null;
-
-            const { course, val } = items[index];
-
-            // ВАРИАНТ А: Берем текущий курс
-            if (val <= currentTarget) {
-                const res = solveExact(index + 1, currentTarget - val);
-                if (res !== null) {
-                    return [course, ...res]; // Нашли решение! Возвращаем цепочку
-                }
-            }
-
-            // ВАРИАНТ Б: Пропускаем текущий курс (если с ним не получилось собрать сумму)
-            return solveExact(index + 1, currentTarget);
-        };
-
-        // 2. Попытка найти ТОЧНОЕ совпадение
-        const exactSolution = solveExact(0, target);
-
-        if (exactSolution) {
-            return exactSolution;
-        }
-
-        // 3. Fallback (Запасной вариант):
-        // Если точное совпадение не найдено (например, юзер ввел кастомную сумму, которую нельзя собрать),
-        // используем старый "Жадный" алгоритм, чтобы набрать МАКСИМУМ, но не больше target.
-
-        this.logger.warn(`Не удалось найти точную комбинацию для ${target}. Используем приближенный подбор.`);
-
-        const greedyResult: CourseItem[] = [];
-        let currentSum = 0;
-
-        for (const item of items) {
-            if (currentSum + item.val <= target) {
-                greedyResult.push(item.course);
-                currentSum += item.val;
-            }
-        }
-
-        return greedyResult;
+        return this.findCoursesInternal(candidates, target, level);
     }
 
     async getCourseAnalytics(accountId: string) {
@@ -176,31 +116,109 @@ export class CourseWorkService {
     }
 
     /**
-     * Отправка курсов в работу (RabbitMQ)
+     * Получение вариантов кнопок для "Постановки в работу"
      */
-    async startWorkFlow(accountId: string) {
-        const { courseList } = await this.getCourseAnalytics(accountId);
+    async getFutureCreditOptions(accountId: string): Promise<number[]> {
+        const { futureCourses } = await this.getCourseAnalytics(accountId);
+        return generatePointOptions(futureCourses);
+    }
 
-        const coursesToStart = courseList.filter(
-            (c: { status: string; stats: { countLessons: number; countLessonsLearned: number } }) =>
-                c.status === 'NONE' || (c.status === 'ACTIVE' && c.stats.countLessons > c.stats.countLessonsLearned),
+    /**
+     * Оценка задачи перед оплатой
+     * Возвращает: кол-во курсов, баллы, примерное время выполнения в минутах
+     */
+    async estimateWorkPayload(accountId: string, targetAmount: number) {
+        const { courseList, cardLevel } = await this.getCourseAnalytics(accountId);
+
+        // Ищем курсы, которые нужно пройти (статус NONE или ACTIVE недоделанные)
+        const candidates = courseList.filter(
+            c =>
+                c.status === CourseStatus.NONE ||
+                (c.status === CourseStatus.ACTIVE && c.stats.countLessons !== c.stats.countLessonsLearned),
         );
 
-        this.logger.log(`Запускаем процесс обучения для ${coursesToStart.length} курсов. Account: ${accountId}`);
+        // Используем существующий алгоритм подбора (переиспользуем логику)
+        const coursesToWork = this.findCoursesInternal(candidates, targetAmount, cardLevel);
 
-        // Имитация отправки в RabbitMQ
-        coursesToStart.forEach((course: { id: any }) => {
+        if (coursesToWork.length === 0) {
+            throw new Error('Не удалось подобрать курсы под эту сумму');
+        }
+
+        // Считаем время: (Duration / 2) / 60 = минуты
+        // Если duration нет, берем дефолт 2000 сек
+        let totalDurationSec = 0;
+        coursesToWork.forEach(c => {
+            const dur = (c as any).duration || 2000;
+            totalDurationSec += dur / 2;
+        });
+
+        return {
+            coursesCount: coursesToWork.length,
+            targetAmount,
+            estimatedTimeMin: Math.ceil(totalDurationSec / 60),
+            courses: coursesToWork, // возвращаем, чтобы потом id отправить в очередь
+        };
+    }
+
+    /**
+     * Постановка в очередь (RabbitMQ) для конкретной суммы
+     */
+    async queueCoursesForAmount(accountId: string, targetAmount: number) {
+        // 1. Снова подбираем курсы (гарантируем актуальность)
+        const estimation = await this.estimateWorkPayload(accountId, targetAmount);
+
+        this.logger.log(`Запускаем в очередь ${estimation.coursesCount} курсов на сумму ${targetAmount}`);
+
+        // 2. Отправляем в RabbitMQ
+        estimation.courses.forEach(course => {
             const payload = {
                 accountId,
                 courseId: course.id,
-                duration: 100, // или брать из course.duration
-                action: 'START_LESSON',
+                action: 'START_LESSON_FLOW', // Отличается от простого теста
+                estimatedDuration: ((course as any).duration || 2000) / 2,
             };
 
-            // this.amqpConnection.publish('course_exchange', 'course.start', payload);
-            this.logger.debug(`[RabbitMQ Mock] Published to course.start: ${JSON.stringify(payload)}`);
+            // this.amqpConnection.publish('course_exchange', 'course.start_flow', payload);
+            this.logger.log(`[RabbitMQ] > Queued course ${course.id} (${course.title})`);
         });
 
-        return coursesToStart.length;
+        return estimation.coursesCount;
+    }
+
+    private findCoursesInternal(candidates: CourseItem[], target: number, level: CardLevel): CourseItem[] {
+        const multiplier = MULTIPLIERS[level];
+
+        const items = candidates.map(c => ({
+            course: c,
+            val: Math.round(c.points * multiplier),
+        }));
+
+        items.sort((a, b) => b.val - a.val);
+
+        // ... Вставьте сюда ту же логику solveExact, что была раньше ...
+        const solveExact = (index: number, currentTarget: number): CourseItem[] | null => {
+            if (currentTarget === 0) return [];
+            if (currentTarget < 0 || index >= items.length) return null;
+            const { course, val } = items[index];
+            if (val <= currentTarget) {
+                const res = solveExact(index + 1, currentTarget - val);
+                if (res !== null) return [course, ...res];
+            }
+            return solveExact(index + 1, currentTarget);
+        };
+
+        const exactSolution = solveExact(0, target);
+        if (exactSolution) return exactSolution;
+
+        // Fallback greedy
+        const greedyResult: CourseItem[] = [];
+        let currentSum = 0;
+        for (const item of items) {
+            if (currentSum + item.val <= target) {
+                greedyResult.push(item.course);
+                currentSum += item.val;
+            }
+        }
+        return greedyResult;
     }
 }

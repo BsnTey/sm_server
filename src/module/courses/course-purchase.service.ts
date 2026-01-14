@@ -1,10 +1,4 @@
-import {
-    BadRequestException,
-    Injectable,
-    InternalServerErrorException,
-    Logger,
-    NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { PaymentService } from '../payment/payment.service';
 import { CourseWorkService } from './courses.service';
 import { UserService } from '../user/user.service';
@@ -40,10 +34,8 @@ export class CoursePurchaseService {
         const user = await this.userService.getUserByTelegramId(telegramId);
         if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
 
-        // 1. Рассчитываем начальную стоимость (предоплата)
         const initialPrice = this.calculatePrice(targetPoints, user.role);
 
-        // Проверка баланса
         if (initialPrice > 0) {
             await this.bottService.getStatistics();
             const currentBalance = await this.bottService.getUserBotBalance(telegramId);
@@ -52,54 +44,86 @@ export class CoursePurchaseService {
             }
         }
 
-        // 2. Списание полной суммы (Hold)
         if (initialPrice > 0) {
             await this.paymentService.changeUserBalance(telegramId, initialPrice, false);
             this.logger.log(`Списано ${initialPrice}₽ у ${telegramId} (Предоплата за ${targetPoints} б.)`);
         }
 
         try {
-            // 3. Выполнение работ
             const result = await this.courseWorkService.completeCoursesForAmount(accountId, targetPoints);
             const { earnedPoints, passedCount } = result;
 
             this.logger.log(`Результат: Пройдено ${passedCount}, Заработано ${earnedPoints} из ${targetPoints}`);
 
-            // 4. Финальный перерасчет (Reconciliation)
-            // Если роль админа (цена 0), то перерасчет не нужен
             if (initialPrice > 0) {
-
-                // Если вообще ничего не прошли
                 if (passedCount === 0 || earnedPoints === 0) {
                     this.logger.warn(`Полный отказ. Возвращаем всю сумму: ${initialPrice}₽`);
                     await this.paymentService.changeUserBalance(telegramId, initialPrice, true);
                     throw new Error('Не удалось пройти ни одного курса. Средства возвращены.');
                 }
 
-                // Считаем, сколько это стоит по факту
                 const actualPrice = this.calculatePrice(earnedPoints, user.role);
 
-                // Если фактическая стоимость меньше списанной (частичный возврат)
                 if (actualPrice < initialPrice) {
                     const refundAmount = initialPrice - actualPrice;
-
-                    this.logger.log(`Частичное выполнение. Возврат разницы: ${refundAmount}₽ (Взяли ${initialPrice}, по факту ${actualPrice})`);
-
+                    this.logger.log(`Частичный возврат: ${refundAmount}₽`);
                     await this.paymentService.changeUserBalance(telegramId, refundAmount, true);
                 }
             }
-
             return { passedCount, earnedPoints };
-
         } catch (error: any) {
-            this.logger.error(`Критическая ошибка процесса: ${error.message}`);
-
+            this.logger.error(`Критическая ошибка: ${error.message}`);
             if (initialPrice > 0 && !error.message.includes('Средства возвращены')) {
-
                 await this.paymentService.changeUserBalance(telegramId, initialPrice, true);
             }
-
             throw new InternalServerErrorException(error.message || 'Ошибка выполнения. Средства возвращены.');
+        }
+    }
+
+    /**
+     * Логика оплаты и постановки в очередь (Start Work)
+     */
+    async processWorkQueuePurchase(telegramId: string, accountId: string, targetPoints: number) {
+        const user = await this.userService.getUserByTelegramId(telegramId);
+        if (!user?.role) throw new NotFoundException(ERROR_FOUND_USER);
+
+        // 1. Расчет стоимости
+        const price = this.calculatePrice(targetPoints, user.role);
+
+        // 2. Проверка баланса
+        if (price > 0) {
+            await this.bottService.getStatistics();
+            const balance = await this.bottService.getUserBotBalance(telegramId);
+            if (balance < price) {
+                throw new BadRequestException(`Недостаточно средств. Нужно ${price}₽, Баланс: ${balance}₽`);
+            }
+        }
+
+        // 3. Списание средств
+        if (price > 0) {
+            await this.paymentService.changeUserBalance(telegramId, price, false);
+            this.logger.log(`Списано ${price}₽ у ${telegramId} за постановку в очередь (${targetPoints} б.)`);
+        }
+
+        try {
+            // 4. Постановка в очередь
+            // queueCoursesForAmount должен возвращать количество курсов
+            const count = await this.courseWorkService.queueCoursesForAmount(accountId, targetPoints);
+
+            this.logger.log(`Успешно поставлено в очередь ${count} курсов для ${accountId}`);
+
+            return { count, price };
+
+        } catch (error: any) {
+            this.logger.error(`Ошибка постановки в очередь: ${error.message}`);
+
+            // 5. ROLLBACK: Если не удалось поставить в очередь — возвращаем деньги
+            if (price > 0) {
+                this.logger.warn(`Возврат средств ${price}₽ для ${telegramId}`);
+                await this.paymentService.changeUserBalance(telegramId, price, true);
+            }
+
+            throw new InternalServerErrorException(error.message || 'Ошибка постановки в очередь. Средства возвращены.');
         }
     }
 }

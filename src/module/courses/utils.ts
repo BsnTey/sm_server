@@ -16,6 +16,7 @@ export const calculatePointsLogic = (courses: CourseItem[], cardLevel: CardLevel
         totalEarned: 0,
         totalFuture: 0,
         earnedCourses: [],
+        futureCourses: [],
     };
 
     for (const course of courses) {
@@ -28,7 +29,9 @@ export const calculatePointsLogic = (courses: CourseItem[], cardLevel: CardLevel
             result.totalEarned += adjustedPoints;
             result.earnedCourses.push(adjustedPoints);
         } else if ((course.status === CourseStatus.ACTIVE && !isLessonsCompleted) || course.status === CourseStatus.NONE) {
+            // Это группа для "Поставить в работу"
             result.totalFuture += adjustedPoints;
+            result.futureCourses.push(adjustedPoints);
         }
     }
 
