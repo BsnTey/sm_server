@@ -6,7 +6,7 @@ import { PrismaService } from '@common/database/prisma.service';
 export class ProxyRepository {
     constructor(private prisma: PrismaService) { }
 
-    async getAllAvailableProxy(currentTime: Date, timeBlockedMinute: number = 5): Promise<Proxy[]> {
+    async getAllAvailableProxy(currentTime: Date, timeBlockedMinute: number = 60): Promise<Proxy[]> {
         const timeBlockedAgo = new Date();
         timeBlockedAgo.setMinutes(currentTime.getMinutes() - timeBlockedMinute);
 

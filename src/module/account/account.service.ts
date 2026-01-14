@@ -86,7 +86,7 @@ export class AccountService {
     private readonly url: string;
     private readonly urlSite: string;
     private readonly adminsId: string[];
-    private durationTimeProxyBlock = 60;
+    private readonly durationTimeProxyBlock: number;
 
     private TTL_CASH_ACCOUNT = 60;
     private TTL_CASH_SHORT_INFO = 20;
@@ -107,6 +107,7 @@ export class AccountService {
         this.url = this.configService.getOrThrow('API_DONOR');
         this.urlSite = this.configService.getOrThrow('API_DONOR_SITE');
         this.adminsId = this.configService.getOrThrow('TELEGRAM_ADMIN_ID').split(',');
+        this.durationTimeProxyBlock = +this.configService.getOrThrow<number>('PROXY_BLOCK_TIME_MINUTES');
     }
 
     async addingAccount(accountDto: AddingAccountRequestDto): Promise<AccountEntity> {
@@ -548,7 +549,7 @@ export class AccountService {
         const currentTime = new Date();
         const timeBlockedAgo = new Date();
 
-        const blockDuration = +(this.durationTimeProxyBlock || 60);
+        const blockDuration = this.durationTimeProxyBlock || 60;
         timeBlockedAgo.setMinutes(currentTime.getMinutes() - blockDuration);
 
         const blockedAt = accountWithProxy.proxy?.blockedAt ? new Date(accountWithProxy.proxy.blockedAt) : null;
