@@ -9,7 +9,8 @@ import { CoursesController } from './courses.controller';
 
 @Module({
     imports: [AccountModule, BottModule, PaymentModule, UserModule],
-    providers: [CourseWorkService, CoursePurchaseService, CoursesController],
+    controllers: [CoursesController],
+    providers: [CourseWorkService, CoursePurchaseService],
     exports: [CourseWorkService, CoursePurchaseService],
 })
 export class CourseModule {}

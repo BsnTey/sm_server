@@ -153,7 +153,7 @@ export class CourseWorkService {
         const coursesToWork = this.findCoursesInternal(candidates, targetAmount, cardLevel);
 
         if (coursesToWork.length === 0) {
-            throw new Error('Не удалось подобрать курсы под эту сумму');
+            throw new Error('Ошибка алгоритма подбора');
         }
 
         let totalDurationSec = 0;
@@ -170,7 +170,11 @@ export class CourseWorkService {
         };
     }
 
-    async queueSpecificCourses(accountId: string, courseIds: number[]) {
+    async queueSpecificCourses(accountId: string, courseIds?: number[]) {
+        if (!courseIds || courseIds.length == 0) {
+            courseIds = Object.keys(COURSE_ID_TO_MNEMO).map(Number);
+        }
+
         this.logger.log(`API запрос: Запуск просмотра ${courseIds.length} курсов. Acc: ${accountId}`);
 
         const payload: CourseViewingPayload = {
