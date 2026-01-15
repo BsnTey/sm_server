@@ -1,23 +1,20 @@
 import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
-import { TelegramService } from '../../telegram.service';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { ALL_KEYS_MENU_BUTTON_NAME, CHECK } from '../base-command/base-command.constants';
 import { CheckingService } from './checking.service';
-import { UserService } from '../../../user/user.service';
 import { Context } from '../../interfaces/telegram.context';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
+import { BaseUpdate } from '../base/base.update';
 
 @Scene(CHECK.scene)
 @UseFilters(TelegrafExceptionFilter)
-export class CheckingUpdate {
-    constructor(
-        private checkingService: CheckingService,
-        private telegramService: TelegramService,
-        private userService: UserService,
-    ) {}
+export class CheckingUpdate extends BaseUpdate {
+    constructor(private checkingService: CheckingService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: Context, @Sender() telegramUser: any) {
@@ -36,7 +33,7 @@ export class CheckingUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')

@@ -11,13 +11,13 @@ import { ALL_KEYS_MENU_BUTTON_NAME, FAMILY } from '../base-command/base-command.
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { ERROR_ACCESS, ERROR_FOUND_USER } from '../../constants/error.constant';
 import { UserRole } from '@prisma/client';
-import { RedisCacheService } from '../../../cache/cache.service';
 import { InviteAccessType } from './interfaces/status.interface';
 import { InviteAccessService } from './invite-access.service';
 import { isAccessPayFamilyKeyboard, payFamilyKeyboard } from '../../keyboards/family.keyboard';
 import { familyCacheKey } from '../../cashe-key/keys';
 import { FamilyAccountCashe } from './interfaces/cashe.interface';
 import { FamilyPurchaseService } from './family-purchase.service';
+import { INotificationPort } from '@core/ports/notification.port';
 
 const FAMILY_TTL = 3600;
 
@@ -38,7 +38,7 @@ export class FamilyPrivelegieUpdate extends BaseUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 }
 
@@ -59,14 +59,14 @@ export class FamilyUserUpdate extends BaseUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 }
 
 @Scene(FAMILY.scene)
 @UseFilters(TelegrafExceptionFilter)
 export class FamilyUpdate extends BaseUpdate {
-    constructor(private cacheService: RedisCacheService) {
+    constructor() {
         super();
     }
 
@@ -77,7 +77,7 @@ export class FamilyUpdate extends BaseUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -99,10 +99,7 @@ export class FamilyUpdate extends BaseUpdate {
 @UseFilters(TelegrafExceptionFilter)
 export class FamilyInputAccountUpdate extends BaseUpdate {
     private readonly logger = new Logger(FamilyInputAccountUpdate.name);
-    constructor(
-        private readonly familyService: FamilyService,
-        private cacheService: RedisCacheService,
-    ) {
+    constructor(private readonly familyService: FamilyService) {
         super();
     }
 
@@ -131,7 +128,7 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @Action('refresh_info_family')
@@ -146,7 +143,6 @@ export class FamilyInputAccountUpdate extends BaseUpdate {
 
     @Action(/exclude_\d+_\d+/)
     async excludeFromFamily(@Ctx() ctx: WizardContext, @Sender() sender: SenderTelegram) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const [, familyId, memberId] = ctx.match[0].split('_');
 
@@ -251,10 +247,10 @@ export class FamilyInviteUpdate extends BaseUpdate {
     private readonly logger = new Logger(FamilyInviteUpdate.name);
 
     constructor(
+        private readonly notificationService: INotificationPort,
         private readonly familyService: FamilyService,
         private readonly inviteAccessService: InviteAccessService,
         private readonly familyPurchaseService: FamilyPurchaseService,
-        private readonly cacheService: RedisCacheService,
     ) {
         super();
     }
@@ -266,7 +262,7 @@ export class FamilyInviteUpdate extends BaseUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @Hears(/^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$/i)
@@ -317,8 +313,8 @@ export class FamilyInviteUpdate extends BaseUpdate {
                         case InviteAccessType.FREE:
                             await this.familyService.doInvite(ownerAccountId, invitedAccountId);
                             if (res.reason) await ctx.reply(`✅ ${res.reason}`);
-                            this.telegramService
-                                .sendAdminMessage(`${sender.first_name || sender.username} бесплатно клеит для ${invitedAccountId}}`)
+                            this.notificationService
+                                .notifyAdmin(`${sender.first_name || sender.username} бесплатно клеит для ${invitedAccountId}}`)
                                 .then();
 
                             await this.gotToFamilyInput(ctx, telegramId, invitedAccountId);
@@ -382,13 +378,13 @@ export class FamilyInviteUpdate extends BaseUpdate {
 
             await ctx.reply('✅ Оплата прошла успешно, приглашение отправлено.');
 
-            await this.telegramService.sendAdminMessage(
+            await this.notificationService.notifyAdmin(
                 `💰 <b>Продажа!</b>\nSeller: ${sender.first_name}\nSum: ${amount}р\nAccount: ${invitedAccountId}`,
             );
 
             await this.gotToFamilyInput(ctx, telegramId, invitedAccountId);
         } catch (e: any) {
-            await this.telegramService.sendAdminMessage(
+            await this.notificationService.notifyAdmin(
                 `💸 <b>Ошибка оплаты/выдачи</b>\n` +
                     `Seller: ${sender.username}\n` +
                     `Account: ${invitedAccountId}\n` +

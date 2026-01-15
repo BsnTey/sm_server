@@ -1,3 +1,5 @@
+import { Course } from '../../account/interfaces/course-list.interface';
+
 export enum CardLevel {
     STANDART = 'STANDART',
     STANDARD = 'STANDARD', //в веб версии так
@@ -11,23 +13,6 @@ export enum CourseStatus {
     FINISHED = 'FINISHED',
 }
 
-export interface CourseStats {
-    countLessons: number;
-    countLessonsLearned: number;
-}
-
-export interface CourseItem {
-    id: number;
-    title: string;
-    points: number;
-    stats: CourseStats;
-    status: CourseStatus | string;
-}
-
-export interface CoursesResponse {
-    list: CourseItem[];
-}
-
 export interface PointsCalculationResult {
     totalEarned: number; // Всего можно забрать сейчас
     totalFuture: number; // Будущий потенциал
@@ -36,6 +21,6 @@ export interface PointsCalculationResult {
 }
 
 export interface CourseAnalyticsResult extends PointsCalculationResult {
-    courseList: CourseItem[];
+    courseList: Course[];
     cardLevel: CardLevel;
 }

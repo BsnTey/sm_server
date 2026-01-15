@@ -1,8 +1,7 @@
 import { Action, Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { ALL_KEYS_MENU_BUTTON_NAME, MAKE_ORDER } from '../base-command/base-command.constants';
-import { NotFoundException, UseFilters } from '@nestjs/common';
+import { NotFoundException, OnModuleInit, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
-import { TelegramService } from '../../telegram.service';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
 import {
@@ -35,7 +34,6 @@ import {
     ordersInfoKeyboard,
     recipientKeyboard,
 } from '../../keyboards/make-order.keyboard';
-import { UserService } from '../../../user/user.service';
 import { isCityPipe } from '../../pipes/isCity.pipe';
 import { ERROR_FIND_CITY, ERROR_FOUND_CASH, ERROR_FOUND_USER } from '../../constants/error.constant';
 import { getTextCart } from '../../utils/cart.utils';
@@ -44,24 +42,17 @@ import { prepareForInternalPickupAvailability } from '../../utils/order.utils';
 import { MakeOrderService } from './make-order.service';
 import { isFioPipe } from '../../pipes/isFio.pipe';
 import { IRecipient, IRecipientOrder } from '../../../account/interfaces/account.interface';
-import { ConfigService } from '@nestjs/config';
 import { Context } from '../../interfaces/telegram.context';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
-import { RedisCacheService } from '../../../cache/cache.service';
 import { OrderState } from '../../interfaces/order.interface';
 import { OrderService } from '../../../order/order.service';
+import { BaseUpdate } from '../base/base.update';
 
-const ORDER_TTL = 3600 * 2;
+const ORDER_TTL = 600;
 
 @Scene(MAKE_ORDER.scene)
 @UseFilters(TelegrafExceptionFilter)
-export class MakeOrderUpdate {
-    constructor(
-        private telegramService: TelegramService,
-        private userService: UserService,
-        private cacheService: RedisCacheService,
-    ) {}
-
+export class MakeOrderUpdate extends BaseUpdate {
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: Context, @Sender() telegramUser: any) {
         // в будующем удалить регу или обновление юзера
@@ -79,7 +70,7 @@ export class MakeOrderUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -96,12 +87,10 @@ export class MakeOrderUpdate {
 
 @Scene(ORDER_MENU_ACCOUNT_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class OrderMenuAccount {
-    constructor(
-        private accountService: AccountService,
-        private telegramService: TelegramService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class OrderMenuAccount extends BaseUpdate {
+    constructor(private accountService: AccountService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
@@ -122,7 +111,7 @@ export class OrderMenuAccount {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @Action('go_to_city')
@@ -143,14 +132,13 @@ export class OrderMenuAccount {
 
 @Scene(ORDER_CITY_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class OrderCity {
+export class OrderCity extends BaseUpdate {
     constructor(
         private accountService: AccountService,
-        private telegramService: TelegramService,
-        private userService: UserService,
         private makeOrderService: MakeOrderService,
-        private cacheService: RedisCacheService,
-    ) {}
+    ) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
@@ -167,7 +155,7 @@ export class OrderCity {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -191,7 +179,6 @@ export class OrderCity {
 
     @Action(/^find_uri_(.+)$/)
     async setCity(@Sender() { id: telegramId }: any, @Ctx() ctx: WizardContext) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const id = ctx.match[0].split('_')[2];
         const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
@@ -206,7 +193,6 @@ export class OrderCity {
 
     @Action(/^id_favourite_city_(.+)$/)
     async selectFavouriteCity(@Sender() { id: telegramId }: any, @Ctx() ctx: WizardContext) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const cityId = ctx.match[0].split('_')[3];
         const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
@@ -230,7 +216,6 @@ export class OrderCity {
 
     @Action(/^del_city_\d+$/)
     async delFavouriteCity(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const cityId = ctx.match[0].split('_')[2];
 
@@ -251,14 +236,13 @@ export class OrderCity {
 
 @Scene(ORDER_FAVOURITE_CITY_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class OrderFavouriteCity {
+export class OrderFavouriteCity extends BaseUpdate {
     constructor(
         private accountService: AccountService,
-        private telegramService: TelegramService,
-        private userService: UserService,
         private makeOrderService: MakeOrderService,
-        private cacheService: RedisCacheService,
-    ) {}
+    ) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -267,7 +251,7 @@ export class OrderFavouriteCity {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -296,7 +280,6 @@ export class OrderFavouriteCity {
 
     @Action(/^add_favourite_city_(.+)$/)
     async selectFavouriteCity(@Sender() { id: telegramId }: any, @Ctx() ctx: WizardContext) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const id = ctx.match[0].split('_')[3];
         const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
@@ -319,13 +302,13 @@ export class OrderFavouriteCity {
 
 @Scene(ORDER_MENU_CART_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class OrderMenuCart {
+export class OrderMenuCart extends BaseUpdate {
     constructor(
         private accountService: AccountService,
-        private telegramService: TelegramService,
         private makeOrderService: MakeOrderService,
-        private cacheService: RedisCacheService,
-    ) {}
+    ) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
@@ -353,14 +336,14 @@ export class OrderMenuCart {
 
         try {
             await ctx.editMessageText(text, keyboard);
-        } catch (err) {
+        } catch {
             await ctx.reply(text, keyboard);
         }
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @Action('add_order_link')
@@ -409,7 +392,6 @@ export class OrderMenuCart {
 
     @Action(/^id_shop_\d+$/)
     async approveShop(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const shopId = ctx.match[0].split('_')[2];
         const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
@@ -495,19 +477,17 @@ export class OrderMenuCart {
         const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
         if (!account) return ctx.reply('Сессия истекла.');
 
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const productId = ctx.match[0].split('_')[2];
         const item = account.cartResponse?.data.cartFull.availableItems.filter(item => item.cartItemId.productId == productId);
         if (item && item.length == 0) return;
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
         //@ts-ignore
         const linesIds = item[0].cartItemId.linesIds;
 
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const sku = ctx.match[0].split('_')[3];
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
         // @ts-ignore
         await this.accountService.removeFromCart(account.accountId, [{ productId, sku, linesIds }]);
         await ctx.scene.reenter();
@@ -517,11 +497,10 @@ export class OrderMenuCart {
     async addItemCart(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
         if (!account) return ctx.reply('Сессия истекла.');
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
         //@ts-ignore
         const productId = ctx.match[0].split('_')[2];
 
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const sku = ctx.match[0].split('_')[3];
 
@@ -542,12 +521,10 @@ export class OrderMenuCart {
 
 @Scene(ORDER_INPUT_ARTICLE_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class OrderInputArticle {
-    constructor(
-        private accountService: AccountService,
-        private telegramService: TelegramService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class OrderInputArticle extends BaseUpdate {
+    constructor(private accountService: AccountService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -561,7 +538,7 @@ export class OrderInputArticle {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -586,7 +563,7 @@ export class OrderInputArticle {
     async selectProduct(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
         if (!account || !account.foundedProduct) return ctx.reply('Сессия истекла.');
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
         //@ts-ignore
         const productId = ctx.update.callback_query.data.split('_')[2];
 
@@ -605,11 +582,10 @@ export class OrderInputArticle {
     async addItemCart(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
         if (!account) return ctx.reply('Сессия истекла.');
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
         //@ts-ignore
         const productId = ctx.match[0].split('_')[2];
 
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const sku = ctx.match[0].split('_')[3];
 
@@ -620,12 +596,10 @@ export class OrderInputArticle {
 
 @Scene(ORDER_INPUT_LINK_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class OrderInputLink {
-    constructor(
-        private accountService: AccountService,
-        private telegramService: TelegramService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class OrderInputLink extends BaseUpdate {
+    constructor(private accountService: AccountService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -639,7 +613,7 @@ export class OrderInputLink {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -655,12 +629,10 @@ export class OrderInputLink {
 
 @Scene(ORDER_INPUT_PROMO_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class OrderInputPromo {
-    constructor(
-        private accountService: AccountService,
-        private telegramService: TelegramService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class OrderInputPromo extends BaseUpdate {
+    constructor(private accountService: AccountService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -674,7 +646,7 @@ export class OrderInputPromo {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -690,12 +662,10 @@ export class OrderInputPromo {
 
 @Scene(ORDER_CHANGE_RECIPIENT_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class OrderChangeRecipient {
-    constructor(
-        private accountService: AccountService,
-        private telegramService: TelegramService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class OrderChangeRecipient extends BaseUpdate {
+    constructor(private accountService: AccountService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
@@ -718,7 +688,7 @@ export class OrderChangeRecipient {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -751,16 +721,19 @@ export class OrderChangeRecipient {
 
 @Scene(ORDER_GET_ORDERS_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class OrderGetOrders {
-    private DOMAIN = this.configService.getOrThrow('DOMAIN', 'http://localhost:3001');
+export class OrderGetOrders extends BaseUpdate implements OnModuleInit {
+    private DOMAIN: string;
 
     constructor(
         private accountService: AccountService,
         private orderService: OrderService,
-        private telegramService: TelegramService,
-        private configService: ConfigService,
-        private cacheService: RedisCacheService,
-    ) {}
+    ) {
+        super();
+    }
+
+    onModuleInit() {
+        this.DOMAIN = this.configService.getOrThrow('DOMAIN');
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
@@ -772,21 +745,20 @@ export class OrderGetOrders {
         const text = 'Имеющиеся заказы на аккаунте:';
         try {
             await ctx.editMessageText(text, keyboard);
-        } catch (err) {
+        } catch {
             await ctx.reply(text, keyboard);
         }
     }
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @Action(/^order_(\d+)-\d+$/)
     async selectOrder(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
         if (!account) return ctx.reply('Сессия истекла.');
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const orderNumber = ctx.match[0].split('_')[1];
         const order = await this.accountService.orderInfo(account.accountId, orderNumber);
@@ -803,7 +775,6 @@ export class OrderGetOrders {
     async cancellOrder(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
         const account = await this.cacheService.get<OrderState>(`order_acc:${telegramId}`);
         if (!account) return ctx.reply('Сессия истекла.');
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const orderNumber = ctx.match[0].split('_')[2];
         await this.accountService.cancellOrder(account.accountId, orderNumber);

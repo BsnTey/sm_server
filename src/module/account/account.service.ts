@@ -79,6 +79,7 @@ import { ProtectedTokensInterface } from './interfaces/protected-tokens.interfac
 import { AnswerItem } from '../courses/data/course-answers.data';
 import { CourseTest } from './interfaces/course-test.interface';
 import { ProfileBonuses } from './interfaces/profile-bonuses.interface';
+import { CourseData } from './interfaces/course-data.interface';
 
 @Injectable()
 export class AccountService {
@@ -1296,6 +1297,19 @@ export class AccountService {
     }
 
     @RetryOnProxyError()
+    async getCoursesById(accountId: string, courseId: string | number): Promise<CourseData> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const qratorJsid = await this.protectionToken.getQratorJsid(accountWithProxyEntity.proxy.proxy);
+        const accessToken = await this.getAccessTokenCourse(accountId);
+
+        const url = this.urlSite + `courses/api/courses/${courseId}`;
+
+        const httpOptions = this.getHttpOptionsSiteCourse(accountWithProxyEntity, { qratorJsid, accessToken });
+        const response = await this.httpService.get(url, httpOptions);
+        return response.data;
+    }
+
+    @RetryOnProxyError()
     async getWebBonuses(accountId: string): Promise<ProfileBonuses> {
         const accountWithProxyEntity = await this.getAccountEntity(accountId);
         const qratorJsid = await this.protectionToken.getQratorJsid(accountWithProxyEntity.proxy.proxy);
@@ -1305,6 +1319,21 @@ export class AccountService {
         const httpOptions = this.getHttpOptionsSite(accountWithProxyEntity, qratorJsid);
         const response = await this.httpService.get(url, httpOptions);
         return response.data;
+    }
+
+    @RetryOnProxyError()
+    async activateCourse(accountId: string, mnemocode: string): Promise<boolean> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const qratorJsid = await this.protectionToken.getQratorJsid(accountWithProxyEntity.proxy.proxy);
+        const accessToken = await this.getAccessTokenCourse(accountId);
+
+        const payload = { status: 'ACTIVE' };
+
+        const url = this.urlSite + `courses/api/courses/${mnemocode}/status`;
+
+        const httpOptions = this.getHttpOptionsSiteCourse(accountWithProxyEntity, { qratorJsid, accessToken });
+        const response = await this.httpService.post(url, payload, httpOptions);
+        return response.status == 204;
     }
 
     @RetryOnProxyError()
@@ -1339,6 +1368,38 @@ export class AccountService {
         return status == 204;
     }
 
+    //для рэббита
+    @RetryOnProxyError()
+    async watchingLessonApi(accountId: string, { mnemocode, lessonId, duration }: IWatchLesson): Promise<boolean> {
+        const accountWithProxyEntity = await this.getAccountEntity(accountId);
+        const qratorJsid = await this.protectionToken.getQratorJsid(accountWithProxyEntity.proxy.proxy);
+        const accessToken = await this.getAccessTokenCourse(accountId);
+
+        const payload = {
+            startTime: 0,
+            endTime: duration,
+        };
+
+        const url = this.urlSite + `courses/api/courses/lessons/${mnemocode}/${lessonId}/watching`;
+
+        const httpOptions = this.getHttpOptionsSiteCourse(accountWithProxyEntity, { qratorJsid, accessToken });
+
+        try {
+            const response = await this.httpService.post(url, payload, httpOptions);
+            return response.status == 204;
+        } catch (e: any) {
+            const status = e.response?.status || 'Unknown';
+            const data = JSON.stringify(e.response?.data || {});
+
+            this.logger.warn(
+                `Ошибка запроса watchingLessonApi (Acc: ${accountWithProxyEntity.accountId}, Lesson: ${lessonId}): Status ${status}, Data: ${data}`,
+            );
+
+            return false;
+        }
+    }
+
+    //для крона
     @RetryOnProxyError()
     private async privateWatchingLesson(
         accountWithProxyEntity: AccountWithProxyEntity,

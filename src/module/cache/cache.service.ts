@@ -91,6 +91,21 @@ export class RedisCacheService {
         return this.client.rPop(key);
     }
 
+    async tryLock(key: string, ttlSeconds: number): Promise<boolean> {
+        // NX: true -> записать только если ключа НЕТ (Not Exists)
+        // EX: ttlSeconds -> удалить ключ через N секунд (Expire)
+        const result = await this.client.set(key, 'LOCKED', {
+            NX: true,
+            EX: ttlSeconds,
+        });
+
+        return result === 'OK';
+    }
+
+    async releaseLock(key: string): Promise<void> {
+        await this.client.del(key);
+    }
+
     async delByPrefix(prefix: string): Promise<void> {
         const keys = await this.client.keys(`${prefix}*`);
         if (keys.length > 0) {

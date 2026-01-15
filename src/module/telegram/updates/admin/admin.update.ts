@@ -10,17 +10,15 @@ import axios from 'axios';
 import { AccountService } from '../../../account/account.service';
 import { AdminGuard } from './admin.guard';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
-import { UserService } from '../../../user/user.service';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
+import { BaseUpdate } from '../base/base.update';
 
 @Scene(ADMIN.scene)
 @UseFilters(TelegrafExceptionFilter)
-export class AdminUpdate {
-    constructor(
-        private telegramService: TelegramService,
-        private accountService: AccountService,
-        private userService: UserService,
-    ) {}
+export class AdminUpdate extends BaseUpdate {
+    constructor(private accountService: AccountService) {
+        super();
+    }
 
     @SceneEnter()
     @UseGuards(AdminGuard)
@@ -32,7 +30,7 @@ export class AdminUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('document')

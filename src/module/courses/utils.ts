@@ -1,4 +1,5 @@
-import { CardLevel, CourseItem, CourseStatus, PointsCalculationResult } from './courses.types';
+import { CardLevel, CourseStatus, PointsCalculationResult } from './interfaces/courses.types';
+import { Course } from '../account/interfaces/course-list.interface';
 
 export const MULTIPLIERS: Record<CardLevel, number> = {
     [CardLevel.STANDART]: 1,
@@ -10,7 +11,7 @@ export const MULTIPLIERS: Record<CardLevel, number> = {
 /**
  * Чистая функция подсчета баллов
  */
-export const calculatePointsLogic = (courses: CourseItem[], cardLevel: CardLevel = CardLevel.STANDART): PointsCalculationResult => {
+export const calculatePointsLogic = (courses: Course[], cardLevel: CardLevel = CardLevel.STANDART): PointsCalculationResult => {
     const multiplier = MULTIPLIERS[cardLevel];
     const result: PointsCalculationResult = {
         totalEarned: 0,

@@ -21,6 +21,7 @@ import { CashedProduct, CheckProductResultItem, ResponseCheckProduct } from './i
 import { ProductApiResponse } from '../account/interfaces/product.interface';
 import { CalculateService } from '../calculate/calculate.service';
 import { ApiAdapter } from '../calculate/api.adapter';
+import { INotificationPort } from '@core/ports/notification.port';
 
 interface AccountProxyItem {
     accountId: string;
@@ -45,6 +46,7 @@ export class CheckingService {
         private calculateService: CalculateService,
         private readonly publisher: DelayedPublisher,
         private readonly cacheService: RedisCacheService,
+        private readonly notificationService: INotificationPort,
     ) {}
 
     //принимает с контроллера входящие аккаунты, сейвит в очередь на нарезку под прокси chunkingAccountForProxy
@@ -260,14 +262,7 @@ export class CheckingService {
         }
 
         if (count === total) {
-            await this.publisher.publish(
-                RABBIT_MQ_QUEUES.MESSAGES_TO_TELEGRAM_QUEUE,
-                {
-                    telegramId: +telegramId,
-                    message: `✅ Обновление персональных скидок для режима категорий завершено!`,
-                },
-                0,
-            );
+            await this.notificationService.notifyUser(telegramId, `✅ Обновление персональных скидок для режима категорий завершено!`);
         }
     }
 
@@ -293,13 +288,9 @@ export class CheckingService {
             // А. Обработка ошибки запроса
             if (res.status === 'rejected') {
                 this.logger.error(`Ошибка получения скидок для ${accountId}`, res.reason?.message);
-                this.publisher.publish(
-                    RABBIT_MQ_QUEUES.MESSAGES_TO_TELEGRAM_QUEUE,
-                    {
-                        telegramId: +telegramId,
-                        message: `❗️ Ошибка получения скидок для аккаунта ${accountId}: ${res.reason?.message}`,
-                    },
-                    0,
+                this.notificationService.notifyUser(
+                    telegramId,
+                    `❗️ Ошибка получения скидок для аккаунта ${accountId}: ${res.reason?.message}`,
                 );
                 return;
             }
@@ -424,14 +415,7 @@ export class CheckingService {
         this.logProcessingResults(telegramId, results, errors);
 
         if (count == total) {
-            await this.publisher.publish(
-                RABBIT_MQ_QUEUES.MESSAGES_TO_TELEGRAM_QUEUE,
-                {
-                    telegramId: +telegramId,
-                    message: `✅ Обновление персональных скидок для быстрого режима завершено!`,
-                },
-                0,
-            );
+            await this.notificationService.notifyUser(telegramId, `✅ Обновление персональных скидок для быстрого режима завершено!`);
         }
     }
 
@@ -551,14 +535,7 @@ export class CheckingService {
 
         if (errors.length > 0) {
             if (errors.length > 0) {
-                this.publisher.publish(
-                    RABBIT_MQ_QUEUES.MESSAGES_TO_TELEGRAM_QUEUE,
-                    {
-                        telegramId: +telegramId,
-                        message: `⚠️ Ошибки при загрузке товаров (${errors.length} акк).`,
-                    },
-                    0,
-                );
+                this.notificationService.notifyUser(telegramId, `⚠️ Ошибки при загрузке товаров (${errors.length} акк).`);
             }
         }
     }
@@ -680,7 +657,7 @@ export class CheckingService {
                             bestProductCandidate = result.product;
                         }
                     }
-                } catch (error) {
+                } catch {
                     this.logger.warn(`Attempt ${i + 1} failed for account ${accounts[i].accountId}`);
                 }
             }
@@ -827,7 +804,7 @@ export class CheckingService {
         try {
             const short = await this.accountService.shortInfoWithCache(accountId);
             bonusCount = short.bonusCount || 0;
-        } catch (e) {}
+        } catch {}
 
         return this.buildResult(product, accountId, bonusCount, ordersToday);
     }

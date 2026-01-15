@@ -3,13 +3,13 @@ import { AmqpConnectionManager } from 'amqp-connection-manager';
 import { RABBIT_MQ_CONNECTION } from './broker.provider';
 import { RABBIT_MQ_QUEUES, RABBIT_MQ_QUEUES_LIST } from '@common/broker/rabbitmq.queues';
 import { ConfirmChannel, ConsumeMessage } from 'amqplib';
-import { OrderTrackingWorker } from '../../module/notification/tracking/tracking.worker';
 import { AccountShortInfoWorker } from './workers/account-short-info.worker';
 import { PersonalDiscountInputWorker } from './workers/personal-discount-input.worker';
 import { PersonalDiscountChunkWorker } from './workers/personal-discount-chunk.worker';
 import { PersonalDiscountProductWorker } from './workers/personal-discount-product.worker';
 import { MessagesToTelegramWorker } from './workers/messages-to-telegram.worker';
 import { DELAYED_EXCHANGE, DELAYED_EXCHANGE_ARGS, DELAYED_EXCHANGE_TYPE } from '@common/broker/rabbitmq.constants';
+import { OrderTrackingWorker } from '../../module/notificationPrefs/tracking/tracking.worker';
 
 @Injectable()
 export class BrokerConsumer implements OnModuleInit {
@@ -181,6 +181,17 @@ export class BrokerConsumer implements OnModuleInit {
             } catch (ackErr) {
                 this.logger.error(`${label}: failed to ack after error (channel probably closed)`, ackErr);
             }
+        }
+    }
+
+    private async handleSimpleAck(msg: ConsumeMessage | null, channel: ConfirmChannel, handler: (payload: Buffer) => Promise<void>) {
+        if (!msg) return;
+        try {
+            await handler(msg.content);
+            channel.ack(msg);
+        } catch (e) {
+            this.logger.error('CRITICAL UNHANDLED WORKER ERROR', e);
+            channel.ack(msg);
         }
     }
 }

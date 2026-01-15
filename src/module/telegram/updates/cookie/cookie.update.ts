@@ -2,22 +2,19 @@ import { ALL_KEYS_MENU_BUTTON_NAME, COOKIE } from '../base-command/base-command.
 import { Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { AccountService } from '../../../account/account.service';
 import { WizardContext } from 'telegraf/typings/scenes';
-import { TelegramService } from '../../telegram.service';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
 import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
-import { UserService } from '../../../user/user.service';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
+import { BaseUpdate } from '../base/base.update';
 
 @Scene(COOKIE.scene)
 @UseFilters(TelegrafExceptionFilter)
-export class CookieUpdate {
-    constructor(
-        private accountService: AccountService,
-        private userService: UserService,
-        private telegramService: TelegramService,
-    ) {}
+export class CookieUpdate extends BaseUpdate {
+    constructor(private accountService: AccountService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
@@ -28,7 +25,7 @@ export class CookieUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')

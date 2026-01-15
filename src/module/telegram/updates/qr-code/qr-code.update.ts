@@ -5,26 +5,23 @@ import { AccountService } from '../../../account/account.service';
 import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { QrCodeService } from './qr-code.service';
-import { TelegramService } from '../../telegram.service';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
 import { qrCodeUpdateKeyboard } from '../../keyboards/qr-code.keyboard';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
-import { UserService } from '../../../user/user.service';
-import { RedisCacheService } from '../../../cache/cache.service';
+import { BaseUpdate } from '../base/base.update';
 
-const QR_TTL = 3600;
+const QR_TTL = 1000;
 
 @Scene(QR_CODE.scene)
 @UseFilters(TelegrafExceptionFilter)
-export class QrCodeUpdate {
+export class QrCodeUpdate extends BaseUpdate {
     constructor(
         private qrCodeService: QrCodeService,
         private accountService: AccountService,
-        private userService: UserService,
-        private telegramService: TelegramService,
-        private cacheService: RedisCacheService,
-    ) {}
+    ) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
@@ -35,7 +32,7 @@ export class QrCodeUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -63,7 +60,7 @@ export class QrCodeUpdate {
         const keyboard = qrCodeUpdateKeyboard.reply_markup;
         try {
             await ctx.editMessageMedia({ type: 'photo', media: { source: qrCodeBuff } }, { reply_markup: keyboard });
-        } catch (err) {
+        } catch {
             await ctx.reply('Не обновлено. Старый QR активен');
         }
     }

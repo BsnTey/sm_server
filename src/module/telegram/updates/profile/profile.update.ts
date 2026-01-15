@@ -1,7 +1,6 @@
 import { Action, Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { ALL_KEYS_MENU_BUTTON_NAME, PROFILE } from '../base-command/base-command.constants';
-import { TelegramService } from '../../telegram.service';
 import { CheckingService } from '../checking/checking.service';
 import { profileKeyboard } from '../../keyboards/profile.keyboard';
 import { NotFoundException, UseFilters } from '@nestjs/common';
@@ -14,19 +13,17 @@ import {
     MY_DISCOUNT_SCENE,
     PROFILE_GET_INFO_ORDER,
 } from '../../scenes/profile.scene-constant';
-import { UserService } from '../../../user/user.service';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { OrderService } from '../../../order/order.service';
+import { BaseUpdate } from '../base/base.update';
 
 @Scene(PROFILE.scene)
 @UseFilters(TelegrafExceptionFilter)
-export class ProfileUpdate {
-    constructor(
-        private telegramService: TelegramService,
-        private checkingService: CheckingService,
-        private userService: UserService,
-    ) {}
+export class ProfileUpdate extends BaseUpdate {
+    constructor(private checkingService: CheckingService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
@@ -38,7 +35,7 @@ export class ProfileUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -103,12 +100,10 @@ export class ProfileUpdate {
 
 @Scene(PROFILE_GET_INFO_ORDER)
 @UseFilters(TelegrafExceptionFilter)
-export class GetInfoOrderUpdate {
-    constructor(
-        private orderService: OrderService,
-        private userService: UserService,
-        private telegramService: TelegramService,
-    ) {}
+export class GetInfoOrderUpdate extends BaseUpdate {
+    constructor(private orderService: OrderService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -117,7 +112,7 @@ export class GetInfoOrderUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -135,12 +130,11 @@ export class GetInfoOrderUpdate {
 
 // @Scene(PROMOCODE_BOT_SCENE)
 // @UseFilters(TelegrafExceptionFilter)
-// export class PromocodeBotUpdate {
+// export class PromocodeBotUpdate extends BaseUpdate {
 //     constructor(
-//         private telegramService: TelegramService,
 //         private paymentService: PaymentService,
-//         private userService: UserService,
 //     ) {
+// super();
 //     }
 //
 //     @SceneEnter()
@@ -178,6 +172,6 @@ export class GetInfoOrderUpdate {
 //
 //     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
 //     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-//         await this.telegramService.exitScene(menuBtn, ctx);
+//         await this.exitScene(menuBtn, ctx);
 //     }
 // }

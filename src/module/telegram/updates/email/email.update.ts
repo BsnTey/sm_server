@@ -5,22 +5,21 @@ import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter
 import { ALL_KEYS_MENU_BUTTON_NAME, CASH_RECEIPT } from '../base-command/base-command.constants';
 import { EmailService } from './email.service';
 import { AccountService } from '../../../account/account.service';
-import { TelegramService } from '../../telegram.service';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
 import { ERROR_ACCOUNT_NOT_FOUND } from '../../../account/constants/error.constant';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
-import { UserService } from '../../../user/user.service';
+import { BaseUpdate } from '../base/base.update';
 
 @Scene(CASH_RECEIPT.scene)
 @UseFilters(TelegrafExceptionFilter)
-export class EmailUpdate {
+export class EmailUpdate extends BaseUpdate {
     constructor(
         private accountService: AccountService,
-        private userService: UserService,
         private emailService: EmailService,
-        private telegramService: TelegramService,
-    ) {}
+    ) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
@@ -31,7 +30,7 @@ export class EmailUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')

@@ -7,7 +7,6 @@ import { ALL_KEYS_MENU_BUTTON_NAME } from '../base-command/base-command.constant
 import { BaseUpdate } from '../base/base.update';
 import { SenderTelegram } from '../../interfaces/telegram.context';
 import { AccountService } from '../../../account/account.service';
-import { CalculateService } from '../../../calculate/calculate.service';
 import { CheckingService } from '../../../checking/checking.service';
 
 @Scene(MY_DISCOUNT_SCENE)
@@ -17,7 +16,6 @@ export class MyDiscountUpdate extends BaseUpdate {
 
     constructor(
         private readonly accountService: AccountService,
-        private readonly calculateService: CalculateService,
         private readonly checkingService: CheckingService,
     ) {
         super();
@@ -30,7 +28,7 @@ export class MyDiscountUpdate extends BaseUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -79,7 +77,7 @@ export class MyDiscountUpdate extends BaseUpdate {
                             for (const item of searchResult.data.list.slice(0, 5)) {
                                 suggestions.push({ productId: item.id, name: item.name });
                             }
-                        } catch (e) {
+                        } catch {
                             this.logger.warn(`Failed to search by article: ${article}`);
                         }
                     }
@@ -120,7 +118,7 @@ export class MyDiscountUpdate extends BaseUpdate {
                             totalBonus += result.data.calcProd.calcBonusForProduct;
                             totalMyDiscount += result.data.calcProd.usedMyDiscountRub;
                         }
-                    } catch (e) {
+                    } catch {
                         this.logger.warn(`Failed to get calc for product ${productId}`);
                     }
                 }
@@ -176,7 +174,7 @@ export class MyDiscountUpdate extends BaseUpdate {
                             for (const item of searchResult.data.list.slice(0, 3)) {
                                 suggestions.push({ productId: item.id, name: item.name, query: article });
                             }
-                        } catch (e) {
+                        } catch {
                             this.logger.warn(`Failed to search by article: ${article}`);
                         }
                     }
@@ -291,7 +289,7 @@ export class MyDiscountUpdate extends BaseUpdate {
                         for (const item of searchResult.data.list.slice(0, 3)) {
                             suggestions.push({ productId: item.id, name: item.name });
                         }
-                    } catch (e) {
+                    } catch {
                         this.logger.warn(`Failed to search by article: ${article}`);
                     }
                 }

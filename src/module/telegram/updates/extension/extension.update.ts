@@ -3,14 +3,13 @@ import { WizardContext } from 'telegraf/typings/scenes';
 import { NotFoundException, UseFilters } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
-
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { ERROR_ACCESS, ERROR_FOUND_USER } from '../../constants/error.constant';
-import { UserService } from '../../../user/user.service';
 import { extensionVersion } from '@common/constants/extension';
 import { EXTENSION_SCENE } from '../../scenes/profile.scene-constant';
 import { downloadExtension } from '../../keyboards/profile.keyboard';
 import { UserRole } from '@prisma/client';
+import { BaseUpdate } from '../base/base.update';
 
 interface ContextWithMatch extends WizardContext {
     match: RegExpExecArray;
@@ -18,8 +17,10 @@ interface ContextWithMatch extends WizardContext {
 
 @Scene(EXTENSION_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class ExtensionUpdate {
-    constructor(private userService: UserService) {}
+export class ExtensionUpdate extends BaseUpdate {
+    constructor() {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
@@ -79,7 +80,7 @@ export class ExtensionUpdate {
                 source: filePath,
                 filename: safeFilename,
             });
-        } catch (e) {
+        } catch {
             await ctx.reply('Произошла ошибка при отправке файла.');
         }
     }

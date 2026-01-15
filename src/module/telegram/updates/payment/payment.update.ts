@@ -3,7 +3,6 @@ import { WizardContext } from 'telegraf/typings/scenes';
 import { BadRequestException, Logger, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { ALL_KEYS_MENU_BUTTON_NAME } from '../base-command/base-command.constants';
-import { TelegramService } from '../../telegram.service';
 import { MAKE_DEPOSIT_SCENE, PAYMENT_PROMOCODE_BOT_SCENE } from '../../scenes/profile.scene-constant';
 import { isMoneyAmountPipe } from '../../pipes/isMoneyAmount.pipe';
 import { cancelPaymentKeyboard, comebackPayment, createdPaymentKeyboard } from '../../keyboards/profile.keyboard';
@@ -14,21 +13,21 @@ import { getFileNameForReceipt } from '../../utils/receipt.utils';
 import { extractAmountFTransferedPay } from '../../utils/payment.utils';
 import { PaymentService } from '../../../payment/payment.service';
 import { FortuneCouponService } from '../../../coupon/fortune-coupon.service';
-import { RedisCacheService } from '../../../cache/cache.service';
+import { BaseUpdate } from '../base/base.update';
 
 @Scene(MAKE_DEPOSIT_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class PaymentUpdate {
+export class PaymentUpdate extends BaseUpdate {
     private readonly logger = new Logger(PaymentUpdate.name);
     private readonly PAYMENT_TTL = 3600;
 
     constructor(
-        private telegramService: TelegramService,
         private paymentService: PaymentService,
         private fileService: FileService,
         private fortuneCouponService: FortuneCouponService,
-        private cacheService: RedisCacheService,
-    ) {}
+    ) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
@@ -52,7 +51,7 @@ export class PaymentUpdate {
                 'У вас есть незавершенные заявки на пополнение. Выберете одну из них, либо создайте новую, отправив сумму пополнения в бот';
             try {
                 await ctx.editMessageText(text, keyboard);
-            } catch (e) {
+            } catch {
                 await ctx.reply(text, keyboard);
             }
         }
@@ -60,7 +59,7 @@ export class PaymentUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -87,7 +86,6 @@ export class PaymentUpdate {
 
     @Action(/^cancelPayment_.*$/)
     async cancelPayment(@Ctx() ctx: WizardContext) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const paymentId = ctx.match[0].split('_')[1];
 
@@ -111,7 +109,6 @@ export class PaymentUpdate {
 
     @Action(/^createdPayment_.*$/)
     async createdPayment(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const paymentInfo = ctx.match[0].split('_')[1];
         const [paymentId, amount, amountCredited] = paymentInfo.split('|');
@@ -136,7 +133,6 @@ export class PaymentUpdate {
         }
         let fileName;
         try {
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             //@ts-ignore
             const photos = ctx!.message!.photo;
             const fileId = photos[photos.length - 2].file_id;
@@ -158,7 +154,6 @@ export class PaymentUpdate {
 
     @On('document')
     async inputReceiptDoc(@Sender() { id: telegramId }: any, @Ctx() ctx: WizardContext) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const document = ctx.message!.document!;
         const cached = await this.cacheService.get<{ paymentId: string }>(`payment_process:${telegramId}`);
@@ -210,14 +205,14 @@ export class PaymentUpdate {
 
 @Scene(PAYMENT_PROMOCODE_BOT_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class PaymentPromocodeUpdate {
+export class PaymentPromocodeUpdate extends BaseUpdate {
     private readonly logger = new Logger(PaymentUpdate.name);
     constructor(
-        private telegramService: TelegramService,
         private paymentService: PaymentService,
         private fortuneCouponService: FortuneCouponService,
-        private cacheService: RedisCacheService,
-    ) {}
+    ) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -226,7 +221,7 @@ export class PaymentPromocodeUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')

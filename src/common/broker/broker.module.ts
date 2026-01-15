@@ -4,7 +4,6 @@ import { BrokerConsumer } from './broker.consumer';
 import { brokerProvider, RABBIT_MQ, rabbitChannelProvider } from './broker.provider';
 import { ConfigModule } from '@nestjs/config';
 import { DelayedPublisher } from '@common/broker/delayed.publisher';
-import { NotificationModule } from '../../module/notification/notification.module';
 import { AccountModule } from '../../module/account/account.module';
 import { AccountShortInfoWorker } from './workers/account-short-info.worker';
 import { PersonalDiscountInputWorker } from './workers/personal-discount-input.worker';
@@ -13,10 +12,12 @@ import { PersonalDiscountChunkWorker } from './workers/personal-discount-chunk.w
 import { PersonalDiscountProductWorker } from './workers/personal-discount-product.worker';
 import { MessagesToTelegramWorker } from './workers/messages-to-telegram.worker';
 import { TelegramModule } from '../../module/telegram/telegram.module';
+import { CourseViewingWorker } from '../../module/courses/course-viewing.worker';
+import { NotificationPrefsModule } from '../../module/notificationPrefs/notificationPrefs.module';
 
 @Global()
 @Module({
-    imports: [ConfigModule, forwardRef(() => NotificationModule), AccountModule, CheckingModule, TelegramModule],
+    imports: [ConfigModule, forwardRef(() => NotificationPrefsModule), AccountModule, CheckingModule, TelegramModule],
     providers: [
         brokerProvider,
         rabbitChannelProvider,
@@ -27,6 +28,7 @@ import { TelegramModule } from '../../module/telegram/telegram.module';
         PersonalDiscountChunkWorker,
         PersonalDiscountProductWorker,
         MessagesToTelegramWorker,
+        CourseViewingWorker,
     ],
     exports: [brokerProvider, DelayedPublisher, rabbitChannelProvider],
 })

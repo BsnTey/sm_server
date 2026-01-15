@@ -1,25 +1,37 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AccountService } from '../account/account.service';
 import { COURSE_ANSWERS, COURSE_ID_TO_MNEMO } from './data/course-answers.data';
-import { CardLevel, CourseAnalyticsResult, CourseItem, CourseStatus } from './courses.types';
+import { CardLevel, CourseAnalyticsResult, CourseStatus } from './interfaces/courses.types';
 import { calculatePointsLogic, generatePointOptions, MULTIPLIERS } from './utils';
 import { RedisCacheService } from '../cache/cache.service';
 import { courseAnalyticsKey } from '../cache/cache.keys';
 import sleep from 'sleep-promise';
+import { CourseViewingPayload } from './interfaces/course-queue.interface';
+import { Course } from '../account/interfaces/course-list.interface';
+import { courseViewing } from '../../infrastructure/bullmq/bullmq.queues';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class CourseWorkService {
     private readonly logger = new Logger(CourseWorkService.name);
 
     constructor(
-        private accountService: AccountService,
+        private readonly accountService: AccountService,
         private readonly cacheService: RedisCacheService,
+        @InjectQueue(courseViewing) private readonly viewingQueue: Queue,
     ) {}
 
     /**
      * Основной метод: подбирает курсы под сумму и проходит их
      */
-    async completeCoursesForAmount(accountId: string, targetAmount: number): Promise<{ earnedPoints: number; passedCount: number }> {
+    async completeCoursesForAmount(
+        accountId: string,
+        targetAmount: number,
+    ): Promise<{
+        earnedPoints: number;
+        passedCount: number;
+    }> {
         // 1. Получаем данные и уровень карты
         const { courseList, cardLevel } = await this.getCourseAnalytics(accountId);
 
@@ -70,7 +82,7 @@ export class CourseWorkService {
         return { earnedPoints, passedCount };
     }
 
-    private findCoursesForTarget(allCourses: CourseItem[], target: number, level: CardLevel): CourseItem[] {
+    private findCoursesForTarget(allCourses: Course[], target: number, level: CardLevel): Course[] {
         // Фильтр для "Earned" (уже пройденных)
         const candidates = allCourses.filter(c => c.status === CourseStatus.ACTIVE && c.stats.countLessons === c.stats.countLessonsLearned);
         return this.findCoursesInternal(candidates, target, level);
@@ -144,48 +156,54 @@ export class CourseWorkService {
             throw new Error('Не удалось подобрать курсы под эту сумму');
         }
 
-        // Считаем время: (Duration / 2) / 60 = минуты
-        // Если duration нет, берем дефолт 2000 сек
         let totalDurationSec = 0;
         coursesToWork.forEach(c => {
-            const dur = (c as any).duration || 2000;
-            totalDurationSec += dur / 2;
+            const dur = c.duration;
+            totalDurationSec += dur * 0.6;
         });
 
         return {
             coursesCount: coursesToWork.length,
             targetAmount,
             estimatedTimeMin: Math.ceil(totalDurationSec / 60),
-            courses: coursesToWork, // возвращаем, чтобы потом id отправить в очередь
+            courses: coursesToWork,
         };
     }
 
     /**
-     * Постановка в очередь (RabbitMQ) для конкретной суммы
+     * Постановка в очередь для конкретной суммы
      */
-    async queueCoursesForAmount(accountId: string, targetAmount: number) {
-        // 1. Снова подбираем курсы (гарантируем актуальность)
+    async queueCoursesForAmount(accountId: string, targetAmount: number, telegramId: string) {
         const estimation = await this.estimateWorkPayload(accountId, targetAmount);
 
-        this.logger.log(`Запускаем в очередь ${estimation.coursesCount} курсов на сумму ${targetAmount}`);
+        this.logger.log(`Запускаем флоу просмотра для ${estimation.coursesCount} курсов. Acc: ${accountId}`);
 
-        // 2. Отправляем в RabbitMQ
-        estimation.courses.forEach(course => {
-            const payload = {
-                accountId,
-                courseId: course.id,
-                action: 'START_LESSON_FLOW', // Отличается от простого теста
-                estimatedDuration: ((course as any).duration || 2000) / 2,
-            };
+        const courseIds = estimation.courses.map(c => c.id);
 
-            // this.amqpConnection.publish('course_exchange', 'course.start_flow', payload);
-            this.logger.log(`[RabbitMQ] > Queued course ${course.id} (${course.title})`);
+        const payload: CourseViewingPayload = {
+            accountId,
+            telegramId,
+            courseIds: courseIds,
+            skipTests: false,
+            skipNotifiy: false,
+        };
+
+        await this.viewingQueue.add('process-flow', payload, {
+            jobId: `flow:${accountId}`,
+            delay: 1000,
+            attempts: 3,
+            backoff: {
+                type: 'exponential', // Экспоненциальная задержка (1с, 2с, 4с, 8с...)
+                delay: 120000, // Начальная задержка 120 сек
+            },
+            removeOnComplete: true,
+            removeOnFail: 50, // Хранить последние 50 ошибок для дебага (не удалять сразу)
         });
 
         return estimation.coursesCount;
     }
 
-    private findCoursesInternal(candidates: CourseItem[], target: number, level: CardLevel): CourseItem[] {
+    private findCoursesInternal(candidates: Course[], target: number, level: CardLevel): Course[] {
         const multiplier = MULTIPLIERS[level];
 
         const items = candidates.map(c => ({
@@ -195,23 +213,11 @@ export class CourseWorkService {
 
         items.sort((a, b) => b.val - a.val);
 
-        // ... Вставьте сюда ту же логику solveExact, что была раньше ...
-        const solveExact = (index: number, currentTarget: number): CourseItem[] | null => {
-            if (currentTarget === 0) return [];
-            if (currentTarget < 0 || index >= items.length) return null;
-            const { course, val } = items[index];
-            if (val <= currentTarget) {
-                const res = solveExact(index + 1, currentTarget - val);
-                if (res !== null) return [course, ...res];
-            }
-            return solveExact(index + 1, currentTarget);
-        };
-
-        const exactSolution = solveExact(0, target);
+        const exactSolution = this.solveExact(0, target, items);
         if (exactSolution) return exactSolution;
 
         // Fallback greedy
-        const greedyResult: CourseItem[] = [];
+        const greedyResult: Course[] = [];
         let currentSum = 0;
         for (const item of items) {
             if (currentSum + item.val <= target) {
@@ -220,5 +226,23 @@ export class CourseWorkService {
             }
         }
         return greedyResult;
+    }
+
+    private solveExact(
+        index: number,
+        currentTarget: number,
+        items: {
+            course: Course;
+            val: number;
+        }[],
+    ): Course[] | null {
+        if (currentTarget === 0) return [];
+        if (currentTarget < 0 || index >= items.length) return null;
+        const { course, val } = items[index];
+        if (val <= currentTarget) {
+            const res = this.solveExact(index + 1, currentTarget - val, items);
+            if (res !== null) return [course, ...res];
+        }
+        return this.solveExact(index + 1, currentTarget, items);
     }
 }

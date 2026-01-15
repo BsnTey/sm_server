@@ -20,7 +20,7 @@ interface IBonusDetail {
 
 @Injectable()
 export class CheckingService {
-    private readonly TIMEOUT = 15000;
+    private readonly TIMEOUT = 30000;
 
     constructor(
         private readonly accountService: AccountService,

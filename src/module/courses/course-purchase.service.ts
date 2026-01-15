@@ -108,7 +108,7 @@ export class CoursePurchaseService {
         try {
             // 4. Постановка в очередь
             // queueCoursesForAmount должен возвращать количество курсов
-            const count = await this.courseWorkService.queueCoursesForAmount(accountId, targetPoints);
+            const count = await this.courseWorkService.queueCoursesForAmount(accountId, targetPoints, telegramId);
 
             this.logger.log(`Успешно поставлено в очередь ${count} курсов для ${accountId}`);
 

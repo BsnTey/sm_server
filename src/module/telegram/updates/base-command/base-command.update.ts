@@ -1,5 +1,6 @@
-import { UseFilters, UseGuards } from '@nestjs/common';
+import { OnModuleInit, UseFilters, UseGuards } from '@nestjs/common';
 import { Ctx, Hears, Message, On, Scene, SceneEnter, Start, Update } from 'nestjs-telegraf';
+import { BaseUpdate as BaseUpdateExt } from '../base/base.update';
 import { WizardContext } from 'telegraf/typings/scenes';
 import {
     ADMIN,
@@ -21,8 +22,6 @@ import {
 import { Context } from '../../interfaces/telegram.context';
 import { AdminGuard } from '../admin/admin.guard';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
-import { TelegramService } from '../../telegram.service';
-import { ConfigService } from '@nestjs/config';
 import { FAMILY_PRIVELEGIE, FAMILY_USER } from '../../scenes/family.scene';
 import { EXTENSION_SCENE } from '../../scenes/profile.scene-constant';
 
@@ -118,13 +117,10 @@ export class BaseUpdate {
 
 @Scene(HELP.scene)
 @UseFilters(TelegrafExceptionFilter)
-export class HelpUpdate {
-    private readonly shopTg: string;
+export class HelpUpdate extends BaseUpdateExt implements OnModuleInit {
+    private shopTg: string;
 
-    constructor(
-        private configService: ConfigService,
-        private telegramService: TelegramService,
-    ) {
+    onModuleInit() {
         this.shopTg = this.configService.getOrThrow('SHOP_TELEGRAM');
     }
 
@@ -135,6 +131,6 @@ export class HelpUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 }

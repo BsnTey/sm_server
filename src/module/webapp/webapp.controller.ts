@@ -1,16 +1,16 @@
 import { BadRequestException, Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { TelegramService } from '../telegram/telegram.service';
 import { join } from 'path';
 import { ConfigService } from '@nestjs/config';
 import { MirrorService } from '../mirror/mirror.service';
+import { INotificationPort } from '@core/ports/notification.port';
 
 @Controller('webapp')
 export class WebAppController {
-    private DOMAIN = this.configService.getOrThrow('DOMAIN', 'http://localhost:3001');
+    private DOMAIN = this.configService.getOrThrow('DOMAIN');
 
     constructor(
-        private telegramService: TelegramService,
+        private readonly notificationService: INotificationPort,
         private configService: ConfigService,
         private mirrorService: MirrorService,
     ) {}
@@ -35,7 +35,7 @@ export class WebAppController {
         await this.mirrorService.updateAccountMirror(id, { accountId, userIp: ipAddress });
         const mirrorToken = await this.mirrorService.generateMirrorToken(id);
         const mirrorUrl = `${this.DOMAIN}/api/mirror/auth?token=${mirrorToken.mirrorToken}`;
-        await this.telegramService.sendMessage(Number(telegramId), `Ваша ссылка на зеркало: ${mirrorUrl}`);
+        await this.notificationService.notifyUser(telegramId, `Ваша ссылка на зеркало: ${mirrorUrl}`);
         return { success: true, link: mirrorUrl };
     }
 }

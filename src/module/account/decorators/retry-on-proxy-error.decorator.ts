@@ -99,7 +99,6 @@ export function RetryOnProxyError(options: RetryOnProxyErrorOptions = {}): Metho
                     }
 
                     return await originalMethod.apply(this, args);
-
                 } catch (error: any) {
                     lastError = error;
 

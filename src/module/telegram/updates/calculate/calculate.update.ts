@@ -1,7 +1,6 @@
 import { Action, Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { ALL_KEYS_MENU_BUTTON_NAME, CALCULATE_BONUS } from '../base-command/base-command.constants';
 import { WizardContext } from 'telegraf/typings/scenes';
-import { TelegramService } from '../../telegram.service';
 import { calculateInfoKeyboard } from '../../keyboards/calculate.keyboard';
 import { Markup } from 'telegraf';
 import { CALCULATE_SETTINGS_SCENE } from '../../scenes/calculate.scene-constant';
@@ -9,18 +8,18 @@ import { ICalculateCash } from '../../interfaces/calculate.interface';
 import { CalculateService } from '../../../calculate/calculate.service';
 import { CommissionType } from '@prisma/client';
 import { TemplateService } from '../../../template/template.service';
-import { RedisCacheService } from '../../../cache/cache.service';
+import { BaseUpdate } from '../base/base.update';
 
-const CALC_TTL = 3600;
+const CALC_TTL = 360;
 
 @Scene(CALCULATE_BONUS.scene)
-export class CalculateUpdate {
+export class CalculateUpdate extends BaseUpdate {
     constructor(
-        private telegramService: TelegramService,
         private calculateServiceTelegram: TemplateService,
         private calculateService: CalculateService,
-        private cacheService: RedisCacheService,
-    ) {}
+    ) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -29,7 +28,7 @@ export class CalculateUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @Action('go_to_calculate_info')
@@ -165,7 +164,7 @@ export class CalculateUpdate {
 Общая скидка (бонусы + промо): ${priceWithoutDiscount - totalPricePromo}`,
                 Markup.inlineKeyboard(keyboardButtons),
             );
-        } catch (e) {
+        } catch {
             await ctx.reply('Что то пошло не так. Проверьте правильность введения');
         }
     }

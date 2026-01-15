@@ -6,15 +6,14 @@ import { NotFoundException, UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
 import { COURSES_SCENE, GET_COURSES_SCENE } from '../../scenes/profile.scene-constant';
 import { BaseUpdate } from '../base/base.update';
-import { RedisCacheService } from '../../../cache/cache.service';
 import { Context, SenderTelegram } from '../../interfaces/telegram.context';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
 import { coursesCacheKey } from '../../cashe-key/keys';
 import { CourseWorkService } from '../../../courses/courses.service';
 import { getAvailableRanges, getOptionsInSpecificRange, RANGE_STEP } from '../../../courses/utils';
 import { CoursePurchaseService } from '../../../courses/course-purchase.service';
-import { ERROR_ACCESS, ERROR_FOUND_USER } from '../../constants/error.constant';
-import { UserRole } from '@prisma/client';
+import { ERROR_FOUND_USER } from '../../constants/error.constant';
+import { INotificationPort } from '@core/ports/notification.port';
 
 const TTL_COURSES = 3600;
 
@@ -22,7 +21,7 @@ const TTL_COURSES = 3600;
 @Scene(COURSES_SCENE)
 @UseFilters(TelegrafExceptionFilter)
 export class CoursesUpdate extends BaseUpdate {
-    constructor(private cacheService: RedisCacheService) {
+    constructor() {
         super();
     }
 
@@ -33,7 +32,7 @@ export class CoursesUpdate extends BaseUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -51,7 +50,7 @@ export class CoursesUpdate extends BaseUpdate {
 @UseFilters(TelegrafExceptionFilter)
 export class GetCoursesUpdate extends BaseUpdate {
     constructor(
-        private cacheService: RedisCacheService,
+        private readonly notificationService: INotificationPort,
         private courseWorkService: CourseWorkService,
         private coursePurchaseService: CoursePurchaseService,
     ) {
@@ -194,7 +193,6 @@ export class GetCoursesUpdate extends BaseUpdate {
         await ctx.reply('⏳ Проверка баланса и запуск...');
 
         try {
-            // Вызываем новый метод сервиса, вся логика там
             const { price } = await this.coursePurchaseService.processWorkQueuePurchase(telegramId, session.accountId, session.workAmount);
 
             // Формируем успешный ответ
@@ -203,12 +201,12 @@ export class GetCoursesUpdate extends BaseUpdate {
             });
 
             // Лог админу
-            await this.telegramService.sendAdminMessage(
+            await this.notificationService.notifyAdmin(
                 `🚀 Запуск работы (Queue)\nUser: ${sender.username}\nБаллы: ${session.workAmount}\nЦена: ${price}₽`,
             );
         } catch (e: any) {
             await ctx.reply(`❌ Ошибка: ${e.message}`);
-            await this.telegramService.sendAdminMessage(`❌ Ошибка запуска работы\nUser: ${sender.username}\nError: ${e.message}`);
+            await this.notificationService.notifyAdmin(`❌ Ошибка запуска работы\nUser: ${sender.username}\nError: ${e.message}`);
         }
     }
 
@@ -354,13 +352,13 @@ export class GetCoursesUpdate extends BaseUpdate {
 
             await ctx.reply(msg, { parse_mode: 'HTML' });
 
-            await this.telegramService.sendAdminMessage(
+            await this.notificationService.notifyAdmin(
                 `💰 Продажа курсов!\nSeller: ${sender.first_name}\nБаллы: ${session.selectedAmount}\nАккаунт: ${session.accountId}`,
             );
         } catch (e: any) {
             await ctx.reply(`❌ <b>Ошибка:</b> ${e.message}`, { parse_mode: 'HTML' });
 
-            await this.telegramService.sendAdminMessage(
+            await this.notificationService.notifyAdmin(
                 `❌ Ошибка на курсах\n` + `Seller: ${sender.username}\n` + `Account: ${session.accountId}\n` + `Error: ${e.message}`,
             );
         }
@@ -387,6 +385,6 @@ export class GetCoursesUpdate extends BaseUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 }

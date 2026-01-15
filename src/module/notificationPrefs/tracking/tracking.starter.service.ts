@@ -36,7 +36,7 @@ export class TrackingStarterService {
         await this.publisher.publish(RABBIT_MQ_QUEUES.ORDERS_TRACKING_QUEUE, job, 5_000);
         try {
             await this.orderService.orderHistory(dto.accountId);
-        } catch (e) {
+        } catch {
             //ignore
         }
 

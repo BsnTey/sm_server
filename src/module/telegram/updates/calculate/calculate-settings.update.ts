@@ -1,7 +1,6 @@
 import { Action, Ctx, Hears, Message, On, Scene, SceneEnter, Sender } from 'nestjs-telegraf';
 import { ALL_KEYS_MENU_BUTTON_NAME, CALCULATE_BONUS } from '../base-command/base-command.constants';
 import { WizardContext } from 'telegraf/typings/scenes';
-import { TelegramService } from '../../telegram.service';
 import { Markup } from 'telegraf';
 import { calculateTemplatesKeyboard } from '../../keyboards/calculate.keyboard';
 import {
@@ -16,20 +15,17 @@ import {
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { NotFoundException } from '@nestjs/common';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
-import { UserService } from '../../../user/user.service';
 import { TemplateService } from '../../../template/template.service';
 import { CommissionType } from '@prisma/client';
-import { RedisCacheService } from '../../../cache/cache.service';
+import { BaseUpdate } from '../base/base.update';
 
 const TEMPLATE_TTL = 3600;
 
 @Scene(CALCULATE_SETTINGS_SCENE)
-export class CalculateSettingsScene {
-    constructor(
-        private telegramService: TelegramService,
-        private calculateService: TemplateService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class CalculateSettingsScene extends BaseUpdate {
+    constructor(private calculateService: TemplateService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
@@ -50,7 +46,7 @@ export class CalculateSettingsScene {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @Action('back_to_calculate')
@@ -67,7 +63,6 @@ export class CalculateSettingsScene {
 
     @Action(/^template_(.+)$/)
     async viewTemplate(@Ctx() ctx: WizardContext) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const templateId = ctx.match[1];
         const template = await this.calculateService.getTemplateById(templateId);
@@ -98,7 +93,6 @@ export class CalculateSettingsScene {
 
     @Action(/^delete_template_(.+)$/)
     async deleteTemplate(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const templateId = ctx.match[1];
         await this.calculateService.deleteTemplate(templateId, String(telegramId));
@@ -113,11 +107,10 @@ export class CalculateSettingsScene {
 }
 
 @Scene(TEMPLATE_NAME_SCENE)
-export class TemplateNameScene {
-    constructor(
-        private telegramService: TelegramService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class TemplateNameScene extends BaseUpdate {
+    constructor() {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -131,7 +124,7 @@ export class TemplateNameScene {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -145,11 +138,10 @@ export class TemplateNameScene {
 }
 
 @Scene(TEMPLATE_TEXT_SCENE)
-export class TemplateTextScene {
-    constructor(
-        private telegramService: TelegramService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class TemplateTextScene extends BaseUpdate {
+    constructor() {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -171,7 +163,7 @@ export class TemplateTextScene {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @Hears('Отмена')
@@ -192,11 +184,10 @@ export class TemplateTextScene {
 }
 
 @Scene(COMMISSION_TYPE_SCENE)
-export class CommissionTypeScene {
-    constructor(
-        private telegramService: TelegramService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class CommissionTypeScene extends BaseUpdate {
+    constructor() {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -213,7 +204,7 @@ export class CommissionTypeScene {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @Action('cancel_template')
@@ -223,7 +214,6 @@ export class CommissionTypeScene {
 
     @Action(/^commission_(.+)$/)
     async onTypeSelected(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const commissionType = ctx.match[1];
 
@@ -236,11 +226,10 @@ export class CommissionTypeScene {
 }
 
 @Scene(COMMISSION_RATE_SCENE)
-export class CommissionRateScene {
-    constructor(
-        private telegramService: TelegramService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class CommissionRateScene extends BaseUpdate {
+    constructor() {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -254,7 +243,7 @@ export class CommissionRateScene {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @Hears('Отмена')
@@ -278,20 +267,17 @@ export class CommissionRateScene {
             await this.cacheService.set(`template_draft:${telegramId}`, templateData, TEMPLATE_TTL);
 
             await ctx.scene.enter(ROUND_TO_SCENE);
-        } catch (e) {
+        } catch {
             await ctx.reply('Пожалуйста, введите корректное число.');
         }
     }
 }
 
 @Scene(ROUND_TO_SCENE)
-export class RoundToScene {
-    constructor(
-        private telegramService: TelegramService,
-        private templateService: TemplateService,
-        private userService: UserService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class RoundToScene extends BaseUpdate {
+    constructor(private templateService: TemplateService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -311,7 +297,7 @@ export class RoundToScene {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @Action('cancel_template')
@@ -321,7 +307,6 @@ export class RoundToScene {
 
     @Action(/^round_(\d+)$/)
     async onRoundSelected(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
         const roundTo = parseInt(ctx.match[1]);
         await this.saveTemplate(ctx, String(telegramId), roundTo);
@@ -369,13 +354,10 @@ export class RoundToScene {
 }
 
 @Scene(CUSTOM_ROUND_SCENE)
-export class CustomRoundScene {
-    constructor(
-        private telegramService: TelegramService,
-        private templateService: TemplateService,
-        private userService: UserService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class CustomRoundScene extends BaseUpdate {
+    constructor(private templateService: TemplateService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -389,7 +371,7 @@ export class CustomRoundScene {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @Hears('Отмена')
@@ -441,7 +423,7 @@ export class CustomRoundScene {
             await ctx.reply('Шаблон успешно создан', keyboard);
 
             await ctx.scene.enter(CALCULATE_BONUS.scene);
-        } catch (e) {
+        } catch {
             await ctx.reply('Пожалуйста, введите корректное число.');
         }
     }

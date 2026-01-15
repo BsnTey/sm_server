@@ -2,21 +2,20 @@ import { Action, Ctx, Hears, Message, Scene, SceneEnter, Sender } from 'nestjs-t
 import { FORTUNE_BOT_SCENE } from '../../scenes/profile.scene-constant';
 import { UseFilters } from '@nestjs/common';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
-import { TelegramService } from '../../telegram.service';
 import { WizardContext } from 'telegraf/typings/scenes';
 import { ALL_KEYS_MENU_BUTTON_NAME } from '../base-command/base-command.constants';
 import { getSurprise } from '../../keyboards/profile.keyboard';
 import { FortuneCouponService } from '../../../coupon/fortune-coupon.service';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { SenderTelegram } from '../../interfaces/telegram.context';
+import { BaseUpdate } from '../base/base.update';
 
 @Scene(FORTUNE_BOT_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class FortuneUpdate {
-    constructor(
-        private telegramService: TelegramService,
-        private fortuneCouponService: FortuneCouponService,
-    ) {}
+export class FortuneUpdate extends BaseUpdate {
+    constructor(private fortuneCouponService: FortuneCouponService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: SenderTelegram) {
@@ -31,7 +30,7 @@ export class FortuneUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @Action('get_surprise')

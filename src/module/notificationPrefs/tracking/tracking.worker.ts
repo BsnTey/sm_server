@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AccountService } from '../../account/account.service';
 import { UserService } from '../../user/user.service';
-import { TelegramService } from '../../telegram/telegram.service';
 import { DelayedPublisher } from '@common/broker/delayed.publisher';
 import { RABBIT_MQ_QUEUES } from '@common/broker/rabbitmq.queues';
 import { TrackOrderJob } from './tracking.types';
 import { OrderStatus } from '@prisma/client';
 import { LabelToOrderStatus, OrderStatusTiming, nextDelayMs } from '../../account/constants/order.constant';
 import { ConfigService } from '@nestjs/config';
+import { INotificationPort } from '@core/ports/notification.port';
 
 @Injectable()
 export class OrderTrackingWorker {
@@ -15,10 +15,10 @@ export class OrderTrackingWorker {
     private urlSite = this.configService.getOrThrow('API_DONOR_SITE');
 
     constructor(
+        private readonly notificationService: INotificationPort,
         private readonly accountService: AccountService,
         private readonly users: UserService,
         private readonly publisher: DelayedPublisher,
-        private readonly telegram: TelegramService,
         private configService: ConfigService,
     ) {}
 
@@ -54,7 +54,7 @@ export class OrderTrackingWorker {
     private async notifyError(telegramId: number, orderNumber: string) {
         const link = this.formatThanksLink(orderNumber);
         const text = [`Не удалось отследить статус заказа ${orderNumber}.`, `Вы можете проверить вручную: ${link}`].join('\n');
-        await this.telegram.sendMessage(telegramId, text);
+        await this.notificationService.notifyUser(telegramId, text);
     }
 
     private async notifyStatusIfAllowed(telegramId: number, status: OrderStatus, orderNumber: string, label?: string) {
@@ -62,7 +62,7 @@ export class OrderTrackingWorker {
         if (!prefs.has(status)) return;
 
         const text = this.formatStatusText(orderNumber, status, label);
-        await this.telegram.sendMessage(telegramId, text);
+        await this.notificationService.notifyUser(telegramId, text);
     }
 
     private isTerminal(status: OrderStatus): boolean {
@@ -78,7 +78,7 @@ export class OrderTrackingWorker {
         let resp: any;
         try {
             resp = await this.accountService.orderInfo(accountId, orderNumber);
-        } catch (e) {
+        } catch {
             // ошибка апи — сообщаем и выходим без репаблиша
             await this.notifyError(+telegramId, orderNumber);
             this.logger.warn(`orderInfo failed for ${orderNumber}`);

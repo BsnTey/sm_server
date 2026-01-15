@@ -24,7 +24,7 @@ export interface IAccountCourseWProgress extends Lesson {
 
 export interface IWatchLesson {
     mnemocode: string;
-    videoId: string;
+    videoId?: string;
     lessonId: string;
     duration: number;
 }

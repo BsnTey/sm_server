@@ -42,11 +42,17 @@ export interface Lesson {
     image: string;
     duration: number;
     videoId: string;
-    status: string;
+    status: LessonStatus;
     timer?: any;
 }
 
 export interface Stats {
     countLessons: number;
     countLessonsLearned?: any;
+}
+
+export enum LessonStatus {
+    NONE = 'NONE',
+    VIEWED = 'VIEWED',
+    BLOCKED = 'BLOCKED',
 }

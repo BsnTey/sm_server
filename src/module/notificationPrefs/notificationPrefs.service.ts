@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { $Enums, OrderStatus, UserTelegram } from '@prisma/client';
+import { $Enums, OrderStatus } from '@prisma/client';
 import { UserService } from '../user/user.service';
 import { UpdatingPreferenceStatusRequestDto } from './dto/update-preference-status.dto';
 import { OrderStatusTiming } from '../account/constants/order.constant';
@@ -9,8 +9,8 @@ import { RedisCacheService } from '../cache/cache.service';
 import { getPrefsUserByTelegramIdKey } from '../cache/cache.keys';
 
 @Injectable()
-export class NotificationService {
-    private readonly logger = new Logger(NotificationService.name);
+export class NotificationPrefsService {
+    private readonly logger = new Logger(NotificationPrefsService.name);
     private TTL_USER_PREFS = 60;
 
     constructor(

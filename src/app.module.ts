@@ -18,7 +18,6 @@ import { CronModule } from './module/cron/cron.module';
 import { WebappModule } from './module/webapp/webapp.module';
 import { CouponModule } from './module/coupon/coupon.module';
 import { BrokerModule } from '@common/broker/broker.module';
-import { NotificationModule } from './module/notification/notification.module';
 import { CalculateModule } from './module/calculate/calculate.module';
 import { ConfigAppModule } from './module/config/config.module';
 import { TemplateModule } from './module/template/template.module';
@@ -26,8 +25,10 @@ import { UserModule } from './module/user/user.module';
 import { CheckingModule } from './module/checking/checking.module';
 import { RedisCacheModule } from './module/cache/cache.module';
 import { DeviceModule } from '@core/device/device.module';
-import { BrowserModule } from './shared/browser/browser.module';
 import { CourseModule } from './module/courses/courses.module';
+import { BullConfigModule } from './infrastructure/bullmq/bull-config.module';
+import { NotificationPrefsModule } from './module/notificationPrefs/notificationPrefs.module';
+import { NotificationModule } from './infrastructure/notification/notification.module';
 
 @Module({
     imports: [
@@ -35,6 +36,7 @@ import { CourseModule } from './module/courses/courses.module';
             isGlobal: true,
             expandVariables: true,
         }),
+        BullConfigModule,
         ScheduleModule.forRoot(),
         TelegrafModule.forRootAsync(getTelegramConfig()),
         BrokerModule,
@@ -53,7 +55,7 @@ import { CourseModule } from './module/courses/courses.module';
         CronModule,
         WebappModule,
         CouponModule,
-        NotificationModule,
+        NotificationPrefsModule,
         CalculateModule,
         ConfigModule,
         ConfigAppModule,
@@ -62,6 +64,7 @@ import { CourseModule } from './module/courses/courses.module';
         RedisCacheModule,
         DeviceModule,
         CourseModule,
+        NotificationModule,
     ],
 })
 export class AppModule {}

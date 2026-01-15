@@ -6,25 +6,21 @@ import { AccountService } from '../../../account/account.service';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
 import { CHANGE_NUMBER_CODE_SCENE, CHANGE_NUMBER_INPUT_NUMBER_SCENE } from '../../scenes/change-number.scene-constants';
 import { TelegrafExceptionFilter } from '../../filters/telegraf-exception.filter';
-import { TelegramService } from '../../telegram.service';
 import { isPhonePipe } from '../../pipes/isPhone.pipe';
 import { isCodePipe } from '../../pipes/isCode.pipe';
 import { Context } from '../../interfaces/telegram.context';
-import { UserService } from '../../../user/user.service';
 import { getMainMenuKeyboard } from '../../keyboards/base.keyboard';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
-import { RedisCacheService } from '../../../cache/cache.service';
+import { BaseUpdate } from '../base/base.update';
 
 const CHANGE_NUM_TTL = 3600;
 
 @Scene(CHANGE_NUMBER.scene)
 @UseFilters(TelegrafExceptionFilter)
-export class ChangeNumberUpdate {
-    constructor(
-        private telegramService: TelegramService,
-        private userService: UserService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class ChangeNumberUpdate extends BaseUpdate {
+    constructor() {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: Context, @Sender() telegramUser: any) {
@@ -43,7 +39,7 @@ export class ChangeNumberUpdate {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -59,12 +55,10 @@ export class ChangeNumberUpdate {
 
 @Scene(CHANGE_NUMBER_INPUT_NUMBER_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class ChangeNumberInputNumber {
-    constructor(
-        private accountService: AccountService,
-        private telegramService: TelegramService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class ChangeNumberInputNumber extends BaseUpdate {
+    constructor(private accountService: AccountService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext, @Sender() { id: telegramId }: any) {
@@ -78,7 +72,7 @@ export class ChangeNumberInputNumber {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
@@ -103,13 +97,10 @@ export class ChangeNumberInputNumber {
 
 @Scene(CHANGE_NUMBER_CODE_SCENE)
 @UseFilters(TelegrafExceptionFilter)
-export class ChangeNumberInputCode {
-    constructor(
-        private accountService: AccountService,
-        private telegramService: TelegramService,
-        private userService: UserService,
-        private cacheService: RedisCacheService,
-    ) {}
+export class ChangeNumberInputCode extends BaseUpdate {
+    constructor(private accountService: AccountService) {
+        super();
+    }
 
     @SceneEnter()
     async onSceneEnter(@Ctx() ctx: WizardContext) {
@@ -120,7 +111,7 @@ export class ChangeNumberInputCode {
 
     @Hears(ALL_KEYS_MENU_BUTTON_NAME)
     async exit(@Message('text') menuBtn: string, @Ctx() ctx: WizardContext) {
-        await this.telegramService.exitScene(menuBtn, ctx);
+        await this.exitScene(menuBtn, ctx);
     }
 
     @On('text')
