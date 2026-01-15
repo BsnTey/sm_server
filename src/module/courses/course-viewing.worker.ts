@@ -32,7 +32,7 @@ export class CourseViewingWorker extends WorkerHost {
 
     async process(job: Job<CourseViewingPayload>): Promise<void> {
         const payload = job.data;
-        const { courseIds, accountId, telegramId, skipTests, skipNotifiy } = payload;
+        const { courseIds, accountId, telegramId, skipTests } = payload;
         let { currentCourseId } = payload;
 
         const lockKey = `lock:viewing:${accountId}`;
@@ -48,7 +48,7 @@ export class CourseViewingWorker extends WorkerHost {
             // 1. ОПРЕДЕЛЕНИЕ ТЕКУЩЕГО КУРСА
             if (!currentCourseId) {
                 if (courseIds.length === 0) {
-                    await this.finishFlow(telegramId, accountId, skipNotifiy);
+                    await this.finishFlow(accountId, telegramId);
                     return;
                 }
                 currentCourseId = courseIds[0];
@@ -139,7 +139,7 @@ export class CourseViewingWorker extends WorkerHost {
 
             // 6. ПЕРЕХОД К СЛЕДУЮЩЕМУ КУРСУ
             this.logger.log(`🏁 Курс ${currentCourseId} полностью завершен.`);
-            await this.moveToNextCourse(payload, currentCourseId, skipNotifiy);
+            await this.moveToNextCourse(payload, currentCourseId);
         } catch (error: any) {
             // await this.handleError(error, payload);
             this.logger.error(`❌ Ошибка [Job ${job.id}]: ${error.message}`);
@@ -161,7 +161,7 @@ export class CourseViewingWorker extends WorkerHost {
         });
     }
 
-    private async moveToNextCourse(payload: CourseViewingPayload, finishedCourseId: number, skipNotifiy: boolean) {
+    private async moveToNextCourse(payload: CourseViewingPayload, finishedCourseId: number) {
         const remainingCourses = payload.courseIds.filter(id => id !== finishedCourseId);
 
         if (remainingCourses.length > 0) {
@@ -186,13 +186,13 @@ export class CourseViewingWorker extends WorkerHost {
                 delayMs,
             );
         } else {
-            await this.finishFlow(payload.telegramId, payload.accountId, skipNotifiy);
+            await this.finishFlow(payload.accountId, payload.telegramId);
         }
     }
 
-    private async finishFlow(telegramId: string, accountId: string, skipNotifiy: boolean) {
+    private async finishFlow(accountId: string, telegramId?: string, ) {
         this.logger.log(`🎉 Цепочка завершена для ${accountId}`);
-        if (skipNotifiy) return;
+        if (!telegramId) return;
         await this.notificationService.notifyUser(telegramId, `✅ Завершено. Проверьте баланс через пару минут.`);
     }
 
@@ -201,6 +201,7 @@ export class CourseViewingWorker extends WorkerHost {
         if (job.attemptsMade >= (job.opts.attempts || 3)) {
             this.logger.error(`💀 FAILED FINAL for ${job.data.accountId}. Reason: ${error.message}`);
             await this.notificationService.notifyAdmin(`🚨 Фатальная ошибка BullMQ\nAcc: ${job.data.accountId}\nErr: ${error.message}`);
+            if (!job.data.telegramId) return;
             await this.notificationService.notifyUser(job.data.telegramId, `⚠️ Произошла ошибка. Мы уже разбираемся.`);
         }
     }

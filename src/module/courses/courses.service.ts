@@ -170,6 +170,30 @@ export class CourseWorkService {
         };
     }
 
+    async queueSpecificCourses(accountId: string, courseIds: number[]) {
+        this.logger.log(`API запрос: Запуск просмотра ${courseIds.length} курсов. Acc: ${accountId}`);
+
+        const payload: CourseViewingPayload = {
+            accountId,
+            courseIds: courseIds,
+            skipTests: true,
+        };
+
+        await this.viewingQueue.add('process-flow', payload, {
+            jobId: `flow:${accountId}`,
+            delay: 1000,
+            attempts: 3,
+            backoff: {
+                type: 'exponential',
+                delay: 120000,
+            },
+            removeOnComplete: true,
+            removeOnFail: 50,
+        });
+
+        return courseIds.length;
+    }
+
     /**
      * Постановка в очередь для конкретной суммы
      */
@@ -185,7 +209,6 @@ export class CourseWorkService {
             telegramId,
             courseIds: courseIds,
             skipTests: false,
-            skipNotifiy: false,
         };
 
         await this.viewingQueue.add('process-flow', payload, {
