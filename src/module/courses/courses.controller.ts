@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import { CourseWorkService } from './courses.service';
 import { CourseWorkerApiRequestDto } from './dto/courses-worker.dto';
 import { HasZenno } from '@common/decorators/zenno.decorator';
