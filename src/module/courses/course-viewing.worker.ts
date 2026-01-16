@@ -50,6 +50,7 @@ export class CourseViewingWorker extends WorkerHost {
                 }
                 currentCourseId = courseIds[0];
                 await this.scheduleNextStep({ ...payload, currentCourseId }, 1000);
+                return;
             }
 
             this.logger.log(`👷 Worker [Job ${job.id}]: Обработка курса ${currentCourseId} для ${accountId}`);
@@ -57,6 +58,12 @@ export class CourseViewingWorker extends WorkerHost {
             // 2. ПОЛУЧЕНИЕ ДАННЫХ КУРСА
             const courseData: CourseData = await this.accountService.getCoursesById(accountId, currentCourseId);
             const mnemocode = courseData.mnemocode;
+
+            if (courseData.status === CourseStatus.FINISHED) {
+                this.logger.log(`⏩ Курс ${currentCourseId} уже пройден. Пропускаем.`);
+                await this.moveToNextCourse(payload, currentCourseId);
+                return;
+            }
 
             // 3. АКТИВАЦИЯ (если нужно)
             if (courseData.status === LessonStatus.NONE) {
