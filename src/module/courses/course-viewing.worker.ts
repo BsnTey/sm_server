@@ -34,7 +34,7 @@ export class CourseViewingWorker extends WorkerHost {
 
         const lockKey = `lock:viewing:${accountId}`;
 
-        const isLockAcquired = await this.cacheService.tryLock(lockKey, 10);
+        const isLockAcquired = await this.cacheService.tryLock(lockKey, 30);
 
         if (!isLockAcquired) {
             this.logger.warn(`🛑 [Job ${job.id}] Дубль для ${accountId}. Лок занят. Пропускаем.`);
@@ -115,29 +115,31 @@ export class CourseViewingWorker extends WorkerHost {
 
             // 5. ТЕСТЫ
             if (courseData.status !== CourseStatus.FINISHED) {
-                if (!skipTests) {
-                    this.logger.log(`📝 Видео просмотрены. Проходим тест для ${mnemocode}`);
-
-                    const mappedMnemo = COURSE_ID_TO_MNEMO[currentCourseId] || mnemocode;
-                    const answersData = COURSE_ANSWERS[mappedMnemo];
-
-                    if (!answersData) {
-                        this.logger.warn(`Нет ответов для курса ${mnemocode}. Пропускаем тест.`);
-                        throw new Error(`Ошибка в answersData для id: ${courseData.id}`);
-                    }
-
-                    const testRes = await this.accountService.passTest(accountId, mappedMnemo, answersData.answers);
-
-                    if (!testRes || !testRes.success) {
-                        throw new Error(`Ошибка выполнения passTest для id: ${courseData.id}`);
-                    }
-
-                    this.logger.log(`✅ Тест сдан!`);
-                } else {
+                if (skipTests) {
                     this.logger.log(`⏭ Пропуск теста (skipTests=true).`);
+                    await this.moveToNextCourse(payload, currentCourseId);
+                    return;
                 }
 
-                await this.scheduleNextStep(payload, 5000);
+                this.logger.log(`📝 Видео просмотрены. Проходим тест для ${mnemocode}`);
+
+                const mappedMnemo = COURSE_ID_TO_MNEMO[currentCourseId] || mnemocode;
+                const answersData = COURSE_ANSWERS[mappedMnemo];
+
+                if (!answersData) {
+                    this.logger.warn(`Нет ответов для курса ${mnemocode}. Пропускаем тест.`);
+                    throw new Error(`Ошибка в answersData для id: ${courseData.id}`);
+                }
+
+                const testRes = await this.accountService.passTest(accountId, mappedMnemo, answersData.answers);
+
+                if (!testRes || !testRes.success) {
+                    throw new Error(`Ошибка выполнения passTest для id: ${courseData.id}`);
+                }
+
+                this.logger.log(`✅ Тест сдан!`);
+
+                await this.moveToNextCourse(payload, currentCourseId);
                 return;
             }
 
@@ -170,22 +172,48 @@ export class CourseViewingWorker extends WorkerHost {
 
         if (remainingCourses.length > 0) {
             const nextCourseId = remainingCourses[0];
-            let delayMs = 60000;
+            const nextPayload: CourseViewingPayload = {
+                ...payload,
+                courseIds: remainingCourses,
+                currentCourseId: nextCourseId,
+            };
+
+            let delayMs = 30000;
 
             try {
                 const nextCourseData = await this.accountService.getCoursesById(payload.accountId, nextCourseId);
-                if (nextCourseData.lessons && nextCourseData.lessons.length > 0) {
-                    const firstLesson = nextCourseData.lessons[0];
-                    delayMs = (firstLesson.duration / 2) * 1000;
-                    this.logger.log(`⏳ Следующий курс ${nextCourseId}. Ждем ${delayMs / 1000}с (1-й урок).`);
+
+                if (nextCourseData.status === CourseStatus.FINISHED) {
+                    this.logger.log(`⏩ Курс ${nextCourseData.id} уже пройден. Пропускаем.`);
+                    await this.moveToNextCourse(nextPayload, nextCourseData.id);
+                    return;
                 }
-                delayMs += 30000;
+
+                if (nextCourseData.status === LessonStatus.NONE) {
+                    this.logger.log(`Курс ${nextCourseData.id} не активен. Активируем...`);
+                    await this.accountService.activateCourse(payload.accountId, nextCourseData.mnemocode);
+                }
+
+                if (nextCourseData.lessons && nextCourseData.lessons.length > 0) {
+
+                    const firstUnwatched = nextCourseData.lessons.find(l => l.status !== LessonStatus.VIEWED);
+
+                    if (firstUnwatched) {
+                        delayMs = Math.ceil(firstUnwatched.duration * 0.6 * 1000);
+                        this.logger.log(
+                            `⏳ Следующий курс ${nextCourseId}. Первый непросмотренный: "${firstUnwatched.title}". Ждем ${delayMs / 1000}с.`,
+                        );
+                    } else {
+                        delayMs = 5000;
+                        this.logger.log(`⏩ Следующий курс ${nextCourseId}: все видео просмотрены. Переход к блоку тестам через 5с.`);
+                    }
+                }
             } catch {
                 this.logger.warn(`Ошибка инфо след. курс ${nextCourseId}, дефолтная задержка.`);
             }
 
             // Планируем следующий курс
-            await this.scheduleNextStep({ ...payload, courseIds: remainingCourses, currentCourseId: nextCourseId }, delayMs);
+            await this.scheduleNextStep(nextPayload, delayMs);
         } else {
             await this.finishFlow(payload.accountId, payload.telegramId);
         }
