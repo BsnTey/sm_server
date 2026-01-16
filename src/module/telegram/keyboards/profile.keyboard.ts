@@ -14,7 +14,7 @@ export const profileKeyboard = (role: UserRole) => {
 
     btnArr.push([Markup.button.callback('Получить инфо по заказу', 'get_info_order')]);
 
-    role == UserRole.Admin ? btnArr.push([Markup.button.callback('Наливка', 'get_courses')]) : null;
+    role != UserRole.User ? btnArr.push([Markup.button.callback('Наливка', 'get_courses')]) : null;
 
     role != UserRole.User ? btnArr.push([Markup.button.callback('Расширение', 'extension')]) : null;
 

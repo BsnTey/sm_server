@@ -88,7 +88,8 @@ export class GetCoursesUpdate extends BaseUpdate {
         const futureOptions = await this.courseWorkService.getFutureCreditOptions(session.accountId);
 
         if (futureOptions.length === 0) {
-            return ctx.reply('Нет доступных зачислений для запуска в работу.');
+            await ctx.reply('Нет доступных зачислений для запуска в работу.');
+            return;
         }
 
         // 2. Диапазоны (аналогично credit_now)
@@ -202,7 +203,7 @@ export class GetCoursesUpdate extends BaseUpdate {
 
             // Лог админу
             await this.notificationService.notifyAdmin(
-                `🚀 Запуск работы (Queue)\nUser: ${sender.username}\nБаллы: ${session.workAmount}\nЦена: ${price}₽`,
+                `🚀 Запуск работы курсов (Queue)\nUser: ${sender.username}\nБаллы: ${session.workAmount}\nЦена: ${price}₽`,
             );
         } catch (e: any) {
             await ctx.reply(`❌ Ошибка: ${e.message}`);
@@ -222,7 +223,8 @@ export class GetCoursesUpdate extends BaseUpdate {
         const allOptions = await this.courseWorkService.getCreditOptions(session.accountId);
 
         if (allOptions.length === 0) {
-            return ctx.reply('Нет доступных баллов для зачисления.');
+            await ctx.reply('Нет доступных баллов для зачисления.');
+            return;
         }
 
         // 2. Определяем доступные диапазоны
@@ -370,7 +372,7 @@ export class GetCoursesUpdate extends BaseUpdate {
             await ctx.deleteMessage();
             await ctx.reply('⏳ Ожидайте выполнения');
             const count = await this.coursePurchaseService.processCoursePurchase(String(tgId), accountId, amount);
-            await ctx.reply(`✅ Готово! Пройдено курсов: ${count.passedCount}`);
+            await ctx.reply(`✅ Готово! Пройдено: ${count.passedCount}`);
         } catch (e: any) {
             await ctx.reply(`❌ Ошибка: ${e.message}`);
         }

@@ -7,13 +7,7 @@ import { AccountService } from '../../account/account.service';
 import { CourseAnswersRepository } from '../repositories/course-answers.repository';
 import { INotificationPort } from '@core/ports/notification.port';
 import { RedisCacheService } from '../../cache/cache.service';
-import {
-    CourseFlowPayload,
-    FlowJobType,
-    WatchLessonPayload,
-    PassTestPayload,
-    BaseFlowPayload,
-} from '../interfaces/course-queue.interface';
+import { CourseFlowPayload, FlowJobType, WatchLessonPayload, PassTestPayload, BaseFlowPayload } from '../interfaces/course-queue.interface';
 
 @Processor(courseViewing)
 @Injectable()
@@ -60,7 +54,7 @@ export class CourseFlowWorker extends WorkerHost {
                     break;
             }
         } catch (e: any) {
-            this.logger.error(`Ошибка в job ${job.id} (${payload.type}): ${e.message}`);
+            this.logger.error(`Ошибка в job ${job.id} (${payload.type}) для ${payload.accountId}: ${e.message}`);
             throw e;
         } finally {
             await this.cacheService.releaseLock(lockKey);
@@ -73,7 +67,7 @@ export class CourseFlowWorker extends WorkerHost {
     }
 
     private async handleWatch(payload: WatchLessonPayload) {
-        this.logger.log(`📺 Просмотр (API): ${payload.lessonTitle}`);
+        this.logger.log(`📺 Просмотр (API): ${payload.lessonTitle} для ${payload.accountId}`);
 
         // ВНИМАНИЕ: Мы уже подождали (delay) перед запуском этой джобы.
         const result = await this.accountService.watchingLessonApi(payload.accountId, {
@@ -94,7 +88,7 @@ export class CourseFlowWorker extends WorkerHost {
     }
 
     private async handleTest(payload: PassTestPayload) {
-        this.logger.log(`📝 Выполнение теста курса ${payload.currentCourseId}`);
+        this.logger.log(`📝 Выполнение теста курса ${payload.currentCourseId} для ${payload.accountId}`);
 
         const mappedMnemo = this.answersRepo.getMnemocode(payload.currentCourseId, payload.mnemocode);
         const answers = this.answersRepo.getAnswers(mappedMnemo);
@@ -114,7 +108,7 @@ export class CourseFlowWorker extends WorkerHost {
     }
 
     private async handleFinish(payload: BaseFlowPayload) {
-        this.logger.log(`🏁 Flow finished for ${payload.accountId}`);
+        this.logger.log(`🏁 Flow закончен для ${payload.accountId}`);
         if (payload.telegramId) {
             await this.notificationService.notifyUser(payload.telegramId, '✅ Завершено. Проверьте баланс через пару минут.');
         }
