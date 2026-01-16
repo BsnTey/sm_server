@@ -15,12 +15,18 @@ export class HttpBrowserGateway {
     }
 
     async solveChallenge({ url, proxy, inputCookies, targetCookie }: InputBrowserData): Promise<BrowserSessionResult> {
-        const response = await this.httpService.post(`${this.url}/browser/session`, {
-            url,
-            proxy,
-            targetCookie,
-            inputCookies,
-        });
+        const response = await this.httpService.post(
+            `${this.url}/browser/session`,
+            {
+                url,
+                proxy,
+                targetCookie,
+                inputCookies,
+            },
+            {
+                timeout: 60,
+            },
+        );
 
         return response.data;
     }

@@ -12,7 +12,6 @@ import { PersonalDiscountChunkWorker } from './workers/personal-discount-chunk.w
 import { PersonalDiscountProductWorker } from './workers/personal-discount-product.worker';
 import { MessagesToTelegramWorker } from './workers/messages-to-telegram.worker';
 import { TelegramModule } from '../../module/telegram/telegram.module';
-import { CourseViewingWorker } from '../../module/courses/course-viewing.worker';
 import { NotificationPrefsModule } from '../../module/notificationPrefs/notificationPrefs.module';
 
 @Global()
@@ -28,7 +27,6 @@ import { NotificationPrefsModule } from '../../module/notificationPrefs/notifica
         PersonalDiscountChunkWorker,
         PersonalDiscountProductWorker,
         MessagesToTelegramWorker,
-        CourseViewingWorker,
     ],
     exports: [brokerProvider, DelayedPublisher, rabbitChannelProvider],
 })

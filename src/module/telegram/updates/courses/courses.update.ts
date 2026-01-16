@@ -9,9 +9,9 @@ import { BaseUpdate } from '../base/base.update';
 import { Context, SenderTelegram } from '../../interfaces/telegram.context';
 import { isAccountIdPipe } from '../../pipes/isAccountId.pipe';
 import { coursesCacheKey } from '../../cashe-key/keys';
-import { CourseWorkService } from '../../../courses/courses.service';
+import { CourseWorkService } from '../../../courses/services/courses.service';
 import { getAvailableRanges, getOptionsInSpecificRange, RANGE_STEP } from '../../../courses/utils';
-import { CoursePurchaseService } from '../../../courses/course-purchase.service';
+import { CoursePurchaseService } from '../../../courses/services/course-purchase.service';
 import { ERROR_FOUND_USER } from '../../constants/error.constant';
 import { INotificationPort } from '@core/ports/notification.port';
 
