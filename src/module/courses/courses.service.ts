@@ -184,7 +184,7 @@ export class CourseWorkService {
         };
 
         await this.viewingQueue.add('process-flow', payload, {
-            jobId: `flow:${accountId}`,
+            jobId: `flow_${accountId}`,
             delay: 1000,
             attempts: 3,
             backoff: {
@@ -216,7 +216,7 @@ export class CourseWorkService {
         };
 
         await this.viewingQueue.add('process-flow', payload, {
-            jobId: `flow:${accountId}`,
+            jobId: `flow_${accountId}`,
             delay: 1000,
             attempts: 3,
             backoff: {

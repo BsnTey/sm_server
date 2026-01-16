@@ -153,7 +153,7 @@ export class CourseViewingWorker extends WorkerHost {
     private async scheduleNextStep(payload: CourseViewingPayload, delayMs: number) {
         await this.viewingQueue.add('process-flow', payload, {
             delay: delayMs,
-            jobId: `flow:${payload.accountId}:${Date.now()}`, // Уникальный ID шага
+            jobId: `flow_${payload.accountId}_${Date.now()}`, // Уникальный ID шага
             attempts: 3,
             backoff: { type: 'exponential', delay: 120000 },
             removeOnComplete: true,
