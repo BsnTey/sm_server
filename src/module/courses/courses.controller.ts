@@ -1,5 +1,5 @@
 import { Body, Controller, HttpCode, Post } from '@nestjs/common';
-import { CourseWorkService } from './courses.service';
+import { CourseWorkService } from './services/courses.service';
 import { CourseWorkerApiRequestDto } from './dto/courses-worker.dto';
 import { HasZenno } from '@common/decorators/zenno.decorator';
 

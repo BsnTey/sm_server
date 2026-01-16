@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
-import { PaymentService } from '../payment/payment.service';
+import { PaymentService } from '../../payment/payment.service';
 import { CourseWorkService } from './courses.service';
-import { UserService } from '../user/user.service';
+import { UserService } from '../../user/user.service';
 import { UserRole } from '@prisma/client';
-import { ERROR_FOUND_USER } from '../telegram/constants/error.constant';
-import { BottService } from '../bott/bott.service';
+import { ERROR_FOUND_USER } from '../../telegram/constants/error.constant';
+import { BottService } from '../../bott/bott.service';
 
 const PRICE_PERCENT = 0.05; // 5% от суммы баллов
 

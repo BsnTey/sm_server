@@ -91,7 +91,7 @@ export class AccountService {
 
     private TTL_CASH_ACCOUNT = 60;
     private TTL_CASH_SHORT_INFO = 20;
-    private TTL_ACCESS_TOKEN_COURSE = 3600;
+    private TTL_ACCESS_TOKEN_COURSE = 15000;
 
     constructor(
         private configService: ConfigService,
@@ -428,12 +428,15 @@ export class AccountService {
     }
 
     private getHttpOptionsSite(accountWithProxy: AccountWithProxyEntity, qratorJsid: string): HttpOptions {
+        if (!qratorJsid) throw new Error(`Not jsid for options header for ${accountWithProxy.accountId}`);
         const { headers, tlsClientIdentifier } = this.sportmasterHeaders.getHeadersSite(accountWithProxy, qratorJsid);
 
         return { headers, proxy: accountWithProxy.proxy!.proxy, tlsClientIdentifier };
     }
 
     private getHttpOptionsSiteCourse(accountWithProxy: AccountWithProxyEntity, tokens: ProtectedTokensInterface): HttpOptions {
+        if (!tokens.accessToken || !tokens.qratorJsid) throw new Error(`Not tokens for options header for ${accountWithProxy.accountId}`);
+
         const { headers, tlsClientIdentifier } = this.sportmasterHeaders.getHeadersForCourse(accountWithProxy, tokens);
 
         return { headers, proxy: accountWithProxy.proxy!.proxy, tlsClientIdentifier };

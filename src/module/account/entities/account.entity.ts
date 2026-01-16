@@ -92,7 +92,8 @@ export class AccountEntity implements Account {
 
     getBasePrepareRequestCookie(addingCookie: Record<string, string> = {}): string {
         const cookiesList: { name: string; value: string }[] = JSON.parse(this.cookie || '[]');
-        const targetNames = new Set(['SMID']);
+        // const targetNames = new Set(['SMID']);
+        const targetNames = new Set(['SMID', 'SMAUTH', 'SMAID', 'smafauth', 'UDID']);
 
         const baseCookies = cookiesList.filter(c => targetNames.has(c.name)).map(c => `${c.name}=${c.value}`);
 

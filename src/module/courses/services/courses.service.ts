@@ -1,16 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AccountService } from '../account/account.service';
-import { COURSE_ANSWERS, COURSE_ID_TO_MNEMO } from './data/course-answers.data';
-import { CardLevel, CourseAnalyticsResult, CourseStatus } from './interfaces/courses.types';
-import { calculatePointsLogic, generatePointOptions, MULTIPLIERS } from './utils';
-import { RedisCacheService } from '../cache/cache.service';
-import { courseAnalyticsKey } from '../cache/cache.keys';
+import { AccountService } from '../../account/account.service';
+import { COURSE_ANSWERS, COURSE_ID_TO_MNEMO } from '../data/course-answers.data';
+import { CardLevel, CourseAnalyticsResult, CourseStatus } from '../interfaces/courses.types';
+import { calculatePointsLogic, generatePointOptions, MULTIPLIERS } from '../utils';
+import { RedisCacheService } from '../../cache/cache.service';
+import { courseAnalyticsKey } from '../../cache/cache.keys';
 import sleep from 'sleep-promise';
-import { CourseViewingPayload } from './interfaces/course-queue.interface';
-import { Course } from '../account/interfaces/course-list.interface';
-import { courseViewing } from '../../infrastructure/bullmq/bullmq.queues';
+import { CourseFlowPayload, FlowJobType } from '../interfaces/course-queue.interface';
+import { Course } from '../../account/interfaces/course-list.interface';
+import { courseViewing } from '../../../infrastructure/bullmq/bullmq.queues';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { VIEWING_CONFIG } from '../constants';
 
 @Injectable()
 export class CourseWorkService {
@@ -66,7 +67,7 @@ export class CourseWorkService {
                 const resp = await this.accountService.passTest(accountId, mnemocode, answers.answers);
                 await sleep(500);
 
-                if (!resp.success) throw new Error('Тест не выполнен');
+                if (!resp.success) throw new Error('Test API failed');
 
                 // Если успешно (не вылетела ошибка):
                 passedCount++;
@@ -159,7 +160,7 @@ export class CourseWorkService {
         let totalDurationSec = 0;
         coursesToWork.forEach(c => {
             const dur = c.duration;
-            totalDurationSec += dur * 0.6;
+            totalDurationSec += dur * VIEWING_CONFIG.SPEED_FACTOR;
         });
 
         return {
@@ -170,64 +171,71 @@ export class CourseWorkService {
         };
     }
 
-    async queueSpecificCourses(accountId: string, courseIds?: number[]) {
-        if (!courseIds || courseIds.length == 0) {
-            courseIds = Object.keys(COURSE_ID_TO_MNEMO).map(Number);
+    /**
+     * Точка входа 2: Конкретный список (без тестов, без уведомлений)
+     */
+    async queueSpecificCourses(accountId: string, needWatchCourseIds?: number[]) {
+        if (!needWatchCourseIds || needWatchCourseIds.length == 0) {
+            needWatchCourseIds = Object.keys(COURSE_ID_TO_MNEMO).map(Number);
+        }
+        // 1. Получаем актуальные данные по курсам, чтобы отсеять полностью завершенные
+        const allCourses = await this.accountService.getCourses(accountId);
+
+        const coursesToProcess = allCourses.list
+            .filter(c => {
+                // Оставляем, если ID в списке И (курс не завершен ИЛИ есть непросмотренные уроки)
+                const isRequested = needWatchCourseIds.includes(c.id);
+                const isNotFinished = c.status !== CourseStatus.FINISHED;
+                // Дополнительная проверка: если статус ACTIVE, но все уроки просмотрены -> для этого метода это "завершен"
+                const hasUnwatched = c.stats.countLessons !== c.stats.countLessonsLearned;
+
+                return isRequested && (isNotFinished || hasUnwatched);
+            })
+            .map(c => c.id);
+
+        this.logger.log(`Запуск Flow (список). Запрошено: ${needWatchCourseIds.length}, Актуально: ${coursesToProcess.length}`);
+
+        if (coursesToProcess.length > 0) {
+            await this.startFlow({
+                accountId,
+                courseIds: coursesToProcess,
+                skipTests: true,
+                type: FlowJobType.DECIDE_NEXT,
+            });
         }
 
-        this.logger.log(`API запрос: Запуск просмотра ${courseIds.length} курсов. Acc: ${accountId}`);
-
-        const payload: CourseViewingPayload = {
-            accountId,
-            courseIds: courseIds,
-            skipTests: true,
-        };
-
-        await this.viewingQueue.add('process-flow', payload, {
-            jobId: `flow_${accountId}`,
-            delay: 1000,
-            attempts: 3,
-            backoff: {
-                type: 'exponential',
-                delay: 120000,
-            },
-            removeOnComplete: true,
-            removeOnFail: 50,
-        });
-
-        return courseIds.length;
+        return coursesToProcess.length;
     }
 
     /**
-     * Постановка в очередь для конкретной суммы
+     * Точка входа 1: Подбор по сумме (с тестами и уведомлением)
      */
     async queueCoursesForAmount(accountId: string, targetAmount: number, telegramId: string) {
         const estimation = await this.estimateWorkPayload(accountId, targetAmount);
 
         this.logger.log(`Запускаем флоу просмотра для ${estimation.coursesCount} курсов. Acc: ${accountId}`);
+        const validCourseIds = estimation.courses.map(c => c.id);
 
-        const courseIds = estimation.courses.map(c => c.id);
+        this.logger.log(`Запуск Flow (сумма). Курсов: ${validCourseIds.length}`);
 
-        const payload: CourseViewingPayload = {
+        await this.startFlow({
             accountId,
             telegramId,
-            courseIds: courseIds,
+            courseIds: validCourseIds,
             skipTests: false,
-        };
-
-        await this.viewingQueue.add('process-flow', payload, {
-            jobId: `flow_${accountId}`,
-            delay: 1000,
-            attempts: 3,
-            backoff: {
-                type: 'exponential', // Экспоненциальная задержка (1с, 2с, 4с, 8с...)
-                delay: 120000, // Начальная задержка 120 сек
-            },
-            removeOnComplete: true,
-            removeOnFail: 50, // Хранить последние 50 ошибок для дебага (не удалять сразу)
+            type: FlowJobType.DECIDE_NEXT,
         });
 
-        return estimation.coursesCount;
+        return validCourseIds.length;
+    }
+
+    private async startFlow(payload: CourseFlowPayload) {
+        // Создаем родительскую задачу
+        await this.viewingQueue.add(payload.type, payload, {
+            jobId: `flow_${payload.accountId}_${Date.now()}`,
+            attempts: 3,
+            removeOnComplete: true,
+        });
     }
 
     private findCoursesInternal(candidates: Course[], target: number, level: CardLevel): Course[] {
