@@ -183,13 +183,15 @@ export class CourseWorkService {
 
         const coursesToProcess = allCourses.list
             .filter(c => {
-                // Оставляем, если ID в списке И (курс не завершен ИЛИ есть непросмотренные уроки)
                 const isRequested = needWatchCourseIds.includes(c.id);
+                // 1. Статус НЕ FINISHED
                 const isNotFinished = c.status !== CourseStatus.FINISHED;
-                // Дополнительная проверка: если статус ACTIVE, но все уроки просмотрены -> для этого метода это "завершен"
+
+                // 2. И есть непросмотренные уроки
                 const hasUnwatched = c.stats.countLessons !== c.stats.countLessonsLearned;
 
-                return isRequested && (isNotFinished || hasUnwatched);
+                // Нам нужно, чтобы выполнялись ОБА условия: статус активен И есть что смотреть.
+                return isRequested && isNotFinished && hasUnwatched;
             })
             .map(c => c.id);
 
