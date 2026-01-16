@@ -42,7 +42,7 @@ export class CourseWorkService {
         // 2. Подбираем курсы
         const coursesToPass = this.findCoursesForTarget(courseList, targetAmount, cardLevel);
 
-        this.logger.log(`Найдено ${coursesToPass.length} курсов для цели ${targetAmount}. Старт прохождения...`);
+        this.logger.log(`Найдено ${coursesToPass.length} курсов для цели ${targetAmount} для ${accountId}. Старт прохождения...`);
 
         let passedCount = 0;
         let earnedPoints = 0;
@@ -52,13 +52,13 @@ export class CourseWorkService {
             try {
                 const mnemocode = COURSE_ID_TO_MNEMO[course.id];
                 if (!mnemocode) {
-                    this.logger.warn(`Skip ID ${course.id}: нет мнемокода`);
+                    this.logger.warn(`Skip ID ${course.id}: нет мнемокода для ${accountId}`);
                     continue;
                 }
 
                 const answers = COURSE_ANSWERS[mnemocode];
                 if (!answers) {
-                    this.logger.warn(`Skip ID ${course.id}: нет ответов`);
+                    this.logger.warn(`Skip ID ${course.id}: нет ответов для ${accountId}`);
                     continue;
                 }
 
@@ -75,7 +75,7 @@ export class CourseWorkService {
                 const pointsForCourse = Math.round(course.points * multiplier);
                 earnedPoints += pointsForCourse;
             } catch (e: any) {
-                this.logger.error(`Ошибка прохождения курса ${course.id}: ${e.message}`);
+                this.logger.error(`Ошибка прохождения курса ${course.id} для ${accountId}: ${e.message}`);
                 // Не прерываем весь процесс, чтобы пройти то, что можно пройти
             }
         }
@@ -195,7 +195,7 @@ export class CourseWorkService {
             })
             .map(c => c.id);
 
-        this.logger.log(`Запуск Flow (список). Запрошено: ${needWatchCourseIds.length}, Актуально: ${coursesToProcess.length}`);
+        this.logger.log(`Запуск Flow (список) для ${accountId}. Запрошено: ${needWatchCourseIds.length}, Актуально: ${coursesToProcess.length}`);
 
         if (coursesToProcess.length > 0) {
             await this.startFlow({
@@ -215,10 +215,9 @@ export class CourseWorkService {
     async queueCoursesForAmount(accountId: string, targetAmount: number, telegramId: string) {
         const estimation = await this.estimateWorkPayload(accountId, targetAmount);
 
-        this.logger.log(`Запускаем флоу просмотра для ${estimation.coursesCount} курсов. Acc: ${accountId}`);
         const validCourseIds = estimation.courses.map(c => c.id);
 
-        this.logger.log(`Запуск Flow (сумма). Курсов: ${validCourseIds.length}`);
+        this.logger.log(`Запуск Flow (сумма). Курсов: ${validCourseIds.length}. Аккаунт: ${accountId}`);
 
         await this.startFlow({
             accountId,

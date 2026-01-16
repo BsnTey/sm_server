@@ -59,41 +59,49 @@ export class ProfileUpdate extends BaseUpdate {
 
     @Action('check_promo')
     async goToCheckerPromo(@Ctx() ctx: WizardContext) {
+        await ctx.deleteMessage();
         await ctx.reply('Пришлите номера аккаунтов, каждый с новой строки');
     }
 
     @Action('check_my_discount')
     async goToCheckerMyDiscount(@Ctx() ctx: WizardContext) {
+        await ctx.deleteMessage();
         await ctx.scene.enter(MY_DISCOUNT_SCENE);
     }
 
     @Action('get_info_order')
     async getInfoOrder(@Ctx() ctx: WizardContext) {
+        await ctx.deleteMessage();
         await ctx.scene.enter(PROFILE_GET_INFO_ORDER);
     }
 
     @Action('payment')
     async makeDeposit(@Ctx() ctx: WizardContext) {
+        await ctx.deleteMessage();
         await ctx.scene.enter(MAKE_DEPOSIT_SCENE);
     }
 
     // @Action('get_promocode')
     // async getPromocode(@Ctx() ctx: WizardContext) {
+    // await ctx.deleteMessage();
     //     await ctx.scene.enter(PROMOCODE_BOT_SCENE);
     // }
 
     @Action('fortune')
     async goToFortune(@Ctx() ctx: WizardContext) {
+        await ctx.deleteMessage();
         await ctx.scene.enter(FORTUNE_BOT_SCENE);
     }
 
     @Action('extension')
     async goToExtension(@Ctx() ctx: WizardContext) {
+        await ctx.deleteMessage();
         await ctx.scene.enter(EXTENSION_SCENE);
     }
 
     @Action('get_courses')
     async goToCourses(@Ctx() ctx: WizardContext) {
+        await ctx.deleteMessage();
         await ctx.scene.enter(COURSES_SCENE);
     }
 }

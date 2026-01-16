@@ -30,7 +30,7 @@ export class CourseOrchestratorService {
 
         // 2. Если курс не активен — активируем и перезапускаем проверку через 1с
         if (courseData.status === LessonStatus.NONE) {
-            this.logger.log(`Orchestrator: Активация курса ${currentCourseId}`);
+            this.logger.log(`Orchestrator: Активация курса ${currentCourseId} для ${accountId}`);
             await this.accountService.activateCourse(accountId, courseData.mnemocode);
             return { nextPayload: payload, delay: 1000 };
         }
@@ -43,7 +43,7 @@ export class CourseOrchestratorService {
             // Рассчитываем задержку (имитация просмотра 50% времени), для мелких курсов минималка 2мин, иначе ошибка
             const waitTime = Math.max(Math.ceil(unwatchedLesson.duration * VIEWING_CONFIG.SPEED_FACTOR * 1000), 120000);
 
-            this.logger.log(`Orchestrator: Найден урок "${unwatchedLesson.title}". Ждем ${waitTime / 1000}с перед просмотром.`);
+            this.logger.log(`Orchestrator: Найден урок "${unwatchedLesson.title}" для ${accountId}. Ждем ${waitTime / 1000}с перед просмотром.`);
 
             return {
                 nextPayload: {
@@ -61,7 +61,7 @@ export class CourseOrchestratorService {
 
         // 4. Уроки кончились. Нужно ли проходить тест?
         if (!payload.skipTests && courseData.status !== CourseStatus.FINISHED) {
-            this.logger.log(`Orchestrator: Уроки пройдены, назначаем тест для ${currentCourseId}`);
+            this.logger.log(`Orchestrator: Уроки пройдены, назначаем тест для ${currentCourseId} для ${accountId}`);
             return {
                 nextPayload: {
                     ...payload,
@@ -75,7 +75,7 @@ export class CourseOrchestratorService {
 
         // 5. Курс полностью завершен (или тесты скипнуты).
         // Удаляем текущий курс из списка и рекурсивно вызываем decideNext для следующего
-        this.logger.log(`Orchestrator: Курс ${currentCourseId} завершен. Переход к следующему.`);
+        this.logger.log(`Orchestrator: Курс ${currentCourseId} завершен для ${accountId}. Переход к следующему.`);
         const nextIds = courseIds.slice(1);
 
         return {

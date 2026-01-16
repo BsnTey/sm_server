@@ -46,18 +46,18 @@ export class CoursePurchaseService {
 
         if (initialPrice > 0) {
             await this.paymentService.changeUserBalance(telegramId, initialPrice, false);
-            this.logger.log(`Списано ${initialPrice}₽ у ${telegramId} (Предоплата за ${targetPoints} б.)`);
+            this.logger.log(`Списано ${initialPrice}₽ у ${telegramId} (Предоплата за ${targetPoints} б.) для ${accountId}`);
         }
 
         try {
             const result = await this.courseWorkService.completeCoursesForAmount(accountId, targetPoints);
             const { earnedPoints, passedCount } = result;
 
-            this.logger.log(`Результат: Пройдено ${passedCount}, Заработано ${earnedPoints} из ${targetPoints}`);
+            this.logger.log(`Результат: Пройдено ${passedCount}, Заработано ${earnedPoints} из ${targetPoints} для ${accountId}`);
 
             if (initialPrice > 0) {
                 if (passedCount === 0 || earnedPoints === 0) {
-                    this.logger.warn(`Полный отказ. Возвращаем всю сумму: ${initialPrice}₽`);
+                    this.logger.warn(`Полный отказ. Возвращаем всю сумму: ${initialPrice}₽ для ${accountId}`);
                     await this.paymentService.changeUserBalance(telegramId, initialPrice, true);
                     throw new Error('Не удалось пройти ни одного курса. Средства возвращены.');
                 }
@@ -66,13 +66,13 @@ export class CoursePurchaseService {
 
                 if (actualPrice < initialPrice) {
                     const refundAmount = initialPrice - actualPrice;
-                    this.logger.log(`Частичный возврат: ${refundAmount}₽`);
+                    this.logger.log(`Частичный возврат: ${refundAmount}₽ для ${accountId}`);
                     await this.paymentService.changeUserBalance(telegramId, refundAmount, true);
                 }
             }
             return { passedCount, earnedPoints };
         } catch (error: any) {
-            this.logger.error(`Критическая ошибка: ${error.message}`);
+            this.logger.error(`Критическая ошибка: ${error.message} для ${accountId}`);
             if (initialPrice > 0 && !error.message.includes('Средства возвращены')) {
                 await this.paymentService.changeUserBalance(telegramId, initialPrice, true);
             }
@@ -102,7 +102,7 @@ export class CoursePurchaseService {
         // 3. Списание средств
         if (price > 0) {
             await this.paymentService.changeUserBalance(telegramId, price, false);
-            this.logger.log(`Списано ${price}₽ у ${telegramId} за постановку в очередь (${targetPoints} б.)`);
+            this.logger.log(`Списано ${price}₽ у ${telegramId} за постановку в очередь (${targetPoints} б.) для ${accountId}`);
         }
 
         try {
@@ -115,11 +115,11 @@ export class CoursePurchaseService {
             return { count, price };
 
         } catch (error: any) {
-            this.logger.error(`Ошибка постановки в очередь: ${error.message}`);
+            this.logger.error(`Ошибка постановки в очередь: ${error.message} для ${accountId}`);
 
             // 5. ROLLBACK: Если не удалось поставить в очередь — возвращаем деньги
             if (price > 0) {
-                this.logger.warn(`Возврат средств ${price}₽ для ${telegramId}`);
+                this.logger.warn(`Возврат средств ${price}₽ для ${telegramId} для ${accountId}`);
                 await this.paymentService.changeUserBalance(telegramId, price, true);
             }
 
