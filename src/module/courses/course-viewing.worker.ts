@@ -11,12 +11,9 @@ import { Job, Queue } from 'bullmq';
 import { courseViewing } from '../../infrastructure/bullmq/bullmq.queues';
 import { INotificationPort } from '@core/ports/notification.port';
 
-@Processor(
-    courseViewing,
-    {
-    concurrency: 10
-    }
-)
+@Processor(courseViewing, {
+    concurrency: 10,
+})
 @Injectable()
 export class CourseViewingWorker extends WorkerHost {
     private readonly logger = new Logger(CourseViewingWorker.name);
@@ -153,7 +150,7 @@ export class CourseViewingWorker extends WorkerHost {
     private async scheduleNextStep(payload: CourseViewingPayload, delayMs: number) {
         await this.viewingQueue.add('process-flow', payload, {
             delay: delayMs,
-            jobId: `flow:${payload.accountId}:${Date.now()}`, // Уникальный ID шага
+            jobId: `flow_${payload.accountId}_${Date.now()}`, // Уникальный ID шага
             attempts: 3,
             backoff: { type: 'exponential', delay: 120000 },
             removeOnComplete: true,
@@ -181,16 +178,13 @@ export class CourseViewingWorker extends WorkerHost {
             }
 
             // Планируем следующий курс
-            await this.scheduleNextStep(
-                { ...payload, courseIds: remainingCourses, currentCourseId: nextCourseId },
-                delayMs,
-            );
+            await this.scheduleNextStep({ ...payload, courseIds: remainingCourses, currentCourseId: nextCourseId }, delayMs);
         } else {
             await this.finishFlow(payload.accountId, payload.telegramId);
         }
     }
 
-    private async finishFlow(accountId: string, telegramId?: string, ) {
+    private async finishFlow(accountId: string, telegramId?: string) {
         this.logger.log(`🎉 Цепочка завершена для ${accountId}`);
         if (!telegramId) return;
         await this.notificationService.notifyUser(telegramId, `✅ Завершено. Проверьте баланс через пару минут.`);
