@@ -89,13 +89,11 @@ export class ProfileUpdate extends BaseUpdate {
 
     @Action('fortune')
     async goToFortune(@Ctx() ctx: WizardContext) {
-        await ctx.deleteMessage();
         await ctx.scene.enter(FORTUNE_BOT_SCENE);
     }
 
     @Action('extension')
     async goToExtension(@Ctx() ctx: WizardContext) {
-        await ctx.deleteMessage();
         await ctx.scene.enter(EXTENSION_SCENE);
     }
 
